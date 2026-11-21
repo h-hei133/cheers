@@ -1,7 +1,6 @@
 import * as fs from "node:fs";
 import { selectSessionReports } from '../reports/projection.js';
 import type { SessionMetadata } from "../schema/sessionMetadataCodec.js";
-import { projectSessionMetadata } from "../schema/sessionMetadataCodec.js";
 import type { Session } from "../schema/sessionRecord.js";
 import { isSessionContextMessage } from '../schema/sessionMessage.js';
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
@@ -9,12 +8,8 @@ import { buildSessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { projectBranchMessages, readTranscriptSnapshot, readTranscriptSnapshotAsync } from "../transcript/sessionTranscript.js";
 import { createTranscriptHeader, type TranscriptEvent } from "../sessionEventCodec.js";
 import { sessionThreadPath } from "../schema/sessionThread.js";
-import { readJsonFileWithRetry, writeJsonFileAtomic } from "./sessionFileStore.js";
 import { reserveSessionLayout, type SessionFileLayout, type SessionStoreLayout } from "./sessionFileLayout.js";
-import {
-  writeSessionState,
-  withSessionMetadataLock,
-} from "./sessionStateStore.js";
+import { readStateSnapshotRequired, writeSessionState } from "./sessionStateStore.js";
 import { projectSessionAnnotations } from '../context/projection.js';
 import { identifyPromptFile, PromptPublicationError, promptIntentPath, readPromptIntent } from './prompt/intent.js';
 import { pathIdentity } from '../../core/workspace/files.js';
@@ -23,8 +18,12 @@ import { parseTranscript } from '../transcript/read.js';
 import { fileVersion, readSessionFileVersion } from './version.js';
 import { projectLoadedSession } from './projection.js';
 import { readSessionSnapshot, readSessionSnapshotAsync, SessionSnapshotConflict, type SessionSnapshotLimits } from './snapshot.js';
+import { activationMetadataText } from './prompt/activation.js';
+import { isResumeCommitted, readSessionRegistryStore } from './currentSessionRegistry.js';
+import { writeSessionMetadataRecord } from './metadata.js';
 
 export { readSessionMetadataRecord } from './snapshot.js';
+export { writeSessionMetadataRecord } from './metadata.js';
 
 export function sessionExistsAtLayout(layout: Pick<SessionFileLayout, "sessionDir">): boolean {
   return fs.existsSync(layout.sessionDir);
@@ -85,30 +84,6 @@ function writeSessionFiles(input: SessionRecordWrite, mode: 'exclusive' | 'exist
   });
 }
 
-export function writeSessionMetadataRecord(input: {
-  readonly session: Session;
-  readonly layout: Pick<SessionFileLayout, "metadataPath" | "stateLockPath">;
-  readonly requireHeld?: boolean;
-}): void {
-  withSessionMetadataLock(input.layout, () => {
-  const metadata = projectSessionMetadata(input.session);
-  // Pinning is owned by session management, independent of an older live view.
-  // Creation and a concurrent catalog read can observe the metadata path
-  // between directory setup and its atomic publication. An optional read keeps
-  // that window equivalent to "no older pin"; a required read turns it into a
-  // false creation failure.
-  const current = readJsonFileWithRetry<SessionMetadata>(input.layout.metadataPath, {
-    required: false,
-    parseErrorDetail: "Failed to load session metadata",
-  });
-  if (current?.id === metadata.id && current.createdAt === metadata.createdAt) {
-    if (current.pinned === true) metadata.pinned = true;
-    else delete metadata.pinned;
-  }
-  writeJsonFileAtomic(input.layout.metadataPath, metadata);
-  }, input.requireHeld);
-}
-
 export function deleteSessionRecord(input: {
   readonly sessionId: string;
   readonly layout: Pick<SessionFileLayout, "sessionDir">;
@@ -126,6 +101,7 @@ interface SessionReadInput {
   readonly limits?: SessionReadLimits;
   readonly salvageTranscript?: boolean;
   readonly signal?: AbortSignal;
+  readonly registryPath?: string;
 }
 
 export interface SessionReadLimits extends SessionSnapshotLimits {
@@ -161,6 +137,26 @@ export function previewPendingSessionRecord(input: SessionReadInput): { snapshot
     };
     const intent = readPromptIntent(input.layout, input.sessionId);
     if (!intent || pathIdentity(input.layout.sessionDir) !== intent.directory) throw new PromptPublicationError('unknown');
+    if (intent.version === 4) {
+      if (!input.registryPath) throw new PromptPublicationError('unknown', 'record');
+      const registryPath = input.registryPath;
+      const readDecision = () => {
+        const registry = readSessionRegistryStore(registryPath);
+        if (registry.readError) throw new PromptPublicationError('unknown', 'record');
+        return isResumeCommitted(registry.store, intent);
+      };
+      const committed = readDecision();
+      const metadata = JSON.parse(activationMetadataText(input.layout, intent, committed));
+      const state = readStateSnapshotRequired(input.layout.statePath);
+      const transcript = readTranscriptSnapshot(input.layout.transcriptPath);
+      const snapshot = projectSessionRecordSnapshot(input, metadata, state, transcript);
+      const assertActivation = () => {
+        if (readDecision() !== committed) throw new PromptPublicationError('unknown', 'record');
+        assertCurrent();
+      };
+      assertActivation();
+      return { snapshot, assertCurrent: assertActivation };
+    }
     const metadata = identifyPromptFile(input.layout.metadataPath, 'metadata', intent.metadata);
     const state = identifyPromptFile(input.layout.statePath, 'state', intent.state);
     const transcript = previewTranscriptAppend(input.layout.transcriptPath, intent.transcript, intent.rows);

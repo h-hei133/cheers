@@ -462,6 +462,22 @@ describe('shell bootstrap', () => {
       terminalReason: before.terminalReason, pendingLifecycle: before.pendingLifecycle });
   });
 
+  it.each(['activation-unknown', 'activation-locked'] as const)('keeps staged startup closed on %s', code => {
+    const sessionManager = new SessionManager();
+    const cwd = fs.mkdtempSync(path.join(fakeHome, 'project-startup-activation-'));
+    const selected = sessionManager.createNew(cwd);
+    const activation = sessionManager.readCurrentSessionSelection(cwd);
+    const startup = prepareShellStartup({ cwd, requestedSessionId: selected.id, runtimeConfig: getRuntimeConfig(cwd),
+      gitContext: getWorkflowGitContext(cwd), sessionManager, renderer: new StreamingRenderer(), emitLifecycleMessages: false });
+    const resume = vi.spyOn(sessionManager, 'tryResume').mockReturnValue(code === 'activation-unknown'
+      ? { ok: false, activation: 'unknown', error: 'Activation is unverified.', recoveryHint: 'Inspect the selection.' }
+      : { ok: true, session: selected, warning: 'The storage lock could not be released.' });
+    try {
+      expect(() => startup.activate()).toThrow(expect.objectContaining({ code }));
+      expect(sessionManager.readCurrentSessionSelection(cwd)).toEqual(activation);
+    } finally { resume.mockRestore(); }
+  });
+
   it('falls back to fresh session when persisted current session cannot be resumed', () => {
     const sessionManager = new SessionManager()
     const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-stale-current-'))
@@ -525,14 +541,26 @@ describe('shell bootstrap', () => {
     expect(result.lifecycleNotices.at(-1)).toContain('Starting a fresh session.')
   })
 
-  it('explains damaged current session pointer stores without restoring stale state', () => {
-    const sessionManager = new SessionManager()
+  it.each([
+    { staged: false, startNewSession: false },
+    { staged: true, startNewSession: false },
+    { staged: false, startNewSession: true },
+    { staged: true, startNewSession: true },
+  ])('starts fresh with a damaged primary registry (staged=$staged, explicit=$startNewSession)', ({ staged, startNewSession }) => {
     const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-current-damaged-'))
+    const legacySession = new SessionManager().createNew(projectRoot, { activate: false })
+    const legacyStorePath = path.join(fakeHome, '.cheer', 'current-session.json')
+    const legacy = JSON.stringify({ schemaVersion: 1, byProjectRoot: {
+      [projectRoot]: { sessionId: legacySession.id, updatedAt: legacySession.updatedAt },
+    } })
+    fs.mkdirSync(path.dirname(legacyStorePath), { recursive: true })
+    fs.writeFileSync(legacyStorePath, legacy, 'utf8')
     const currentStorePath = path.join(fakeHome, '.cheers', 'current-session.json')
-    fs.mkdirSync(path.dirname(currentStorePath), { recursive: true })
     fs.writeFileSync(currentStorePath, '{broken', 'utf8')
 
-    const result = bootstrapShellRuntime({
+    const sessionManager = new SessionManager()
+    const resolve = vi.spyOn(sessionManager, 'resolveCurrentSessionForProject')
+    const input = {
       cwd: projectRoot,
       launchCwd: projectRoot,
       runtimeConfig: getRuntimeConfig(projectRoot),
@@ -540,17 +568,22 @@ describe('shell bootstrap', () => {
       sessionManager,
       renderer: new StreamingRenderer(),
       emitLifecycleMessages: false,
-    })
+      adoptCurrentSession: true,
+      startNewSession,
+    }
+    const result = staged ? prepareShellStartup(input).activate() : bootstrapShellRuntime(input)
 
+    if (startNewSession) expect(resolve).not.toHaveBeenCalled()
+    expect(result.context.session.id).not.toBe(legacySession.id)
     expect(path.resolve(result.context.projectRoot)).toBe(path.resolve(projectRoot))
-    expect(sessionManager.getCurrentSessionForProject(projectRoot)?.id).toBe(
-      result.context.session.id,
-    )
-    expect(result.lifecycleNotices.at(-1)).toContain('Current session pointer ignored:')
+    expect(sessionManager.getSession(result.context.session.id)?.projectRoot).toBe(projectRoot)
+    expect(sessionManager.resolveCurrentSessionForProject(projectRoot)).toMatchObject({ ok: false, reason: 'store-invalid' })
+    expect(fs.readFileSync(currentStorePath, 'utf8')).toBe('{broken')
+    expect(fs.readFileSync(legacyStorePath, 'utf8')).toBe(legacy)
     expect(result.lifecycleNotices.at(-1)).toContain(
       'Current session selection store could not be read',
     )
-    expect(result.lifecycleNotices.at(-1)).toContain('Starting a fresh session.')
+    expect(result.lifecycleNotices.at(-1)).toContain('Starting a fresh session without updating the saved selection.')
   })
 
   it('keeps explicit --session-id precedence over persisted current session pointer', () => {

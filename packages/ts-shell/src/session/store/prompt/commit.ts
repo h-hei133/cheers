@@ -16,6 +16,9 @@ import type { SessionFileLayout } from '../sessionFileLayout.js';
 import { withSessionStateLock } from '../sessionStateStore.js';
 import { readSessionRecordSnapshot } from '../sessionStore.js';
 import { readSessionFileVersion } from '../version.js';
+import { syncStoreDirectory } from '../directory.js';
+import { settleResumeReceipt } from '../currentSessionRegistry.js';
+import { finishActivationMetadata } from './activation.js';
 import { assertNoPromptIntent, encodePromptIntent, hasPromptIntent, identifyPromptFile, promptFileText,
   PromptPublicationError, promptIntentPath, readPromptIntent, type PromptIntent } from './intent.js';
 
@@ -124,13 +127,15 @@ function commitPromptTransaction(
 }
 
 /** Reopen the existing session under its lock and reconcile only the recorded intent. */
-export function recoverSessionPrompt(layout: SessionFileLayout, sessionId: string, beforeReplay?: () => void): void {
+export function recoverSessionPrompt(layout: SessionFileLayout, sessionId: string, registryPath: string, beforeReplay?: () => void): void {
   if (!beforeReplay && !hasPromptIntent(layout)) return;
   try {
     withSessionStateLock(layout, () => {
       beforeReplay?.();
       const intent = readPromptIntent(layout, sessionId);
-      if (intent) finishSessionPrompt(layout, intent);
+      if (intent?.version === 4) {
+        settleResumeReceipt(registryPath, intent, committed => finishActivationMetadata(layout, intent, committed));
+      } else if (intent) finishSessionPrompt(layout, intent);
       else if (beforeReplay) throw new PromptPublicationError('unknown');
     }, lock);
   } catch { throw new PromptPublicationError('unknown'); }
@@ -169,8 +174,5 @@ function finishSessionPrompt(layout: SessionFileLayout, intent: PromptIntent, on
 }
 
 function syncSessionDirectory(layout: SessionFileLayout, directory: string): void {
-  if (pathIdentity(layout.sessionDir) !== directory) throw new PromptPublicationError('unknown');
-  if (process.platform === 'win32') return;
-  const fd = fs.openSync(layout.sessionDir, fs.constants.O_RDONLY | (fs.constants.O_DIRECTORY ?? 0));
-  try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  syncStoreDirectory(layout.sessionDir, directory);
 }

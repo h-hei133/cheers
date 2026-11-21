@@ -5,6 +5,7 @@ import { isRecord } from '../../../core/values/record.js';
 import { decodeTranscriptLine } from '../../sessionEventCodec.js';
 import type { TranscriptAppendSource } from '../../transcript/append.js';
 import type { SessionFileLayout } from '../sessionFileLayout.js';
+import type { SessionActivationIdentity } from '../activation.js';
 
 const MAX_INTENT_BYTES = 192 * 1024 * 1024;
 const MAX_METADATA_BYTES = 1024 * 1024;
@@ -24,6 +25,13 @@ export interface PromptIntent {
 export interface PromptFileChange {
   readonly before: string;
   readonly after: string;
+}
+
+export interface ActivationIntent extends SessionActivationIdentity {
+  readonly version: 4;
+  readonly sessionId: string;
+  readonly directory: string;
+  readonly metadata: PromptFileChange;
 }
 
 export type PromptTransactionKind = 'prompt' | 'outcome' | 'record';
@@ -54,17 +62,28 @@ export function hasPromptIntent(layout: Pick<SessionFileLayout, 'stateLockPath'>
   }
 }
 
-export function readPromptIntent(layout: SessionFileLayout, sessionId: string): PromptIntent | undefined {
+export function readPromptIntent(layout: SessionFileLayout, sessionId: string): PromptIntent | ActivationIntent | undefined {
   const text = readTextFile(promptIntentPath(layout), MAX_INTENT_BYTES);
   if (text === undefined) return undefined;
   const value: unknown = JSON.parse(text);
-  if (!isRecord(value) || (value.version !== 1 && value.version !== 2 && value.version !== 3) || value.sessionId !== sessionId || typeof value.directory !== 'string'
+  if (!isRecord(value) || value.sessionId !== sessionId || typeof value.directory !== 'string'
+    || !isFileChange(value.metadata, MAX_METADATA_BYTES)) throw new PromptPublicationError('unknown');
+  const metadata: unknown = JSON.parse(value.metadata.after);
+  if (!isRecord(metadata) || metadata.id !== sessionId) throw new PromptPublicationError('unknown');
+  if (value.version === 4) {
+    if (typeof value.activationId !== 'string' || !/^[0-9a-f-]{36}$/.test(value.activationId)
+      || typeof value.registryId !== 'string' || !/^[0-9a-f-]{36}$/.test(value.registryId)
+      || typeof metadata.createdAt !== 'string' || typeof metadata.updatedAt !== 'string'
+      || typeof metadata.projectRoot !== 'string') throw new PromptPublicationError('unknown');
+    return value as unknown as ActivationIntent;
+  }
+  if ((value.version !== 1 && value.version !== 2 && value.version !== 3)
     || !isRecord(value.transcript) || typeof value.transcript.identity !== 'string' || typeof value.transcript.bytes !== 'number'
     || !Number.isSafeInteger(value.transcript.bytes) || value.transcript.bytes < 0 || !isDigest(value.transcript.sha256)
     || typeof value.transcript.separator !== 'boolean' || typeof value.rows !== 'string'
-    || !isFileChange(value.metadata, MAX_METADATA_BYTES) || !isFileChange(value.state, MAX_STATE_BYTES)) throw new PromptPublicationError('unknown');
-  const metadata: unknown = JSON.parse(value.metadata.after), state: unknown = JSON.parse(value.state.after);
-  if (!isRecord(metadata) || metadata.id !== sessionId || !isRecord(state) || state.projectRoot !== metadata.projectRoot) {
+    || !isFileChange(value.state, MAX_STATE_BYTES)) throw new PromptPublicationError('unknown');
+  const state: unknown = JSON.parse(value.state.after);
+  if (!isRecord(state) || state.projectRoot !== metadata.projectRoot) {
     throw new PromptPublicationError('unknown');
   }
   if (value.version === 2) {
@@ -128,8 +147,9 @@ function isSettlementIntent(rows: string, metadata: Record<string, unknown>, sta
   }
 }
 
-export function encodePromptIntent(intent: PromptIntent): string {
-  if (!isFileChange(intent.metadata, MAX_METADATA_BYTES) || !isFileChange(intent.state, MAX_STATE_BYTES)) throw new PromptPublicationError('unchanged');
+export function encodePromptIntent(intent: PromptIntent | ActivationIntent): string {
+  if (!isFileChange(intent.metadata, MAX_METADATA_BYTES)
+    || (intent.version !== 4 && !isFileChange(intent.state, MAX_STATE_BYTES))) throw new PromptPublicationError('unchanged');
   if (intent.version === 2 && !isSettlementIntent(intent.rows, JSON.parse(intent.metadata.after), JSON.parse(intent.state.after))) {
     throw new PromptPublicationError('unchanged', 'outcome');
   }

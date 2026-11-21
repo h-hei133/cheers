@@ -16,6 +16,20 @@ export interface SessionActivationOptions {
   readonly captureSelection?: (candidate: CurrentSessionSelectionRecord) => void;
   /** Resume holds the session lock before publishing its metadata under the registry lock. */
   readonly publishMetadata?: () => void;
+  /** An existing session lock owns this prepared metadata until the registry settles it. */
+  readonly prepareMetadata?: (identity: SessionActivationIdentity) => PreparedActivationMetadata;
+  readonly onReleaseError?: () => void;
+}
+
+export interface SessionActivationIdentity {
+  readonly activationId: string;
+  readonly registryId: string;
+}
+
+export interface PreparedActivationMetadata {
+  readonly receipt: string;
+  readonly assertCurrent: () => void;
+  readonly finish: () => void;
 }
 
 export class SessionActivationConflict extends Error {

@@ -35,8 +35,10 @@ describe("entries command", () => {
   }
 
   beforeEach(() => {
-    home = fs.mkdtempSync(path.join(os.tmpdir(), "entries-home-"));
-    workdir = fs.mkdtempSync(path.join(os.tmpdir(), "entries-work-"));
+    const temporaryRoot = path.join(os.tmpdir(), "cheers-test");
+    fs.mkdirSync(temporaryRoot, { recursive: true });
+    home = fs.mkdtempSync(path.join(temporaryRoot, "entries-home-"));
+    workdir = fs.mkdtempSync(path.join(temporaryRoot, "entries-work-"));
     process.env.HOME = home;
     process.env.USERPROFILE = home;
 
@@ -113,6 +115,20 @@ describe("entries command", () => {
     const result = await runEntriesCommand(["nope"], context());
     expect(result.output).toContain("No entry with id `nope`");
     expect(result.output).toContain("silently skip");
+  });
+
+  it("lists readable transcript entries when the saved thread cannot be loaded", async () => {
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    fs.rmSync(layout.statePath);
+    fs.appendFileSync(layout.transcriptPath, "{broken\n");
+
+    const result = await runEntriesCommand([ids[0]!], context());
+
+    expect(result.output).toContain("Leaf: `none`");
+    expect(result.output).not.toContain(`\`${ids[0]}\``);
+    expect(result.output).toContain(`\`${ids[1]}\``);
+    expect(result.output).toContain(`\`${ids[2]}\``);
+    expect((await runEntriesCommand(["tree"], context())).output).toContain("there are no entries");
   });
 
   it("renders the tree with nesting and the leaf", async () => {

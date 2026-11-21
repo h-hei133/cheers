@@ -15,10 +15,7 @@ import { costModel } from "../../core/commands/cost/model.js";
 import { loadCatalog } from "../../core/models/catalogStore.js";
 import { getSessionUsage } from "../../observability/usageTelemetry.js";
 import { readSessionEntries } from "../../session/query/sessionEntries.js";
-import { createSessionStoreLayout, locateExistingSessionLayout } from "../../session/store/sessionFileLayout.js";
-import { readTranscriptEvents } from "../../session/transcript/sessionTranscript.js";
-import { loadSessionRecord } from "../../session/store/sessionStore.js";
-import { readSessionThreadSnapshot } from "../../session/store/threadState.js";
+import { readSessionEntrySnapshot } from "../../session/store/entries.js";
 import { messageToText } from "../../model-adapters/multimodal.js";
 import { configurationAdmission } from "../../core/shell/configuration.js";
 import { openSettings } from "../interactive/settings.js";
@@ -118,19 +115,15 @@ export async function cycleRpcModel(runtimeContext: ShellRuntimeContext): Promis
 }
 
 export async function readRpcEntries(runtimeContext: ShellRuntimeContext, since?: string | number): Promise<Record<string, unknown>> {
-  const layout = locateExistingSessionLayout(createSessionStoreLayout(), runtimeContext.session.id);
-  const events = readTranscriptEvents(layout.transcriptPath);
-  const session = loadSessionRecord({ sessionId: runtimeContext.session.id, layout, cwd: runtimeContext.cwd });
-  const thread = readSessionThreadSnapshot({ session, layout });
-  const leafId = thread.activeLeafId ?? null;
-  if (typeof since === "number") {
-    const result = readSessionEntries(events, leafId);
-    if (result === "unknown-cursor") throw new Error("Unknown session entry cursor.");
-    return { entries: result.entries.slice(Math.max(0, Math.floor(since))), leafId: result.leafId };
+  const selected = runtimeContext.session;
+  const { session, events, thread } = readSessionEntrySnapshot(selected.id, runtimeContext.cwd);
+  if (session.id !== selected.id || session.createdAt !== selected.createdAt || session.projectRoot !== selected.projectRoot) {
+    throw new Error("The selected session changed during the read.");
   }
-  const result = readSessionEntries(events, leafId, since);
+  const result = readSessionEntries(events, thread.activeLeafId ?? null, typeof since === "string" ? since : undefined);
   if (result === "unknown-cursor") throw new Error("Unknown session entry cursor.");
-  return { entries: result.entries, leafId: result.leafId };
+  const entries = typeof since === "number" ? result.entries.slice(Math.max(0, Math.floor(since))) : result.entries;
+  return { entries, leafId: result.leafId };
 }
 
 export function listRpcModels(runtimeContext?: ShellRuntimeContext): readonly Record<string, unknown>[] {

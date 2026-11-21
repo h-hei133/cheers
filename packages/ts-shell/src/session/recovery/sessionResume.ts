@@ -5,7 +5,7 @@ import { projectSessionFileLayout } from '../store/sessionFileLayout.js';
 import { readSessionFileVersion } from '../store/version.js';
 import { withSessionStateLock } from '../store/sessionStateStore.js';
 import { normalizePathIdentity } from '../continuation/roots.js';
-import type { SessionActivationOptions } from '../store/activation.js';
+import type { PreparedActivationMetadata, SessionActivationIdentity, SessionActivationOptions } from '../store/activation.js';
 import { captureActivationGuard } from '../store/activation.js';
 import type { CurrentSessionSelectionRecord } from '../store/currentSelection.js';
 import { PromptPublicationError } from '../store/prompt/intent.js';
@@ -26,13 +26,13 @@ interface SessionResumeCallbacks {
   readonly sessionDir: (sessionId: string) => string;
   readonly loadSession: (sessionId: string) => Session;
   readonly writeSessionMetadata: (session: Session, requireHeld?: boolean) => void;
+  readonly prepareSessionActivation?: (session: Session, identity: SessionActivationIdentity) => PreparedActivationMetadata;
   readonly setCurrentSessionForProject: (
     projectRoot: string,
     sessionId: string,
     options?: SessionActivationOptions,
   ) => void;
   readonly readCurrentSessionSelection?: (projectRoot: string) => CurrentSessionSelectionRecord | undefined;
-  readonly getCurrentSessionForProject?: (projectRoot: string) => Session | null;
   readonly evaluateRecoveryTrustBoundary: (
     session: Session,
   ) => SessionResumeEligibility;
@@ -65,17 +65,17 @@ export function tryResumeSession(
   projectRoot?: string,
   options?: SessionResumeOptions,
 ): SessionResumeResult {
-  let activated: Session | undefined;
-  let activatedVersion: string | undefined;
   let activationStarted = false;
+  let releaseFailed = false;
+  const onReleaseError = () => { releaseFailed = true; };
   let candidate: CurrentSessionSelectionRecord | undefined;
   let publishedSession: Session | undefined;
   let publishedVersion: string | undefined;
   let activationOptions: SessionActivationOptions | undefined;
   try {
-    if (options?.activation) {
-      const capture = options.activation.captureSelection;
-      activationOptions = { guard: captureActivationGuard(options.activation.guard), captureSelection: value => {
+    if (options?.activation || options?.expectedVersion !== undefined) {
+      const capture = options.activation?.captureSelection;
+      activationOptions = { guard: captureActivationGuard(options.activation?.guard), onReleaseError, captureSelection: value => {
         candidate = value;
         capture?.(value);
       } };
@@ -112,26 +112,23 @@ export function tryResumeSession(
       validate();
       if (session.id !== sessionId) throw new Error('The stored session identity does not match the selected session.');
       if (!layout) activationStarted = true;
-      activated = activateSession(callbacks, session, projectRoot, activationOptions, value => {
+      const activated = activateSession(callbacks, session, projectRoot, activationOptions, value => {
         publishedSession = value;
-        if (activationOptions && layout) publishedVersion = readSessionFileVersion(layout);
+        if (layout) publishedVersion = readSessionFileVersion(layout);
       }, layout ? () => {
         validateVersion();
         activationStarted = true;
       } : undefined);
-      if (layout) {
-        activatedVersion = readSessionFileVersion(layout);
-      }
       return { ok: true, session: activated };
     };
-    return layout ? withSessionStateLock(layout, activate, { requireExisting: true }) : activate();
+    return layout ? withSessionStateLock(layout, activate, { requireExisting: true, onReleaseError }) : activate();
   } catch (error) {
     if (error instanceof PromptPublicationError && !activationStarted) {
       return { ok: false, promptPublication: 'unknown', error: error.message,
         recoveryHint: 'Inspect the saved session before retrying.' };
     }
     const versioned = options?.expectedVersion !== undefined || activationOptions?.guard !== undefined;
-    if (publishedSession && candidate && versioned && activationOptions) {
+    if (releaseFailed && publishedSession && candidate && versioned) {
       try {
         const layout = projectSessionFileLayout({ sessionsDir: dirname(callbacks.sessionDir(sessionId)), sessionId });
         const current = callbacks.loadSession(sessionId);
@@ -142,26 +139,11 @@ export function tryResumeSession(
           && current.createdAt === publishedSession.createdAt && current.updatedAt === publishedSession.updatedAt
           && normalizePathIdentity(current.projectRoot) === normalizePathIdentity(publishedSession.projectRoot)
           && unchanged) {
-          return { ok: true, session: current, warning: 'The saved session activation was verified, but its storage lock could not be released. Restart before changing saved sessions.' };
+          return { ok: true, session: { ...current, status: 'active' }, warning: 'The saved session was activated, but its storage lock could not be released. Restart before changing saved sessions.' };
         }
       } catch { /* A missing or replaced activation remains unknown. */ }
-      return { ok: false, activation: 'unknown', error: 'Saved session activation could not be verified after a storage failure.',
-        recoveryHint: 'Restart and inspect the current saved session before continuing.' };
     }
     if (activationStarted && versioned) {
-      // Cleanup can fail after publication. Reread both the exact saved files
-      // and durable selection before adopting that committed activation.
-      try {
-        const layout = projectSessionFileLayout({ sessionsDir: dirname(callbacks.sessionDir(sessionId)), sessionId });
-        const current = activated && callbacks.getCurrentSessionForProject?.(activated.projectRoot || callbacks.cwd());
-        if (activated && activatedVersion && readSessionFileVersion(layout) === activatedVersion
-          && current?.id === activated.id && current.createdAt === activated.createdAt
-          && current.updatedAt === activated.updatedAt
-          && normalizePathIdentity(current.projectRoot) === normalizePathIdentity(activated.projectRoot)) {
-          return { ok: true, session: activated,
-            warning: 'The saved session was activated, but its storage lock could not be released. Restart before changing saved sessions.' };
-        }
-      } catch { /* An unreadable publication remains unknown. */ }
       return { ok: false, activation: 'unknown',
         error: 'Saved session activation could not be verified after a storage failure.',
         recoveryHint: 'Restart and inspect the current saved session before continuing.' };
@@ -192,8 +174,24 @@ function activateSession(callbacks: SessionResumeCallbacks, loaded: Session, pro
     callbacks.writeSessionMetadata(session, validateLockedVersion !== undefined);
     prepared?.(session);
   };
+  let activation = options;
   if (!validateLockedVersion) publishMetadata();
-  callbacks.setCurrentSessionForProject(session.projectRoot || callbacks.cwd(), session.id,
-    validateLockedVersion ? { ...options, publishMetadata } : options);
+  else if (!callbacks.prepareSessionActivation) activation = { ...options, publishMetadata };
+  else activation = { ...options, prepareMetadata: identity => {
+    validateLockedVersion();
+    const proposal = callbacks.prepareSessionActivation!(session, identity);
+    return {
+      ...proposal,
+      assertCurrent: () => {
+        validateLockedVersion();
+        proposal.assertCurrent();
+      },
+      finish: () => {
+        proposal.finish();
+        prepared?.(session);
+      },
+    };
+  } };
+  callbacks.setCurrentSessionForProject(session.projectRoot || callbacks.cwd(), session.id, activation);
   return session;
 }

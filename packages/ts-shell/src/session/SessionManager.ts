@@ -8,7 +8,7 @@
  */
 
 import type { CurrentSessionSelectionResolution } from "./store/currentSelection.js";
-import type { SessionActivationOptions } from './store/activation.js';
+import type { SessionActivationIdentity, SessionActivationOptions } from './store/activation.js';
 import { SESSION_APPROVAL_AUDIT_HISTORY_LIMIT } from "./approval/sessionApprovalMemory.js";
 import { type TranscriptEvent } from "./sessionEventCodec.js";
 import { forkSession, type SessionForkOptions } from './branch/create.js';
@@ -112,10 +112,11 @@ export class SessionManager extends SessionReentrySurface {
       loadSession: (sessionId: string) => this.host.store.load(sessionId),
       writeSessionMetadata: (session: Session, requireHeld?: boolean) =>
         this.host.store.writeSessionMetadata(session, requireHeld),
+      prepareSessionActivation: (session: Session, identity: SessionActivationIdentity) =>
+        this.host.store.prepareSessionActivation(session, identity),
       setCurrentSessionForProject: (projectRoot: string, sessionId: string, options?: SessionActivationOptions) =>
         this.setCurrentSessionForProject(projectRoot, sessionId, options),
       readCurrentSessionSelection: (projectRoot: string) => this.host.store.readCurrentSessionSelection(projectRoot),
-      getCurrentSessionForProject: (projectRoot: string) => this.host.store.getCurrentSessionForProject(projectRoot, { readOnly: true }),
       evaluateRecoveryTrustBoundary: (session: Session) =>
         this.evaluateRecoveryTrustBoundary(session),
       cwd: () => process.cwd(),
@@ -138,10 +139,10 @@ export class SessionManager extends SessionReentrySurface {
   createNewWithId(
     sessionId: string,
     projectRoot: string = process.cwd(),
-    options?: SessionCreationOptions,
+    options?: SessionCreationOptions & { readonly activate?: boolean },
   ): Session {
     return createSessionWithId({
-      callbacks: this.createSessionCreationCallbacks(),
+      callbacks: this.createSessionCreationCallbacks(options?.activate !== false),
       sessionId,
       projectRoot,
       options,

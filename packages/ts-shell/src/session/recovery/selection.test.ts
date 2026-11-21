@@ -6,6 +6,7 @@ import { SessionManager } from '../SessionManager.js';
 import { readSessionNavigation } from '../query/navigation.js';
 import { createSessionStoreLayout, locateExistingSessionLayout } from '../store/sessionFileLayout.js';
 import { SessionStoreAccess } from '../store/sessionStoreAccess.js';
+import { promptIntentPath } from '../store/prompt/intent.js';
 import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import { resumeShellSession } from '../../core/shell/recovery.js';
@@ -17,7 +18,7 @@ import { ConfigState } from '../../config/state.js';
 
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
-  return { ...actual, rmSync: vi.fn(actual.rmSync) };
+  return { ...actual, renameSync: vi.fn(actual.renameSync), rmSync: vi.fn(actual.rmSync) };
 });
 
 let root: string;
@@ -29,6 +30,7 @@ beforeEach(() => {
 afterEach(async () => {
   vi.restoreAllMocks(); vi.unstubAllEnvs();
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  vi.mocked(fileSystem.renameSync).mockImplementation(actual.renameSync).mockClear();
   vi.mocked(fileSystem.rmSync).mockImplementation(actual.rmSync).mockClear();
   actual.rmSync(root, { recursive: true, force: true });
 });
@@ -123,7 +125,31 @@ it('does not expose an admission exception or accept a missing saved preview', a
   expect(test.lines.join('\n')).not.toContain('PRIVATE_ADMISSION_BODY');
 });
 
-it.each(['verified', 'unreadable', 'changed'] as const)(
+it('refuses a transcript change after preparing the resume transaction', async () => {
+  const test = setup();
+  const selection = { sessionId: test.source.id, version: readSessionNavigation(test.source.id, root).version,
+    admission: () => undefined };
+  const rename = (await vi.importActual<typeof import('node:fs')>('node:fs')).renameSync;
+  const marker = promptIntentPath(test.layout);
+  const previousActivation = test.manager.readCurrentSessionSelection(root);
+  const oldMetadata = fs.readFileSync(test.layout.metadataPath);
+  const outsideRow = JSON.stringify({
+    type: 'message', id: 'external-edit', role: 'user', content: 'External edit', timestamp: new Date().toISOString(),
+  }) + '\n';
+  const expectedTranscript = Buffer.concat([fs.readFileSync(test.layout.transcriptPath), Buffer.from(outsideRow)]);
+  vi.mocked(fileSystem.renameSync).mockImplementation((from, to) => {
+    rename(from, to);
+    if (to === marker) fs.appendFileSync(test.layout.transcriptPath, outsideRow);
+  });
+  expect(await test.execute(selection)).toEqual({ resumed: false });
+  expect(test.manager.readCurrentSessionSelection(root)).toEqual(previousActivation);
+  expect(fs.readFileSync(test.layout.metadataPath)).toEqual(oldMetadata);
+  expect(test.manager.getSession(test.source.id)?.id).toBe(test.source.id);
+  expect(fs.existsSync(marker)).toBe(false);
+  expect(fs.readFileSync(test.layout.transcriptPath)).toEqual(expectedTranscript);
+});
+
+it.each(['verified', 'unreadable', 'changed', 'reactivated'] as const)(
   'classifies activation after a storage lock release failure when readback is %s', async readback => {
     const test = setup();
     const selection = { sessionId: test.source.id, version: readSessionNavigation(test.source.id, root).version,
@@ -134,11 +160,12 @@ it.each(['verified', 'unreadable', 'changed'] as const)(
     vi.mocked(fileSystem.rmSync).mockImplementation((file, options) => {
       if (!injected && String(file) === test.layout.stateLockPath) {
         injected = true;
-        pointer = fs.readFileSync(path.join(root, '.cheers', 'current-session.json'));
         if (readback === 'unreadable') fs.renameSync(test.layout.metadataPath, `${test.layout.metadataPath}.unreadable`);
         if (readback === 'changed') fs.appendFileSync(test.layout.transcriptPath, JSON.stringify({
           type: 'message', id: 'late-message', role: 'user', content: 'External change', timestamp: new Date().toISOString(),
         }) + '\n');
+        if (readback === 'reactivated') test.manager.setCurrentSessionForProject(root, test.source.id);
+        pointer = fs.readFileSync(path.join(root, '.cheers', 'current-session.json'));
         throw new Error('PRIVATE_LOCK_RELEASE_BODY');
       }
       return remove(file, options);

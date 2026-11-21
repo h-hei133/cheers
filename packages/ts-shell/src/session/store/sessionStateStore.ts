@@ -62,7 +62,8 @@ export async function readStateSnapshotRequiredAsync(
 export function withSessionStateLock<T>(
   layout: Pick<SessionFileLayout, "stateLockPath">,
   action: () => T,
-  options?: { readonly requireExisting?: boolean; readonly allowPromptIntent?: boolean; readonly recovery?: LockRecovery },
+  options?: { readonly requireExisting?: boolean; readonly allowPromptIntent?: boolean; readonly recovery?: LockRecovery;
+    readonly onReleaseError?: () => void },
 ): T {
   const key = resolve(layout.stateLockPath);
   return withFileLock(layout.stateLockPath, () => {
@@ -70,7 +71,7 @@ export function withSessionStateLock<T>(
     heldStateLocks.add(key);
     try { return action(); }
     finally { heldStateLocks.delete(key); }
-  }, { createParent: !options?.requireExisting, recovery: options?.recovery });
+  }, { createParent: !options?.requireExisting, recovery: options?.recovery, onReleaseError: options?.onReleaseError });
 }
 
 /** Metadata delegates to an existing synchronous state owner; other state lock calls remain nonreentrant. */

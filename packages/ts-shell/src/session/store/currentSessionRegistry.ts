@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import { randomUUID } from 'node:crypto';
+import { dirname } from 'node:path';
 import { withFileLock, writeJsonFileAtomic, writeTextFileAtomic } from "./sessionFileStore.js";
 import type { Session } from "../schema/sessionRecord.js";
 import {
@@ -13,10 +14,17 @@ import {
 import { normalizePathIdentity } from '../continuation/roots.js';
 import { projectCurrentSessionMetadata } from "../sessionMetadataProjection.js";
 import { captureActivationGuard, assertActivationGuard, sameSessionActivation, type SessionActivationOptions } from './activation.js';
+import { hashContent, pathIdentity } from '../../core/workspace/files.js';
+import { syncStoreDirectory } from './directory.js';
+import { encodePromptIntent, PromptPublicationError, type ActivationIntent } from './prompt/intent.js';
 
 export interface SessionRegistryReadResult {
   readonly store: CurrentSessionSelectionStore;
   readonly readError: string | null;
+}
+
+interface MergedSessionRegistryReadResult extends SessionRegistryReadResult {
+  readonly primaryReadError: string | null;
 }
 
 export function readSessionRegistryStore(
@@ -36,12 +44,19 @@ export function readSessionRegistryStore(
  */
 export function readMergedSessionRegistryStore(
   storePaths: readonly string[],
-): SessionRegistryReadResult {
+): MergedSessionRegistryReadResult {
   const merged = createEmptyCurrentSessionSelectionStore();
   let readError: string | null = null;
 
-  for (const storePath of storePaths) {
+  let resumeStoreId: CurrentSessionSelectionStore['resumeStoreId'];
+  let resumeReceipts: CurrentSessionSelectionStore['resumeReceipts'];
+  for (const [index, storePath] of storePaths.entries()) {
     const result = readSessionRegistryStoreAt(storePath);
+    if (index === 0) {
+      if (result.readError) return { ...result, primaryReadError: result.readError };
+      resumeStoreId = result.store.resumeStoreId;
+      resumeReceipts = result.store.resumeReceipts;
+    }
     if (result.readError && !readError) {
       readError = result.readError;
     }
@@ -53,7 +68,11 @@ export function readMergedSessionRegistryStore(
     }
   }
 
-  return { store: merged, readError };
+  return {
+    store: resumeStoreId === undefined ? merged : { ...merged, resumeStoreId, ...(resumeReceipts && { resumeReceipts }) },
+    readError,
+    primaryReadError: null,
+  };
 }
 
 /** Read one project's activation without loading a session or repairing its selection. */
@@ -119,7 +138,7 @@ export function projectCurrentSessionSelectionStore(input: {
   readonly activationId?: string;
 }): CurrentSessionSelectionStore {
   return {
-    schemaVersion: 1,
+    ...input.current,
     byProjectRoot: {
       ...input.current.byProjectRoot,
       [input.normalizedProjectRoot]: {
@@ -143,7 +162,7 @@ export function removeCurrentSessionSelectionFromStore(input: {
   const nextByProjectRoot = { ...input.current.byProjectRoot };
   delete nextByProjectRoot[input.normalizedProjectRoot];
   return {
-    schemaVersion: 1,
+    ...input.current,
     byProjectRoot: nextByProjectRoot,
   };
 }
@@ -265,7 +284,9 @@ export function setCurrentSessionSelection(input: {
     const read = () => readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]);
     assertActivationGuard(guard, read, normalizedProjectRoot);
     const registry = read();
-    if (input.publishMetadata && registry.readError) throw new Error('Current session activation is unavailable.');
+    if (registry.primaryReadError || ((input.publishMetadata || input.prepareMetadata) && registry.readError)) {
+      throw new Error('Current session activation is unavailable.');
+    }
     const current = registry.store;
     const store = projectCurrentSessionSelectionStore({
       current,
@@ -274,7 +295,33 @@ export function setCurrentSessionSelection(input: {
       updatedAt: input.updatedAt,
       activationId: candidate.activationId,
     });
-    if (guard || input.publishMetadata) {
+    if (input.prepareMetadata) {
+      const parent = dirname(input.storePath), identity = pathIdentity(parent);
+      const registryId = current.resumeStoreId ?? randomUUID();
+      if (!current.resumeStoreId || Object.hasOwn(current.resumeReceipts ?? {}, candidate.sessionId)) {
+        // This session's writer holds its lock and has already ruled out a live intent.
+        const initialized = { ...withoutResumeReceipt(current, candidate.sessionId), resumeStoreId: registryId };
+        writeSessionRegistryStore({ storePath: input.storePath, store: initialized });
+        syncStoreDirectory(parent, identity);
+      }
+      const prepared = input.prepareMetadata({ activationId: candidate.activationId, registryId });
+      const committed = { ...store, resumeStoreId: registryId,
+        resumeReceipts: { ...store.resumeReceipts, [candidate.sessionId]: prepared.receipt } };
+      writeTextFileAtomic(input.storePath, JSON.stringify(committed, null, 2), undefined, {
+        createParent: false,
+        beforeRename: () => {
+          assertActivationGuard(guard, read, normalizedProjectRoot);
+          if (pathIdentity(parent) !== identity) throw new Error('Current session registry directory changed.');
+          const primary = readSessionRegistryStoreAt(input.storePath);
+          if (primary.readError || primary.store.resumeStoreId !== registryId) throw new PromptPublicationError('unknown', 'record');
+          prepared.assertCurrent();
+        },
+      });
+      syncStoreDirectory(parent, identity);
+      prepared.finish();
+      writeSessionRegistryStore({ storePath: input.storePath, store: withoutResumeReceipt(committed, candidate.sessionId) });
+      syncStoreDirectory(parent, identity);
+    } else if (guard || input.publishMetadata) {
       let publishMetadata = input.publishMetadata;
       writeTextFileAtomic(input.storePath, JSON.stringify(store, null, 2), undefined, {
         beforeRename: () => {
@@ -284,7 +331,40 @@ export function setCurrentSessionSelection(input: {
         },
       });
     } else writeSessionRegistryStore({ storePath: input.storePath, store });
+  }, { recovery: 'local-dead', onReleaseError: input.onReleaseError });
+}
+
+/** The exact receipt and the selection become durable in the same atomic registry replacement. */
+export function isResumeCommitted(store: CurrentSessionSelectionStore, intent: ActivationIntent): boolean {
+  if (store.resumeStoreId !== intent.registryId) throw new PromptPublicationError('unknown', 'record');
+  const receipt = Object.hasOwn(store.resumeReceipts ?? {}, intent.sessionId) ? store.resumeReceipts![intent.sessionId] : undefined;
+  if (receipt === hashContent(encodePromptIntent(intent))) return true;
+  if (receipt !== undefined || Object.values(store.byProjectRoot).some(selection => selection?.activationId === intent.activationId)) {
+    throw new PromptPublicationError('unknown', 'record');
+  }
+  return false;
+}
+
+export function settleResumeReceipt(storePath: string, intent: ActivationIntent, settle: (committed: boolean) => void): void {
+  withFileLock(`${storePath}.lock`, () => {
+    const current = readSessionRegistryStoreAt(storePath);
+    if (current.readError) throw new PromptPublicationError('unknown', 'record');
+    const committed = isResumeCommitted(current.store, intent);
+    const directory = dirname(storePath), identity = pathIdentity(directory);
+    syncStoreDirectory(directory, identity);
+    settle(committed);
+    if (committed) {
+      writeSessionRegistryStore({ storePath, store: withoutResumeReceipt(current.store, intent.sessionId) });
+      syncStoreDirectory(directory, identity);
+    }
   }, { recovery: 'local-dead' });
+}
+
+function withoutResumeReceipt(store: CurrentSessionSelectionStore, sessionId: string): CurrentSessionSelectionStore {
+  const { resumeReceipts, ...rest } = store;
+  const pending = { ...resumeReceipts };
+  delete pending[sessionId];
+  return Object.keys(pending).length ? { ...rest, resumeReceipts: pending } : rest;
 }
 
 export function clearCurrentSessionSelection(input: {
@@ -299,6 +379,10 @@ export function clearCurrentSessionSelection(input: {
   }
   return withFileLock(`${input.storePath}.lock`, () => {
     const registry = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]);
+    if (registry.primaryReadError) {
+      if (input.expected) return false;
+      throw new Error('Current session activation is unavailable.');
+    }
     const current = registry.store;
     const selected = current.byProjectRoot[input.normalizedProjectRoot]
       ?? current.byProjectRoot[input.normalizedProjectRoot.toLowerCase()];

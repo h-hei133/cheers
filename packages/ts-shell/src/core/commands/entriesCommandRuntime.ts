@@ -1,13 +1,9 @@
 import { entriesSyntax, parseNavigationArgs } from "./navigation/syntax.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
-import { createSessionStoreLayout, locateExistingSessionLayout } from "../../session/store/sessionFileLayout.js";
-import { readTranscriptEvents } from "../../session/transcript/sessionTranscript.js";
-import { readSessionThreadSnapshot } from "../../session/store/threadState.js";
-import { loadSessionRecord } from "../../session/store/sessionStore.js";
+import { readSessionEntrySnapshot, readSessionEntryTranscript } from "../../session/store/entries.js";
 import { readSessionEntries, readSessionTree } from "../../session/query/sessionEntries.js";
 import type { TranscriptEvent } from "../../session/sessionEventCodec.js";
-import type { SessionThreadSnapshot } from "../../session/schema/sessionThread.js";
 
 /**
  * /entries — the session as entries, for something reading it from outside.
@@ -31,33 +27,18 @@ import type { SessionThreadSnapshot } from "../../session/schema/sessionThread.j
 /** Where this session's transcript lives, or nothing when it has none. */
 function transcriptFor(sessionId: string): readonly TranscriptEvent[] {
   try {
-    const layout = locateExistingSessionLayout(createSessionStoreLayout(), sessionId);
-    return readTranscriptEvents(layout.transcriptPath);
+    return readSessionEntryTranscript(sessionId);
   } catch {
     return [];
   }
 }
 
-/**
- * The session's thread, or nothing when it cannot be read.
- *
- * Loaded through the store rather than assembled here: the snapshot's catch-up step
- * reconciles the recorded thread against the session's turns, so it needs the real
- * record. Handing it a stub with only an id threw on the first read — the failure
- * that made `/entries tree` report an internal error instead of a tree.
- */
-function threadFor(sessionId: string, cwd: string): SessionThreadSnapshot | undefined {
+function snapshotFor(sessionId: string, cwd: string) {
   try {
-    const layout = locateExistingSessionLayout(createSessionStoreLayout(), sessionId);
-    const session = loadSessionRecord({ sessionId, layout, cwd });
-    return readSessionThreadSnapshot({ session, layout });
+    return readSessionEntrySnapshot(sessionId, cwd);
   } catch {
     return undefined;
   }
-}
-
-function leafIdFor(sessionId: string, cwd: string): string | null {
-  return threadFor(sessionId, cwd)?.activeLeafId ?? null;
 }
 
 const HELP = [
@@ -81,13 +62,14 @@ export async function runEntriesCommand(
   const sessionId = context.sessionId;
   if (!sessionId) return { kind: "local", output: "No session to read: this command needs a live session." };
   const first = parsed.args[0];
+  const snapshot = snapshotFor(sessionId, context.cwd);
   if (parsed.action.name === "tree") {
-    const snapshot = threadFor(sessionId, context.cwd);
     if (!snapshot) return { kind: "local", output: emptySession(sessionId) };
-    const tree = readSessionTree(snapshot.entries, first);
+    const { thread } = snapshot;
+    const tree = readSessionTree(thread.entries, first);
     if (tree === "unknown-cursor") return { kind: "local", output: unknownCursor(first!) };
     if (tree.length === 0) return { kind: "local", output: emptySession(sessionId) };
-    const lines = ["### Session tree", "", `Leaf: \`${snapshot.activeLeafId ?? "none"}\``, ""];
+    const lines = ["### Session tree", "", `Leaf: \`${thread.activeLeafId ?? "none"}\``, ""];
     const render = (nodes: typeof tree, depth: number): void => {
       for (const node of nodes) {
         lines.push(`${"  ".repeat(depth)}- \`${node.entry.id}\` ${node.entry.role ?? node.entry.kind}`);
@@ -98,8 +80,8 @@ export async function runEntriesCommand(
     return { kind: "local", output: lines.join("\n") };
   }
 
-  const events = transcriptFor(sessionId);
-  const result = readSessionEntries(events, leafIdFor(sessionId, context.cwd), first);
+  const events = snapshot?.events ?? transcriptFor(sessionId);
+  const result = readSessionEntries(events, snapshot?.thread.activeLeafId ?? null, first);
   if (result === "unknown-cursor") return { kind: "local", output: unknownCursor(first!) };
   if (result.entries.length === 0) {
     return {

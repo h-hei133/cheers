@@ -1,6 +1,7 @@
 import type { Session } from "../schema/sessionRecord.js";
 import { PromptPublicationError } from './prompt/intent.js';
 import { SessionSnapshotConflict } from './snapshot.js';
+import { isRecord } from '../../core/values/record.js';
 
 export interface CurrentSessionSelectionRecord {
   readonly sessionId: string;
@@ -12,6 +13,9 @@ export interface CurrentSessionSelectionRecord {
 export interface CurrentSessionSelectionStore {
   readonly schemaVersion: 1;
   readonly byProjectRoot: Record<string, CurrentSessionSelectionRecord>;
+  /** Older writers drop this identity along with the receipts they cannot preserve. */
+  readonly resumeStoreId?: string;
+  readonly resumeReceipts?: Readonly<Record<string, string>>;
 }
 
 export type CurrentSessionSelectionReason =
@@ -71,7 +75,10 @@ export function parseCurrentSessionSelectionStore(
     parsed.schemaVersion !== 1 ||
     !parsed.byProjectRoot ||
     typeof parsed.byProjectRoot !== "object" ||
-    Array.isArray(parsed.byProjectRoot)
+    Array.isArray(parsed.byProjectRoot) ||
+    (parsed.resumeStoreId !== undefined && (typeof parsed.resumeStoreId !== 'string' || !/^[a-f0-9-]{36}$/.test(parsed.resumeStoreId))) ||
+    (parsed.resumeReceipts !== undefined && (!parsed.resumeStoreId || !isRecord(parsed.resumeReceipts)
+      || Object.values(parsed.resumeReceipts).some(receipt => typeof receipt !== 'string' || !/^[a-f0-9]{64}$/.test(receipt))))
   ) {
     return {
       store: createEmptyCurrentSessionSelectionStore(),
@@ -83,6 +90,8 @@ export function parseCurrentSessionSelectionStore(
     store: {
       schemaVersion: 1,
       byProjectRoot: parsed.byProjectRoot,
+      ...(parsed.resumeStoreId === undefined ? {} : { resumeStoreId: parsed.resumeStoreId }),
+      ...(parsed.resumeReceipts === undefined ? {} : { resumeReceipts: parsed.resumeReceipts }),
     },
     readError: null,
   };

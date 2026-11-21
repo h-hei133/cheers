@@ -165,10 +165,18 @@ class ModelReceipt {
 }
 export type SessionModelReceipt = ModelReceipt;
 
-export function writeSessionModel(sessionId: string, selection: SessionModelSelection, baseline: SessionModelEdit, beforeCommit?: () => boolean): SessionModelReceipt {
+export interface SessionModelPublication {
+  readonly publishState?: (snapshot: ReturnType<typeof requiredState>, publish: () => void) => void;
+  readonly committed: (receipt: SessionModelReceipt) => void;
+}
+
+export function writeSessionModel(sessionId: string, selection: SessionModelSelection, baseline: SessionModelEdit, beforeCommit?: () => boolean,
+  publication?: SessionModelPublication): SessionModelReceipt {
   const decoded = decodeSessionModel(selection);
   if (!decoded) throw new SessionModelWriteError('invalid', 'unchanged');
-  return commitModel(sessionId, decoded, baseline, beforeCommit);
+  const receipt = commitModel(sessionId, decoded, baseline, beforeCommit, publication?.publishState);
+  publication?.committed(receipt);
+  return receipt;
 }
 
 /** A no-op has no rollback authority. A restoration receives its own fresh revision. */
@@ -179,7 +187,8 @@ export function restoreSessionModel(receipt: SessionModelReceipt): 'restored' | 
   return 'restored';
 }
 
-function commitModel(sessionId: string, modelSelection: SessionModelSelection | undefined, baseline: SessionModelEdit, beforeCommit?: () => boolean): SessionModelReceipt {
+function commitModel(sessionId: string, modelSelection: SessionModelSelection | undefined, baseline: SessionModelEdit, beforeCommit?: () => boolean,
+  publishState?: SessionModelPublication['publishState']): SessionModelReceipt {
   if (!(baseline instanceof ModelEdit) || baseline.sessionId !== sessionId) throw new SessionModelWriteError('invalid', 'unchanged');
   const layout = layoutFor(sessionId);
   if (layout.statePath !== baseline.statePath) throw new SessionModelWriteError('conflict', 'unchanged');
@@ -200,8 +209,12 @@ function commitModel(sessionId: string, modelSelection: SessionModelSelection | 
       if (modelSelection === undefined) delete next.modelSelection;
       else next.modelSelection = modelSelection;
       if (!sameValue(requiredState(layout.statePath), current)) throw new SessionModelWriteError('conflict', 'unchanged');
-      state = 'unknown'; code = 'write-failed';
-      writeJsonFileAtomic(layout.statePath, next);
+      const publish = () => {
+        state = 'unknown'; code = 'write-failed';
+        writeJsonFileAtomic(layout.statePath, next);
+      };
+      if (publishState) publishState(next, publish);
+      else publish();
       code = 'verification-failed';
       if (!sameValue(requiredState(layout.statePath), next)) throw new SessionModelWriteError('verification-failed', 'unknown');
       receipt = new ModelReceipt(baseline, new ModelEdit(sessionId, layout.statePath, next.projectRoot, next.modelSelection, next.modelRevision), true);

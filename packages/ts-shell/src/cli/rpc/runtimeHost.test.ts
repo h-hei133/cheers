@@ -404,6 +404,46 @@ it.each(['get_fork_messages', 'get_entries', 'get_tree'] as const)(
   },
 );
 
+it('reads the entry cursor and leaf from one saved session snapshot', async () => {
+  const id = context.session.id;
+  manager.addTurn(id, { id: 'first', role: 'user', content: 'Saved question' });
+  manager.addTurn(id, { id: 'second', role: 'assistant', content: 'Saved answer' });
+  const rpc = host();
+  const read = vi.spyOn(fs, 'readFileSync');
+  syncBuiltinESMExports();
+  try {
+    const result = await handleRpcCommand({ type: 'get_entries', since: 'first' }, rpc);
+    expect(result).toMatchObject({ success: true, data: { entries: [{ id: 'second' }], leafId: 'second' } });
+    const reads = read.mock.calls.map(([target]) => target);
+    for (const name of ['metadata.json', 'state.json', 'transcript.jsonl']) {
+      expect(reads.filter(target => target === path.join(manager.getSessionDirPath(id), name))).toHaveLength(1);
+    }
+  } finally { read.mockRestore(); syncBuiltinESMExports(); }
+
+  expect(await handleRpcCommand({ type: 'get_entries', since: 1.9 }, rpc)).toMatchObject({
+    success: true, data: { entries: [{ id: 'second' }], leafId: 'second' },
+  });
+  expect(await handleRpcCommand({ type: 'get_entries', since: 'second' }, rpc)).toMatchObject({
+    success: true, data: { entries: [], leafId: 'second' },
+  });
+  expect(await handleRpcCommand({ type: 'get_entries', since: 'unknown-entry' }, rpc)).toMatchObject({
+    success: false, error: 'Unknown session entry cursor.',
+  });
+});
+
+it.each(['state.json', 'prompt-transaction.json'])('refuses incomplete entry snapshots when %s is invalid', async name => {
+  const id = context.session.id;
+  manager.addTurn(id, { id: 'saved', role: 'user', content: 'Available transcript' });
+  const target = path.join(manager.getSessionDirPath(id), name);
+  fs.writeFileSync(target, '{unfinished');
+
+  const response = await handleRpcCommand({ type: 'get_entries' }, host());
+
+  expect(response.success).toBe(false);
+  expect(response.data).toBeUndefined();
+  expect(fs.readFileSync(target, 'utf8')).toBe('{unfinished');
+});
+
 it('preserves legacy custom read hosts without exposing admission callbacks in response data', async () => {
   const rpc = { ...host(),
     getForkMessages: async () => [{ entryId: 'question', text: 'Editable question' }],

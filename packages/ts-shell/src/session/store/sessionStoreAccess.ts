@@ -2,7 +2,7 @@ import type {
   CurrentSessionSelectionResolution,
   CurrentSessionSelectionRecord,
 } from "./currentSelection.js";
-import type { SessionActivationOptions } from './activation.js';
+import type { SessionActivationIdentity, SessionActivationOptions } from './activation.js';
 import type { Session } from "../schema/sessionRecord.js";
 import type {
   SessionStateSnapshot,
@@ -22,6 +22,7 @@ import {
 import { writeJsonFileAtomic } from "./sessionFileStore.js";
 import { SessionFiles } from './files.js';
 import { SessionStorePaths } from './paths.js';
+import { prepareSessionActivationRecord, writeSessionMetadataRecord } from './metadata.js';
 import {
   SessionCatalog,
   type SessionCatalogDiagnostic,
@@ -34,7 +35,6 @@ import {
   readSessionRecordSnapshot,
   sessionExistsAtLayout,
   type SessionRecordSnapshot,
-  writeSessionMetadataRecord,
 } from "./sessionStore.js";
 import {
   listSessionRecords,
@@ -86,7 +86,7 @@ export class SessionStoreAccess extends SessionStorePaths {
 
   readSnapshot(sessionId: string, options?: { readonly readOnly?: boolean }): SessionRecordSnapshot {
     const layout = locateExistingSessionLayout(this.storeLayout, sessionId);
-    if (!options?.readOnly) recoverSessionPrompt(layout, sessionId);
+    if (!options?.readOnly) recoverSessionPrompt(layout, sessionId, this.storeLayout.currentSessionStorePath);
     return readSessionRecordSnapshot({
       sessionId,
       layout,
@@ -104,6 +104,10 @@ export class SessionStoreAccess extends SessionStorePaths {
       layout: locateExistingSessionLayout(this.storeLayout, session.id),
       requireHeld,
     });
+  }
+
+  prepareSessionActivation(session: Session, identity: SessionActivationIdentity) {
+    return prepareSessionActivationRecord(session, locateExistingSessionLayout(this.storeLayout, session.id), identity);
   }
 
   writeSessionState(
@@ -150,7 +154,7 @@ export class SessionStoreAccess extends SessionStorePaths {
           if (!options) return this.load(sessionId);
           const layout = locateExistingSessionLayout(this.storeLayout, sessionId);
           const input = { sessionId, layout, cwd: process.cwd() };
-          return previewPendingSessionRecord(input)?.snapshot.session ?? loadSessionRecord(input);
+          return previewPendingSessionRecord({ ...input, registryPath: this.storeLayout.currentSessionStorePath })?.snapshot.session ?? loadSessionRecord(input);
         },
         warningState: this.listWarningState,
         warn: (message) => console.warn(message),
