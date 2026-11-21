@@ -167,3 +167,109 @@ it.each(['completed', 'completed_unproven', 'error', 'interrupted'] as const)(
     expect(fs.readFileSync(layout.transcriptPath)).toEqual(after);
   },
 );
+
+it.each(['torn', 'metadata', 'state'] as const)(
+  'reconciles an interrupted addTurn at %s without duplicating the message or losing thread state',
+  stage => {
+    const before = fs.readFileSync(layout.transcriptPath);
+    const content = 'Transactional reply \u{1F9EA} verified';
+    const append = fs.appendFileSync, rename = fs.renameSync;
+    const appendSpy = vi.spyOn(fs, 'appendFileSync').mockImplementation((file, data, options) => {
+      if (stage === 'torn' && typeof file === 'number' && Buffer.isBuffer(data)) {
+        const split = data.indexOf(Buffer.from('\u{1F9EA}')) + 1;
+        if (split <= 0) throw new Error('Expected UTF-8 split fixture.');
+        append(file, data.subarray(0, split), options);
+        throw new Error('Turn append interrupted.');
+      }
+      return append(file, data, options);
+    });
+    const renameSpy = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      if ((stage === 'metadata' && to === layout.metadataPath) || (stage === 'state' && to === layout.statePath)) {
+        throw new Error('Publication interrupted.');
+      }
+      return rename(from, to);
+    });
+    syncBuiltinESMExports();
+    try {
+      expect(() => manager.addTurn(sessionId, { id: 'tx-turn', role: 'assistant', content }))
+        .toThrow(expect.objectContaining({ persistence: 'unknown', kind: 'record' }));
+    } finally { appendSpy.mockRestore(); renameSpy.mockRestore(); syncBuiltinESMExports(); }
+
+    expect(fs.existsSync(promptIntentPath(layout))).toBe(true);
+    const reopened = new SessionManager();
+    const saved = reopened.getSession(sessionId);
+    expect(saved?.turns.map(turn => turn.id)).toEqual(['prior', 'tx-turn']);
+    expect(saved?.turns.at(-1)?.content).toBe(content);
+    expect(fs.existsSync(promptIntentPath(layout))).toBe(false);
+    const state = new SessionStoreAccess().readStateSnapshotRequired(layout.statePath);
+    expect(state.thread?.activeLeafId).toBe('tx-turn');
+    expect(reopened.getTranscriptEvents(sessionId).filter(event => event.type === 'message' && event.id === 'tx-turn')).toHaveLength(1);
+    const after = fs.readFileSync(layout.transcriptPath);
+    expect(after.subarray(0, before.length)).toEqual(before);
+  },
+);
+
+it.each(['markRunStarted', 'markTurnActive', 'markRecoveryReentry', 'saveTerminated', 'updateSessionWorkspaceBinding'] as const)(
+  'recovers an interrupted %s transaction across metadata, state, and transcript',
+  operation => {
+    const nextRoot = path.join(root, 'rebound');
+    fs.mkdirSync(nextRoot, { recursive: true });
+    if (operation === 'markTurnActive' || operation === 'markRecoveryReentry') {
+      manager.persistUserPromptBarrier(sessionId, 'In-flight prompt');
+    }
+    const beforeTranscript = fs.readFileSync(layout.transcriptPath);
+    const rename = fs.renameSync;
+    const spy = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      if (to === layout.statePath) throw new Error('State publication interrupted.');
+      return rename(from, to);
+    });
+    syncBuiltinESMExports();
+    try {
+      const execute = () => {
+        switch (operation) {
+          case 'markRunStarted': return manager.markRunStarted(sessionId, 'Legacy started prompt');
+          case 'markTurnActive': return manager.markTurnActive(sessionId);
+          case 'markRecoveryReentry': return manager.markRecoveryReentry(sessionId, 'mid-turn-reentry');
+          case 'saveTerminated': return manager.saveTerminated(sessionId);
+          case 'updateSessionWorkspaceBinding': return manager.updateSessionWorkspaceBinding(sessionId, {
+            projectRoot: nextRoot,
+            rootMode: 'explicit',
+            requestedWorkspaceRoot: nextRoot,
+            targetPathBase: nextRoot,
+            gitRoot: null,
+          });
+        }
+      };
+      expect(execute).toThrow(expect.objectContaining({ persistence: 'unknown', kind: 'record' }));
+    } finally { spy.mockRestore(); syncBuiltinESMExports(); }
+
+    expect(fs.existsSync(promptIntentPath(layout))).toBe(true);
+    const reopened = new SessionStoreAccess();
+    const saved = reopened.load(sessionId);
+    const state = reopened.readStateSnapshotRequired(layout.statePath);
+    expect(fs.existsSync(promptIntentPath(layout))).toBe(false);
+    const afterTranscript = fs.readFileSync(layout.transcriptPath);
+    if (operation === 'markTurnActive' || operation === 'markRecoveryReentry' || operation === 'updateSessionWorkspaceBinding') {
+      expect(afterTranscript).toEqual(beforeTranscript);
+    } else {
+      expect(afterTranscript.subarray(0, beforeTranscript.length)).toEqual(beforeTranscript);
+    }
+    if (operation === 'markRunStarted') {
+      expect(saved.status).toBe('active');
+      expect(saved.pendingPrompt).toBe('Legacy started prompt');
+    } else if (operation === 'markTurnActive') {
+      expect(state.runPhase).toBe('turn-active');
+    } else if (operation === 'markRecoveryReentry') {
+      expect(saved.status).toBe('active');
+      expect(state.runPhase).toBe('turn-active');
+      expect(state.interruptedKind).toBe('turn');
+    } else if (operation === 'saveTerminated') {
+      expect(saved.status).toBe('terminated');
+      expect(state.runPhase).toBe('idle');
+    } else {
+      expect(saved.projectRoot).toBe(nextRoot);
+      expect(state.projectRoot).toBe(nextRoot);
+      expect(saved.rootMode).toBe('explicit');
+    }
+  },
+);

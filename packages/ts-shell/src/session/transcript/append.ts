@@ -22,10 +22,10 @@ export function captureTranscriptAppend(path: string): TranscriptAppendSource {
 
 /** Continue only the proven byte prefix of one reserved append, including torn UTF-8. */
 export function reconcileTranscriptAppend(path: string, source: TranscriptAppendSource, rows: string, commit = true): boolean {
-  const append = Buffer.from(`${source.separator ? '\n' : ''}${rows}`, 'utf8');
-  return withTranscript(path, commit, (fd, stat) => {
+  const append = rows.length === 0 ? Buffer.alloc(0) : Buffer.from(`${source.separator ? '\n' : ''}${rows}`, 'utf8');
+  return withTranscript(path, commit && append.length > 0, (fd, stat) => {
     const present = verifyAppend(path, fd, stat, source, append);
-    if (!commit) return present === append.length;
+    if (!commit || append.length === 0) return present === append.length;
     if (present < append.length) fs.appendFileSync(fd, append.subarray(present));
     fs.fsyncSync(fd);
     const after = fs.fstatSync(fd);
@@ -37,7 +37,7 @@ export function reconcileTranscriptAppend(path: string, source: TranscriptAppend
 
 /** Read the admitted prefix and pending rows through the same retained descriptor. */
 export function previewTranscriptAppend(path: string, source: TranscriptAppendSource, rows: string): { text: string; complete: boolean } {
-  const appended = `${source.separator ? '\n' : ''}${rows}`;
+  const appended = rows.length === 0 ? '' : `${source.separator ? '\n' : ''}${rows}`;
   const append = Buffer.from(appended, 'utf8');
   return withTranscript(path, false, (fd, stat) => {
     const present = verifyAppend(path, fd, stat, source, append);

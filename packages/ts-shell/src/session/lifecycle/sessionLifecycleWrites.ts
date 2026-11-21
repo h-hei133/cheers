@@ -2,8 +2,9 @@
  * Session lifecycle writes - the state transitions a run records as it goes.
  *
  * A session moves through marks and saves: a run starts, a prompt lands, a turn
- * goes active, an interruption or a terminal outcome is written down. Each one
- * appends a transcript event and rewrites the session state, in that order.
+ * goes active, an interruption or a terminal outcome is written down. Every
+ * multi-file transition commits transcript, metadata, and state through the
+ * single session transaction journal.
  *
  * These live on a base class rather than on the manager so the write path has a
  * home of its own. The manager inherits them, so the call surface is unchanged,
@@ -13,31 +14,27 @@
 
 import { createComponentLogger } from "../../observability/structuredLogger.js";
 import { forgetSessionTodos } from "../../core/commands/todoCommandRuntime.js";
+import { captureCustomMessage } from '../../core/agent/custom.js';
 import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type { QueryRuntimeRecoveryBoundary } from "../../core/query/runtime/state.js";
 import type { DurableLifecycleIndex } from "../../core/tools/toolResultLifecycle.js";
 import type { ApprovalAuditMemoryState } from "../sessionContinuityTypes.js";
-import type { TranscriptEvent } from "../sessionEventCodec.js";
+import {
+  createMessageTranscriptEvent,
+  createTranscriptEntryId,
+  type TranscriptEvent,
+} from "../sessionEventCodec.js";
 import type { Session } from "../schema/sessionRecord.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { ImageContent } from "../../model-adapters/multimodal.js";
 import type {
   SessionStateSnapshot,
-  SessionStateSnapshotOverrides,
   TerminalPersistence,
 } from "../schema/sessionStateSnapshot.js";
 import type { SessionStoreAccess } from "../store/sessionStoreAccess.js";
 import { recordSessionApprovalAuditDecision } from "../approval/sessionApprovalMemory.js";
 import {
-  handleAddTurn,
-  handleMarkRecoveryReentry,
-  handleMarkRunStarted,
-  handleMarkTurnActive,
-  handleSaveTerminated,
-} from "../agent/lifecycle.js";
-import {
   handleAppendQueryEvent,
-  handleAppendTranscriptEvent,
   handleApplyQueryEventToState,
 } from "../agent/persistence.js";
 import { reconcilePendingLifecycleForSession } from "../recovery/sessionRecoveryRuntime.js";
@@ -46,8 +43,19 @@ import { sessionHasConversation } from "../presentation/sessionReentrySurface.js
 import { captureReportWriter } from '../reports/persistence.js';
 import type { ReportWriter } from '../reports/model.js';
 import { SessionCompactionWrites } from '../compaction/writes.js';
-import { commitSessionPrompt, commitSessionSettlement, type SettlementDiagnostic } from '../store/prompt/commit.js';
-import { prepareSessionInterrupted } from './sessionLifecycleStore.js';
+import {
+  commitSessionPrompt,
+  commitSessionRecordTransaction,
+  commitSessionSettlement,
+  type SettlementDiagnostic,
+} from '../store/prompt/commit.js';
+import {
+  prepareSessionInterrupted,
+  prepareSessionRecoveryReentry,
+  prepareSessionRunStarted,
+  prepareSessionTerminated,
+  prepareSessionTurnActive,
+} from './sessionLifecycleStore.js';
 import { prepareSessionCompleted, prepareSessionError } from './sessionTerminalStore.js';
 
 const sessionLogger = createComponentLogger("SessionManager");
@@ -77,34 +85,23 @@ export interface SessionLifecycleWriteHost {
 export abstract class SessionLifecycleWrites extends SessionCompactionWrites {
   protected constructor(protected readonly host: SessionLifecycleWriteHost) { super(host.store); }
 
-  private createSessionLifecycleCallbacks() {
-    return {
-      loadSession: (sessionId: string) => this.host.store.load(sessionId),
-      appendTranscriptEvent: (sessionId: string, event: TranscriptEvent) =>
-        this.appendTranscriptEvent(sessionId, event),
-      writeSessionMetadata: (session: Session) =>
-        this.host.store.writeSessionMetadata(session),
-      writeSessionState: (
-        session: Session,
-        overrides?: SessionStateSnapshotOverrides,
-      ) => this.host.store.writeSessionState(session, overrides),
-      now: () => new Date().toISOString(),
-    };
-  }
-
-  private appendTranscriptEvent(
-    sessionId: string,
-    event: TranscriptEvent,
-  ): void {
-    handleAppendTranscriptEvent(this.host.store, sessionId, event);
-  }
-
   private applyQueryEventToState(sessionId: string, event: QueryEvent): void {
     handleApplyQueryEventToState(this.host.store, sessionId, event);
   }
 
   addTurn(sessionId: string, message: SessionMessage): void {
-    handleAddTurn(this.createSessionLifecycleCallbacks(), sessionId, message);
+    const captured = captureCustomMessage(message);
+    commitSessionRecordTransaction(this.host.store.stateLayout(sessionId), sessionId, (session, timestamp) => {
+      const nextMessage: SessionMessage & { timestamp: string } = {
+        ...captured,
+        timestamp,
+        id: captured.id ?? createTranscriptEntryId('turn'),
+      };
+      return {
+        session: { ...session, turns: [...session.turns, nextMessage], updatedAt: timestamp },
+        events: [createMessageTranscriptEvent(nextMessage)],
+      };
+    });
   }
 
   captureReportWriter(sessionId: string): ReportWriter {
@@ -136,7 +133,8 @@ export abstract class SessionLifecycleWrites extends SessionCompactionWrites {
   }
 
   markRunStarted(sessionId: string, prompt: string): void {
-    handleMarkRunStarted(this.createSessionLifecycleCallbacks(), sessionId, prompt);
+    commitSessionRecordTransaction(this.host.store.stateLayout(sessionId), sessionId,
+      (session, timestamp) => prepareSessionRunStarted(session, timestamp, prompt));
   }
 
   persistUserPromptBarrier(sessionId: string, prompt: string, metadata?: Record<string, unknown>, images?: readonly ImageContent[], admission?: () => void): void {
@@ -144,18 +142,16 @@ export abstract class SessionLifecycleWrites extends SessionCompactionWrites {
   }
 
   markTurnActive(sessionId: string): void {
-    handleMarkTurnActive(this.createSessionLifecycleCallbacks(), sessionId);
+    commitSessionRecordTransaction(this.host.store.stateLayout(sessionId), sessionId,
+      (session, timestamp) => prepareSessionTurnActive(session, timestamp));
   }
 
   markRecoveryReentry(
     sessionId: string,
     boundary: QueryRuntimeRecoveryBoundary,
   ): void {
-    handleMarkRecoveryReentry(
-      this.createSessionLifecycleCallbacks(),
-      sessionId,
-      boundary,
-    );
+    commitSessionRecordTransaction(this.host.store.stateLayout(sessionId), sessionId,
+      (session, timestamp) => prepareSessionRecoveryReentry(session, timestamp, boundary));
   }
 
   saveInterrupted(
@@ -191,7 +187,8 @@ export abstract class SessionLifecycleWrites extends SessionCompactionWrites {
    * that restores nothing.
    */
   saveTerminated(sessionId: string): void {
-    handleSaveTerminated(this.createSessionLifecycleCallbacks(), sessionId);
+    commitSessionRecordTransaction(this.host.store.stateLayout(sessionId), sessionId,
+      (session, timestamp) => prepareSessionTerminated(session, timestamp));
     if (this.discardIfEmpty(sessionId)) return;
   }
 

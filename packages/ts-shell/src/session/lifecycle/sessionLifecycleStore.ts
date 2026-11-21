@@ -24,6 +24,12 @@ interface SessionLifecycleCallbacks {
   readonly now: () => string;
 }
 
+export interface SessionLifecycleTransition {
+  readonly session: Session;
+  readonly events: readonly TranscriptEvent[];
+  readonly overrides: SessionStateSnapshotOverrides;
+}
+
 /**
  * The subject line of a session, derived from its first prompt.
  *
@@ -53,56 +59,94 @@ export function deriveSessionTitleFromPrompt(prompt: string): string {
   return title.join("");
 }
 
+export function prepareSessionRunStarted(
+  session: Session,
+  timestamp: string,
+  prompt: string,
+): SessionLifecycleTransition {
+  session.status = "active";
+  delete session.lastError;
+  session.pendingPrompt = prompt;
+  session.updatedAt = timestamp;
+  if (!session.title?.trim()) {
+    const derived = deriveSessionTitleFromPrompt(prompt);
+    if (derived) session.title = derived;
+  }
+  return {
+    session,
+    events: [createLifecycleTranscriptEvent({ event: "run-started", timestamp: session.updatedAt, detail: prompt })],
+    overrides: {
+      pendingPromptEntryId: undefined,
+      terminalReason: undefined,
+      terminalClassification: undefined,
+      terminalReasonCode: undefined,
+      lastContinuationReason: undefined,
+      pendingLifecycle: createEmptyLifecycleIndex(),
+    },
+  };
+}
+
 export function markSessionRunStarted(
   callbacks: SessionLifecycleCallbacks,
   sessionId: string,
   prompt: string,
 ): void {
-  const session = callbacks.loadSession(sessionId);
-  session.status = "active";
+  const prepared = prepareSessionRunStarted(callbacks.loadSession(sessionId), callbacks.now(), prompt);
+  for (const event of prepared.events) callbacks.appendTranscriptEvent(sessionId, event);
+  callbacks.writeSessionMetadata(prepared.session);
+  callbacks.writeSessionState(prepared.session, prepared.overrides);
+}
+
+export function prepareSessionTurnActive(
+  session: Session,
+  timestamp: string,
+): SessionLifecycleTransition {
   delete session.lastError;
-  session.pendingPrompt = prompt;
-  session.updatedAt = callbacks.now();
-  if (!session.title?.trim()) {
-    const derived = deriveSessionTitleFromPrompt(prompt);
-    if (derived) session.title = derived;
-  }
-  callbacks.appendTranscriptEvent(
-    sessionId,
-    createLifecycleTranscriptEvent({
-      event: "run-started",
-      timestamp: session.updatedAt,
-      detail: prompt,
-    }),
-  );
-  callbacks.writeSessionMetadata(session);
-  callbacks.writeSessionState(session, {
-    pendingPromptEntryId: undefined,
-    terminalReason: undefined,
-    terminalClassification: undefined,
-    terminalReasonCode: undefined,
-    lastContinuationReason: undefined,
-    pendingLifecycle: createEmptyLifecycleIndex(),
-  });
+  session.updatedAt = timestamp;
+  return {
+    session,
+    events: [],
+    overrides: {
+      runPhase: "turn-active",
+      interruptedKind: undefined,
+      terminalReason: undefined,
+      terminalClassification: undefined,
+      terminalReasonCode: undefined,
+      lastContinuationReason: undefined,
+      pendingLifecycle: createEmptyLifecycleIndex(),
+    },
+  };
 }
 
 export function markSessionTurnActive(
   callbacks: SessionLifecycleCallbacks,
   sessionId: string,
 ): void {
-  const session = callbacks.loadSession(sessionId);
+  const prepared = prepareSessionTurnActive(callbacks.loadSession(sessionId), callbacks.now());
+  callbacks.writeSessionMetadata(prepared.session);
+  callbacks.writeSessionState(prepared.session, prepared.overrides);
+}
+
+export function prepareSessionRecoveryReentry(
+  session: Session,
+  timestamp: string,
+  boundary: QueryRuntimeRecoveryBoundary,
+): SessionLifecycleTransition {
+  session.status = "active";
   delete session.lastError;
-  session.updatedAt = callbacks.now();
-  callbacks.writeSessionMetadata(session);
-  callbacks.writeSessionState(session, {
-    runPhase: "turn-active",
-    interruptedKind: undefined,
-    terminalReason: undefined,
-    terminalClassification: undefined,
-    terminalReasonCode: undefined,
-    lastContinuationReason: undefined,
-    pendingLifecycle: createEmptyLifecycleIndex(),
-  });
+  session.updatedAt = timestamp;
+  return {
+    session,
+    events: [],
+    overrides: {
+      runPhase: boundary === "mid-turn-reentry" ? "turn-active" : "prompt-persisted",
+      interruptedKind: boundary === "mid-turn-reentry" ? "turn" : "prompt",
+      terminalReason: undefined,
+      terminalClassification: undefined,
+      terminalReasonCode: undefined,
+      lastContinuationReason: undefined,
+    },
+  };
 }
 
 export function markSessionRecoveryReentry(
@@ -110,20 +154,9 @@ export function markSessionRecoveryReentry(
   sessionId: string,
   boundary: QueryRuntimeRecoveryBoundary,
 ): void {
-  const session = callbacks.loadSession(sessionId);
-  session.status = "active";
-  delete session.lastError;
-  session.updatedAt = callbacks.now();
-  callbacks.writeSessionMetadata(session);
-  callbacks.writeSessionState(session, {
-    runPhase:
-      boundary === "mid-turn-reentry" ? "turn-active" : "prompt-persisted",
-    interruptedKind: boundary === "mid-turn-reentry" ? "turn" : "prompt",
-    terminalReason: undefined,
-    terminalClassification: undefined,
-    terminalReasonCode: undefined,
-    lastContinuationReason: undefined,
-  });
+  const prepared = prepareSessionRecoveryReentry(callbacks.loadSession(sessionId), callbacks.now(), boundary);
+  callbacks.writeSessionMetadata(prepared.session);
+  callbacks.writeSessionState(prepared.session, prepared.overrides);
 }
 
 export function saveSessionInterrupted(
@@ -154,30 +187,35 @@ export function prepareSessionInterrupted(
   } };
 }
 
+export function prepareSessionTerminated(
+  session: Session,
+  timestamp: string,
+): SessionLifecycleTransition {
+  session.status = "terminated";
+  delete session.lastError;
+  delete session.pendingPrompt;
+  session.updatedAt = timestamp;
+  return {
+    session,
+    events: [createLifecycleTranscriptEvent({ event: "run-terminated", timestamp: session.updatedAt })],
+    overrides: {
+      runPhase: "idle",
+      interruptedKind: undefined,
+      terminalReason: undefined,
+      terminalClassification: undefined,
+      terminalReasonCode: undefined,
+      lastContinuationReason: undefined,
+      pendingLifecycle: createEmptyLifecycleIndex(),
+    },
+  };
+}
+
 export function saveSessionTerminated(
   callbacks: SessionLifecycleCallbacks,
   sessionId: string,
 ): void {
-  const session = callbacks.loadSession(sessionId);
-  session.status = "terminated";
-  delete session.lastError;
-  delete session.pendingPrompt;
-  session.updatedAt = callbacks.now();
-  callbacks.appendTranscriptEvent(
-    sessionId,
-    createLifecycleTranscriptEvent({
-      event: "run-terminated",
-      timestamp: session.updatedAt,
-    }),
-  );
-  callbacks.writeSessionMetadata(session);
-  callbacks.writeSessionState(session, {
-    runPhase: "idle",
-    interruptedKind: undefined,
-    terminalReason: undefined,
-    terminalClassification: undefined,
-    terminalReasonCode: undefined,
-    lastContinuationReason: undefined,
-    pendingLifecycle: createEmptyLifecycleIndex(),
-  });
+  const prepared = prepareSessionTerminated(callbacks.loadSession(sessionId), callbacks.now());
+  for (const event of prepared.events) callbacks.appendTranscriptEvent(sessionId, event);
+  callbacks.writeSessionMetadata(prepared.session);
+  callbacks.writeSessionState(prepared.session, prepared.overrides);
 }

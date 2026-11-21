@@ -41,6 +41,9 @@ import {
   type SessionResumeResult,
 } from "./recovery/sessionResume.js";
 import type { ReplayPlan } from "./replay/sessionReplayFacade.js";
+import { commitSessionRecordTransaction } from './store/prompt/commit.js';
+import { migrateSessionTranscript, type TranscriptMigrationOptions, type TranscriptMigrationResult } from './store/migration/transcript.js';
+export type { TranscriptMigrationOptions, TranscriptMigrationResult } from './store/migration/transcript.js';
 export type { CurrentSessionSelectionResolution } from "./store/currentSelection.js";
 export type {
   ApprovalAuditMemoryState,
@@ -201,6 +204,11 @@ export class SessionManager extends SessionReentrySurface {
     return session;
   }
 
+  /** Preview or explicitly apply a transcript format change for this saved session. */
+  migrateTranscript(sessionId: string, options: TranscriptMigrationOptions = {}): TranscriptMigrationResult {
+    return migrateSessionTranscript(() => this.host.store.stateLayout(sessionId), sessionId, options);
+  }
+
   rebindSessionProjectRoot(sessionId: string, nextProjectRoot: string,
     options?: SessionRootRebindOptions,
   ): Session {
@@ -239,14 +247,14 @@ export class SessionManager extends SessionReentrySurface {
       readonly gitRoot?: string | null;
     },
   ): Session {
-    const session = this.host.store.load(sessionId);
-    applySessionWorkspaceBinding({
-      session,
-      binding,
-      updatedAt: new Date().toISOString(),
-    });
-    this.host.store.writeSessionMetadata(session);
-    this.host.store.writeSessionState(session);
+    const session = commitSessionRecordTransaction(
+      this.host.store.stateLayout(sessionId),
+      sessionId,
+      (current, timestamp) => {
+        applySessionWorkspaceBinding({ session: current, binding, updatedAt: timestamp });
+        return { session: current };
+      },
+    );
     this.setCurrentSessionForProject(session.projectRoot, session.id);
     return session;
   }

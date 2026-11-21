@@ -51,29 +51,45 @@ export function commitSessionSettlement(
   });
 }
 
+/** Commit any multi-file turn, lifecycle, or workspace-binding update through the single transaction journal. */
+export function commitSessionRecordTransaction(
+  layout: SessionFileLayout, sessionId: string,
+  prepare: (session: Session, timestamp: string) => {
+    readonly session: Session;
+    readonly events?: readonly TranscriptEvent[];
+    readonly overrides?: SessionStateSnapshotOverrides;
+  },
+  admission?: () => void,
+): Session {
+  return commitPromptTransaction(layout, sessionId, 3, (session, timestamp) => {
+    const prepared = prepare(session, timestamp);
+    return { session: prepared.session, events: prepared.events ?? [], overrides: prepared.overrides ?? {} };
+  }, admission);
+}
+
 function commitPromptTransaction(
   layout: SessionFileLayout, sessionId: string, journalVersion: PromptIntent['version'],
   prepare: (session: Session, timestamp: string) => {
     session: Session; events: readonly TranscriptEvent[]; overrides: SessionStateSnapshotOverrides;
   },
   admission?: () => void,
-): void {
-  const kind = journalVersion === 1 ? 'prompt' : 'outcome';
+): Session {
+  const kind = journalVersion === 1 ? 'prompt' : journalVersion === 2 ? 'outcome' : 'record';
   let attempted = false;
   let persisted = false;
   let cleanupFailed = false;
   try {
-    withSessionStateLock(layout, () => {
+    return withSessionStateLock(layout, () => {
       assertNoPromptIntent(layout);
       const directory = pathIdentity(layout.sessionDir);
       const version = readSessionFileVersion(layout);
       const metadataBefore = hashContent(promptFileText(layout.metadataPath, 'metadata'));
       const stateBefore = hashContent(promptFileText(layout.statePath, 'state'));
       const current = readSessionRecordSnapshot({ layout, sessionId, cwd: process.cwd() });
-      if (current.session.id !== sessionId || current.transcriptTruncated || current.warnings.length) throw new PromptPublicationError('unchanged');
+      if (current.session.id !== sessionId || current.transcriptTruncated || current.warnings.length) throw new PromptPublicationError('unchanged', kind);
       const transcript = captureTranscriptAppend(layout.transcriptPath);
       const prepared = prepare(current.session, new Date().toISOString());
-      const rows = `${prepared.events.map(encodeTranscriptEvent).join('\n')}\n`;
+      const rows = prepared.events.length ? `${prepared.events.map(encodeTranscriptEvent).join('\n')}\n` : '';
       const metadata = JSON.stringify(projectSessionMetadata(prepared.session), null, 2);
       const snapshot = buildSessionStateSnapshot(prepared.session, current.state, prepared.overrides);
       persistSessionUsage(sessionId, current.state.usage, usage => {
@@ -86,7 +102,7 @@ function commitPromptTransaction(
           beforeRename: () => {
             admission?.();
             assertNoPromptIntent(layout);
-            if (pathIdentity(layout.sessionDir) !== directory || readSessionFileVersion(layout) !== version) throw new PromptPublicationError('unchanged');
+            if (pathIdentity(layout.sessionDir) !== directory || readSessionFileVersion(layout) !== version) throw new PromptPublicationError('unchanged', kind);
           },
           onRenameStart: () => { attempted = true; },
         });
@@ -98,7 +114,8 @@ function commitPromptTransaction(
           cleanupFailed = true;
         }
       });
-      if (cleanupFailed) throw new PromptPublicationError('persisted');
+      if (cleanupFailed) throw new PromptPublicationError('persisted', kind);
+      return prepared.session;
     }, lock);
   } catch (error) {
     if (!attempted && error instanceof PromptPublicationError && error.persistence === 'unknown') throw error;

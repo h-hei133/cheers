@@ -10,9 +10,10 @@ import { fileVersion } from '../version.js';
 const MAX_INTENT_BYTES = 192 * 1024 * 1024;
 const MAX_METADATA_BYTES = 1024 * 1024;
 const MAX_STATE_BYTES = 64 * 1024 * 1024;
+const RECORD_STATUSES = new Set(['active', 'interrupted', 'completed', 'completed_unproven', 'error', 'terminated']);
 
 export interface PromptIntent {
-  readonly version: 1 | 2;
+  readonly version: 1 | 2 | 3;
   readonly sessionId: string;
   readonly directory: string;
   readonly transcript: TranscriptAppendSource;
@@ -26,9 +27,11 @@ export interface PromptFileChange {
   readonly after: string;
 }
 
+export type PromptTransactionKind = 'prompt' | 'outcome' | 'record';
+
 export class PromptPublicationError extends Error {
-  constructor(readonly persistence: 'unchanged' | 'unknown' | 'persisted', readonly kind: 'prompt' | 'outcome' = 'prompt') {
-    const subject = kind === 'prompt' ? 'prompt' : 'prompt outcome';
+  constructor(readonly persistence: 'unchanged' | 'unknown' | 'persisted', readonly kind: PromptTransactionKind = 'prompt') {
+    const subject = kind === 'prompt' ? 'prompt' : kind === 'outcome' ? 'prompt outcome' : 'session update';
     super(persistence === 'persisted' ? `The ${subject} was saved. Reopen the saved session before continuing.`
       : persistence === 'unknown' ? `${subject[0]!.toUpperCase()}${subject.slice(1)} persistence is unknown. Reopen the saved session to check it.`
       : `The ${subject} could not be saved.`);
@@ -67,7 +70,7 @@ export function readPromptIntent(layout: SessionFileLayout, sessionId: string): 
   const text = readTextFile(promptIntentPath(layout), MAX_INTENT_BYTES);
   if (text === undefined) return undefined;
   const value: unknown = JSON.parse(text);
-  if (!isRecord(value) || (value.version !== 1 && value.version !== 2) || value.sessionId !== sessionId || typeof value.directory !== 'string'
+  if (!isRecord(value) || (value.version !== 1 && value.version !== 2 && value.version !== 3) || value.sessionId !== sessionId || typeof value.directory !== 'string'
     || !isRecord(value.transcript) || typeof value.transcript.identity !== 'string' || typeof value.transcript.bytes !== 'number'
     || !Number.isSafeInteger(value.transcript.bytes) || value.transcript.bytes < 0 || !isDigest(value.transcript.sha256)
     || typeof value.transcript.separator !== 'boolean' || typeof value.rows !== 'string'
@@ -78,6 +81,10 @@ export function readPromptIntent(layout: SessionFileLayout, sessionId: string): 
   }
   if (value.version === 2) {
     if (!isSettlementIntent(value.rows, metadata, state)) throw new PromptPublicationError('unknown', 'outcome');
+    return value as unknown as PromptIntent;
+  }
+  if (value.version === 3) {
+    if (!isRecordIntent(value.rows, metadata, state)) throw new PromptPublicationError('unknown', 'record');
     return value as unknown as PromptIntent;
   }
   const [lifecycle, message, end, extra] = value.rows.split('\n', 4);
@@ -91,6 +98,20 @@ export function readPromptIntent(layout: SessionFileLayout, sessionId: string): 
     throw new PromptPublicationError('unknown');
   }
   return value as unknown as PromptIntent;
+}
+
+function isRecordIntent(rows: string, metadata: Record<string, unknown>, state: Record<string, unknown>): boolean {
+  if (typeof metadata.updatedAt !== 'string' || typeof state.status !== 'string' || !RECORD_STATUSES.has(state.status)) return false;
+  if (rows === '') return true;
+  const lines = rows.split('\n', 3);
+  if (lines.length !== 2 || lines[1] !== '') return false;
+  const event = decodeTranscriptLine(lines[0]!);
+  if (event.timestamp !== metadata.updatedAt) return false;
+  if (event.type === 'message') return typeof event.id === 'string' && event.id.length > 0;
+  if (event.type !== 'lifecycle') return false;
+  if (event.event === 'run-started') return state.status === 'active' && state.pendingPrompt === event.detail;
+  if (event.event === 'run-terminated') return state.status === 'terminated' && state.runPhase === 'idle' && state.pendingPrompt === undefined;
+  return false;
 }
 
 function isSettlementIntent(rows: string, metadata: Record<string, unknown>, state: Record<string, unknown>): boolean {
@@ -123,6 +144,9 @@ export function encodePromptIntent(intent: PromptIntent): string {
   if (!isFileChange(intent.metadata, MAX_METADATA_BYTES) || !isFileChange(intent.state, MAX_STATE_BYTES)) throw new PromptPublicationError('unchanged');
   if (intent.version === 2 && !isSettlementIntent(intent.rows, JSON.parse(intent.metadata.after), JSON.parse(intent.state.after))) {
     throw new PromptPublicationError('unchanged', 'outcome');
+  }
+  if (intent.version === 3 && !isRecordIntent(intent.rows, JSON.parse(intent.metadata.after), JSON.parse(intent.state.after))) {
+    throw new PromptPublicationError('unchanged', 'record');
   }
   const text = JSON.stringify(intent);
   if (Buffer.byteLength(text) > MAX_INTENT_BYTES) throw new PromptPublicationError('unchanged');
