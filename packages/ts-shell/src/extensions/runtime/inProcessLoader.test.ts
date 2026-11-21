@@ -23,25 +23,38 @@ afterEach(() => {
 })
 
 describe('in-process TS/JS extension loader with VIRTUAL_MODULES', () => {
-  it('refuses session model control in an installed script before contacting the host', async () => {
+  it('refuses session registrations and settings in installed scripts before contacting the host', async () => {
     const dir = inputWorkerDirectory();
     const file = path.join(dir, 'effort.ts');
     const setThinkingLevel = vi.fn(async () => ({ status: 'applied' as const, level: 'high' as const }));
+    const setModel = vi.fn(async () => ({ status: 'applied' as const, model: 'example' }));
+    const setActiveTools = vi.fn();
     const sendMessage = vi.fn();
     fs.writeFileSync(file, `export default api => api.on('session_start', async () => {
-      try { await api.setThinkingLevel('high'); }
-      catch (error) {
-        if (error instanceof Error && error.message.includes('no session model control')) await api.sendMessage('refused');
+      for (const [name, perform, diagnostic] of [
+        ['effort', () => api.setThinkingLevel('high'), 'no session model control'],
+        ['model', () => api.setModel('example'), 'no session model control'],
+        ['tools', () => api.setActiveTools(['read']), 'no session tool selection control'],
+        ['provider', () => api.registerProvider('example', {}), 'Provider registration is unavailable'],
+        ['server', () => api.registerMcpServer('example', {}), 'MCP server registration is unavailable'],
+        ['renderer', () => api.registerMessageRenderer('example', () => 'example'), 'Message renderer registration is unavailable'],
+      ]) {
+        try { await perform(); }
+        catch (error) {
+          if (error instanceof Error && error.message.includes(diagnostic)) await api.sendMessage(name);
+        }
       }
     });`);
     const result = await executeInProcessScript({ root: dir, scriptFile: file,
       record: { manifest: { name: 'effort', version: '1' }, source: 'fixture', digest: 'a'.repeat(64) } as VersionRecord,
-      argv: [], denyRules: () => [], context: { workspaceRoot: dir, taskId: 'effort' }, host: { setThinkingLevel, sendMessage },
+      argv: [], denyRules: () => [], context: { workspaceRoot: dir, taskId: 'effort' }, host: { setThinkingLevel, setModel, setActiveTools, sendMessage },
       invoke: { kind: 'event', event: 'session_start', payload: { type: 'session_start', sessionId: 'effort', workspaceRoot: dir, reason: 'startup' } },
     });
     expect(result.success).toBe(true);
-    expect(sendMessage).toHaveBeenCalledWith('refused');
+    expect(sendMessage.mock.calls).toEqual(['effort', 'model', 'tools', 'provider', 'server', 'renderer'].map(name => [name]));
     expect(setThinkingLevel).not.toHaveBeenCalled();
+    expect(setModel).not.toHaveBeenCalled();
+    expect(setActiveTools).not.toHaveBeenCalled();
   });
 
   it.each(['then-getter', 'thenable', 'constructor-getter', 'then-own', 'species', 'mixed-decision'] as const)(

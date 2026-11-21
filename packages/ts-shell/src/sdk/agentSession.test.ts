@@ -7,6 +7,8 @@ import { createAgentSession, DefaultResourceLoader, getRuntimeConfig, type Exten
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../session/model/state.js';
 import { sessionMcpDefinitions } from '../core/catalog/mcp.js';
 import { renderCustomMessage } from '../core/catalog/renderers.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { projectTrust } from '../core/security/projectTrust.js';
 
 const tempDirs: string[] = [];
 const originalHome = process.env.HOME;
@@ -111,6 +113,41 @@ describe("DefaultResourceLoader", () => {
 });
 
 describe("createAgentSession & AgentSession", () => {
+  it('keeps a caller-owned MCP connection usable by two SDK sessions and after their disposal', async () => {
+    const { work } = makeEnv();
+    const name = 'configured-server';
+    fs.writeFileSync(path.join(work, '.cheers.mcp.json'), JSON.stringify({ mcpServers: { [name]: { url: 'http://127.0.0.1:8009/mcp' } } }));
+    const gateway = new CoreMcpGateway(work);
+    const trust = vi.spyOn(projectTrust, 'isProjectUntrusted').mockReturnValue(false);
+    const connect = vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+    const capabilities = vi.spyOn(Client.prototype, 'getServerCapabilities').mockReturnValue({ tools: {} });
+    const request = vi.spyOn(Client.prototype, 'request').mockImplementation(async input => input.method === 'tools/list'
+      ? { tools: [{ name: 'inspect', inputSchema: { type: 'object' } }] }
+      : { content: [{ type: 'text', text: 'answer' }] });
+    const loader = new DefaultResourceLoader({ cwd: work, noContextFiles: true, extensionFactories: [api => {
+      api.registerMessageRenderer('custom-note', () => 'Configured SDK note');
+    }] });
+    const sessions: Array<Awaited<ReturnType<typeof createAgentSession>>['session']> = [];
+    try {
+      await loader.reload();
+      sessions.push((await createAgentSession({ cwd: work, mcpGateway: gateway })).session);
+      sessions.push((await createAgentSession({ cwd: work, mcpGateway: gateway, resourceLoader: loader })).session);
+      const snapshot = await gateway.snapshot(undefined, undefined, candidate => candidate === name);
+      expect(snapshot.tools.map(tool => tool.qualifiedName)).toEqual([`mcp__${name}__inspect`]);
+      const contractId = snapshot.tools[0]?.contractId;
+      expect(contractId).toBeTruthy();
+      for (const session of sessions) {
+        await session.dispose();
+        await expect(gateway.invokeTool(name, 'inspect', {}, undefined, { contractId })).resolves.toEqual({ content: 'answer' });
+      }
+      expect(connect).toHaveBeenCalledTimes(1);
+    } finally {
+      await Promise.allSettled(sessions.map(session => session.dispose()));
+      await gateway.close();
+      trust.mockRestore(); connect.mockRestore(); capabilities.mockRestore(); request.mockRestore();
+    }
+  });
+
   it('publishes session registrations through the public resource loader and withdraws them on disposal', async () => {
     const { work } = makeEnv();
     const resourceLoader = new DefaultResourceLoader({ cwd: work, noContextFiles: true, extensionFactories: [api => {
@@ -195,6 +232,27 @@ describe("createAgentSession & AgentSession", () => {
       await session.prompt('second request');
       expect(session.runtimeContext.promptIdentity?.schemaDigest).toMatch(/^[a-f\d]{64}$/);
       expect(session.runtimeContext.promptIdentity?.schemaDigest).not.toBe(selected);
+    } finally { await session.dispose(); }
+  });
+
+  it('uses the successor tool selection from SDK reload startup', async () => {
+    const { work } = makeEnv();
+    let current!: ExtensionAPI;
+    const resourceLoader = new DefaultResourceLoader({ cwd: work, noContextFiles: true, extensionFactories: [api => {
+      current = api;
+      api.on('session_start', async event => {
+        await api.setActiveTools(event.reason === 'reload' ? ['grep', 'write'] : ['read']);
+      });
+    }] });
+    await resourceLoader.reload();
+    const { session } = await createAgentSession({ cwd: work, resourceLoader, tools: ['read', 'grep'] });
+    try {
+      const original = current;
+      expect(await original.getActiveTools()).toEqual(['read']);
+      const result = await session.reload();
+      expect(result, 'reason' in result ? result.reason : undefined).toMatchObject({ status: 'reloaded' });
+      await expect(original.setActiveTools(['read'])).rejects.toThrow(/retired/);
+      expect(await current.getActiveTools()).toEqual(['grep']);
     } finally { await session.dispose(); }
   });
 

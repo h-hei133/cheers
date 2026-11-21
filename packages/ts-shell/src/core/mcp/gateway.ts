@@ -33,7 +33,7 @@ import { McpGatewayBlockedError, unavailableServer, unknownServer } from "./stat
 
 export interface McpDefinitionSource {
   read(workspaceRoot: string): Record<string, ScopedMcpServerConfig>;
-  subscribe(changed: () => void): () => void;
+  subscribe(changed: () => void, workspaceRoot: () => string): () => void;
 }
 
 export class CoreMcpGateway {
@@ -56,7 +56,7 @@ export class CoreMcpGateway {
     this.background = new McpBackgroundDiscovery(this.connectionManager, this.snapshotTimeoutMs);
     this.unsubscribeDefinitions = definitions?.subscribe(() => {
       if (!this.closed) void this.configurationChanged().catch(() => {});
-    });
+    }, () => this.workspaceRoot);
   }
 
   subscribe(changed: () => void): () => void {

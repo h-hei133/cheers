@@ -93,7 +93,8 @@ export class CoreMcpConnectionManager {
     if (client && JSON.stringify(client.config) !== JSON.stringify(config)) throw new Error('MCP server definition changed.');
     if (!client) {
       client = new CoreMcpClient(name, config, workspaceRoot, undefined, () => this.changes.notify("catalog"),
-        this.authorizationFor?.(name, config), this.admissionFor?.(name, config, workspaceRoot));
+        config.extensionOwner === undefined ? this.authorizationFor?.(name, config) : undefined,
+        this.admissionFor?.(name, config, workspaceRoot));
       this.clients.set(name, client);
     }
     return client;
