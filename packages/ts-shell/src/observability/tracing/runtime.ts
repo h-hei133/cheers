@@ -5,12 +5,14 @@ import { runTraceScope, type TraceScope } from './context.js';
 import { InMemoryTraceStore } from './span.js';
 import type { TelemetryContext } from './types.js';
 import type { OperationSpan } from './operations.js';
+import { traceParentCarrier } from './carrier.js';
 
 /** Capture storage once; async settlement never re-resolves the current profile. */
 export function runSessionTrace<T>(
   identity: { readonly sessionId: string; readonly workspaceRoot: string },
   callback: (span: OperationSpan<'session.run'>) => T | Promise<T>,
   recorder?: TelemetryContext,
+  traceParent?: string,
 ): Promise<T> {
   const persist = !process.env.VITEST && process.env.NODE_ENV !== 'test';
   let scope: TraceScope = identity;
@@ -29,5 +31,5 @@ export function runSessionTrace<T>(
       span.setStatus({ status: 'error', error: { name: 'RunError', message: 'Session run failed.' } });
       throw error;
     }
-  }));
+  }), traceParentCarrier(traceParent));
 }

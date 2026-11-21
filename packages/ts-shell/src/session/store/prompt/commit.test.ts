@@ -4,7 +4,9 @@ import path from 'node:path';
 import { syncBuiltinESMExports } from 'node:module';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../../SessionManager.js';
-import { readSessionRecordSnapshot, readSessionRecordSnapshotAsync } from '../sessionStore.js';
+import { readBoundSessionRevision, readBoundSessionState, readBoundSessionStateAsync } from '../bound.js';
+import { readSessionManagementSnapshot } from '../management.js';
+import { readSessionRecordSnapshotAsync } from '../sessionStore.js';
 import { SessionStoreAccess } from '../sessionStoreAccess.js';
 import type { SessionFileLayout } from '../sessionFileLayout.js';
 import { PromptPublicationError, promptIntentPath } from './intent.js';
@@ -44,8 +46,39 @@ it('refuses changed write admission before publishing a recoverable intent', () 
   expect(fs.existsSync(promptIntentPath(layout))).toBe(false);
 });
 
+it('reads a legacy recovery snapshot once and preserves its readable transcript rows', () => {
+  const timestamp = '2026-10-30T00:00:00.000Z';
+  const user = { type: 'message', role: 'user', content: 'Old question', timestamp };
+  const assistant = { type: 'message', role: 'assistant', content: 'Old answer', timestamp };
+  const transcript = [JSON.stringify(user), '{partial', JSON.stringify(assistant)].join('\n');
+  const state = JSON.stringify({ status: 'completed', durableStatus: 'success', projectRoot: root });
+  fs.writeFileSync(layout.transcriptPath, transcript);
+  fs.writeFileSync(layout.statePath, state);
+  const read = vi.spyOn(fs, 'readFileSync');
+  syncBuiltinESMExports();
+  try {
+    const snapshot = manager.getRecoverySnapshot(sessionId);
+    expect(snapshot.durableStatus).toBe('success');
+    expect(snapshot.transcriptEvents).toMatchObject([
+      { ...user, id: 'line-1' },
+      { ...assistant, id: 'line-3' },
+    ]);
+    expect(snapshot.lastUserMessage?.id).toBe('line-1');
+    expect(snapshot.lastAssistantMessage?.id).toBe('line-3');
+    for (const file of [layout.metadataPath, layout.statePath, layout.transcriptPath]) {
+      expect(read.mock.calls.filter(([target]) => target === file)).toHaveLength(1);
+    }
+  } finally {
+    read.mockRestore();
+    syncBuiltinESMExports();
+  }
+  expect(fs.readFileSync(layout.transcriptPath, 'utf8')).toBe(transcript);
+  expect(fs.readFileSync(layout.statePath, 'utf8')).toBe(state);
+});
+
 it.each(['none', 'torn', 'metadata', 'state', 'published'] as const)('reconciles the exact %s interruption without duplicating the prompt', async stage => {
   const before = fs.readFileSync(layout.transcriptPath);
+  const priorSession = manager.getSession(sessionId)!;
   const prompt = 'Review \u{1F50E} after reopening';
   const image = { type: 'image' as const, data: 'aGVsbG8=', mimeType: 'image/png' };
   const localMetadata = { adoption: 'original' };
@@ -82,14 +115,19 @@ it.each(['none', 'torn', 'metadata', 'state', 'published'] as const)('reconciles
   expect(observer.getCurrentSessionForProject(root, { readOnly: true })).toBeNull();
   expect(observer.readCurrentSessionSelection(root)?.sessionId).toBe(sessionId);
   expect(fs.existsSync(promptIntentPath(layout))).toBe(true);
-  expect(() => readSessionRecordSnapshot({ sessionId, layout, cwd: root })).toThrow(PromptPublicationError);
+  expect(() => observer.readSnapshot(sessionId, { readOnly: true })).toThrow(PromptPublicationError);
   await expect(readSessionRecordSnapshotAsync({ sessionId, layout, cwd: root })).rejects.toThrow(PromptPublicationError);
+  expect(() => readBoundSessionRevision(manager, priorSession)).toThrow(expect.objectContaining({ code: 'unavailable' }));
+  expect(() => readBoundSessionState(manager, priorSession)).toThrow(expect.objectContaining({ code: 'unavailable' }));
+  await expect(readBoundSessionStateAsync(manager, priorSession)).rejects.toMatchObject({ code: 'unavailable' });
+  expect(() => readSessionManagementSnapshot(layout, sessionId)).toThrow(PromptPublicationError);
 
   const reopened = new SessionManager();
+  const recovery = reopened.getRecoverySnapshot(sessionId);
   const saved = reopened.getSession(sessionId);
   expect(saved?.turns).toMatchObject([{ id: 'prior' }, { role: 'user', content: [{ type: 'text', text: prompt }, image], metadata: localMetadata }]);
   const source = saved!.turns[1]!.id;
-  expect(reopened.getRecoverySnapshot(sessionId)).toMatchObject({ pendingPrompt: prompt, runPhase: 'prompt-persisted',
+  expect(recovery).toMatchObject({ pendingPrompt: prompt, runPhase: 'prompt-persisted',
     lastLifecycleEvent: { event: 'run-started', sourceEntryId: source }, lastUserMessage: { id: source } });
   const events = reopened.getTranscriptEvents(sessionId);
   expect(events.filter(event => event.type === 'lifecycle' && event.event === 'run-started')).toHaveLength(1);
@@ -97,6 +135,8 @@ it.each(['none', 'torn', 'metadata', 'state', 'published'] as const)('reconciles
   const after = fs.readFileSync(layout.transcriptPath);
   expect(after.subarray(0, before.length)).toEqual(before);
   expect(fs.existsSync(promptIntentPath(layout))).toBe(false);
+  expect(readBoundSessionState(reopened, saved!).state.pendingPrompt).toBe(prompt);
+  expect(readSessionManagementSnapshot(layout, sessionId).state.pendingPrompt).toBe(prompt);
   expect(new SessionStoreAccess().load(sessionId)).toEqual(saved);
   expect(fs.readFileSync(layout.transcriptPath)).toEqual(after);
 });
@@ -150,12 +190,15 @@ it.each(['completed', 'completed_unproven', 'error', 'interrupted'] as const)(
     const reopen = new SessionStoreAccess();
     expect(reopen.resolveCurrentSessionForProject(root, { readOnly: true }))
       .toMatchObject({ ok: false, reason: 'prompt-publication-unknown', sessionId });
+    expect(() => reopen.readSnapshot(sessionId, { readOnly: true })).toThrow(PromptPublicationError);
+    const finalEvent = outcome === 'completed_unproven' ? 'run-completed-unproven' : `run-${outcome}`;
+    const recovery = new SessionManager().getRecoverySnapshot(sessionId);
+    expect(recovery.transcriptEvents).toContainEqual(expect.objectContaining({ type: 'lifecycle', event: finalEvent }));
     const saved = reopen.load(sessionId);
     expect(saved.status).toBe(outcome);
     expect(saved.pendingPrompt).toBe(outcome === 'interrupted' ? 'Recover this run' : undefined);
     expect(fs.existsSync(promptIntentPath(layout))).toBe(false);
     const events = manager.getTranscriptEvents(sessionId);
-    const finalEvent = outcome === 'completed_unproven' ? 'run-completed-unproven' : `run-${outcome}`;
     expect(events.filter(event => event.type === 'lifecycle' && event.event === finalEvent)).toHaveLength(1);
     if (outcome === 'error' || outcome === 'interrupted') {
       expect(events.at(-2)).toMatchObject({ type: 'query-event', sourceEntryId,
@@ -196,7 +239,9 @@ it.each(['torn', 'metadata', 'state'] as const)(
     } finally { appendSpy.mockRestore(); renameSpy.mockRestore(); syncBuiltinESMExports(); }
 
     expect(fs.existsSync(promptIntentPath(layout))).toBe(true);
+    expect(() => new SessionStoreAccess().readSnapshot(sessionId, { readOnly: true })).toThrow(PromptPublicationError);
     const reopened = new SessionManager();
+    expect(reopened.getRecoverySnapshot(sessionId).lastAssistantMessage).toMatchObject({ id: 'tx-turn', content });
     const saved = reopened.getSession(sessionId);
     expect(saved?.turns.map(turn => turn.id)).toEqual(['prior', 'tx-turn']);
     expect(saved?.turns.at(-1)?.content).toBe(content);

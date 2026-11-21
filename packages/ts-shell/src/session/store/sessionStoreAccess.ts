@@ -31,7 +31,9 @@ import {
   deleteSessionRecord,
   loadSessionRecord,
   previewPendingSessionRecord,
+  readSessionRecordSnapshot,
   sessionExistsAtLayout,
+  type SessionRecordSnapshot,
   writeSessionMetadataRecord,
 } from "./sessionStore.js";
 import {
@@ -79,9 +81,13 @@ export class SessionStoreAccess extends SessionStorePaths {
   }
 
   load(sessionId: string, options?: { readonly readOnly?: boolean }): Session {
+    return this.readSnapshot(sessionId, options).session;
+  }
+
+  readSnapshot(sessionId: string, options?: { readonly readOnly?: boolean }): SessionRecordSnapshot {
     const layout = locateExistingSessionLayout(this.storeLayout, sessionId);
     if (!options?.readOnly) recoverSessionPrompt(layout, sessionId);
-    return loadSessionRecord({
+    return readSessionRecordSnapshot({
       sessionId,
       layout,
       cwd: process.cwd(),
@@ -92,10 +98,11 @@ export class SessionStoreAccess extends SessionStorePaths {
     createSessionRecord(session, this.storeLayout);
   }
 
-  writeSessionMetadata(session: Session): void {
+  writeSessionMetadata(session: Session, requireHeld?: boolean): void {
     writeSessionMetadataRecord({
       session,
       layout: locateExistingSessionLayout(this.storeLayout, session.id),
+      requireHeld,
     });
   }
 

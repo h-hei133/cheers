@@ -74,7 +74,7 @@
 - [x] **F2.3** 无动态代码生成的 Schema 校验。Linux 本地功能验收完成，提交 `980bb6d1`。工具、配置、目录导入、媒体和 MCP 共用解释式校验。五个新回归覆盖相邻 Draft 7 断言、科学计数法倍数、动态兄弟分支及两种依赖作用域。编译版 Node 24 和 20.3 禁字符串代码生成后各通过四组实际入口验证。标准核心用例 3261 通过、230 准入拒绝、1 项 Draft 7 差异源于保留相邻约束。当前配置模型两次调用均在鉴权阶段停止，历史安装与真实模型证据保留各自构建。
 - [x] **F2.4** 阶梯计价：当前Linux功能验收完成。目录schedule有界唯一strict input threshold和部分override；请求前深capture，完整单次输入选最高档后仅flat持久化，不使用会话累计。原三条计费入口、warm/trace和ledger mode贯通，缺分配/无效类别保留sticky partial，legacy聚合遇tiers保持unknown。37文件765项、七门/2690modules/0monoliths、build `a395e98082bc`、15有效反转24AssertionErrors/exact恢复151项通过；Linux公开compiled SDK/CLI九组24实际POST、配置模型两bodySent/200/completed/marker及numeric usage、npm15入口strict类型/八组23POSTpassed。独立代码/架构最终review收尾中，不当批准；正常pinned judge仍exit2/not_proven，不声明真实账单/全平台/CI。[交付](../../../.omx/artifacts/upgrade-pricing-2026-11-18/delivery.json)。
 - [x] **F2.5** Span、事件、链接、查询和作用域。Linux 本地功能验收完成，提交 `a069b2d4`。同会话和工作区先过滤再计配额，持久 span 从分页结果展示。配置拒绝后旧看板随即失去权限，后续配置修正不恢复旧权限。真实已接受响应生成类型化事件，HTML 和 JSON 显示绝对事件时间与链接，重复游标保留不完整状态。七个新行为回归和编译版 `/trace` 命令通过。F2.6 的直方图和跨进程传播继续开放。
-- [ ] **F2.6** 有界直方图及跨进程传播。`6980109e` 已将计数与耗时绑定原运行，`/metrics --run` 可查询分布及缺失覆盖。Linux 并行运行、退出恢复与旧记录回归通过。跨进程传播仍需实际接收端。
+- [x] **F2.6** 有界直方图及跨进程传播。`6980109e` 将计数和耗时绑定原运行，`/metrics --run` 可查询分布与缺失覆盖。RPC `prompt` 接收 W3C `traceparent` 版本 00，按当前会话和工作区为 `session.run` 建立父 span。Linux 独立 CLI 进程验证非法载体拒绝、伪造归属无效、追踪请求接续及随后请求独立建链。
 
 ## T4: 领域包与配置脚本收敛（P2，功能批次稳定后独立实施）
 
@@ -85,7 +85,7 @@
 
 ## T5: 会话与恢复（P3，高风险独立批次）
 
-- [ ] **T5.1** 会话多文件事务：普通提示（v1）、运行结算（v2）与其余多文件记录写入（v3：`addTurn`、`markRunStarted`、`markTurnActive`、`markRecoveryReentry`、`saveTerminated`、`updateSessionWorkspaceBinding`）已全部统一到单一 `prompt-transaction.json` 事务日志与重开恢复路径。覆盖零行 transcript 校验、截断 UTF-8 续写、metadata/state 失败恢复与冲突保留。仅三文件合并为单一存储格式及跨 `current-session.json` 注册表原子性仍开放。
+- [ ] **T5.1** 会话事务和单一存储。提示、运行结算及其余多文件记录写入共用 `prompt-transaction.json` v1–v3。恢复从同一读取入口取得会话、状态和事件，绑定读取及管理预览拒绝未结算事务，注册表清理按激活 ID 复核后执行。保护性恢复将会话与注册表写入放在同一锁序内，仍有两次独立磁盘发布。单文件迁移和崩溃后的跨注册表原子性继续开放。
 - [x] **T5.2** 旧格式迁移与单一读写权威：Linux 本地功能验收完成。`SessionManager.migrateTranscript`（`session/store/migration/transcript.ts`）以预览确认令牌绑定会话身份、目录、版本、状态与准入；写入前创建只读内容寻址备份并 fsync 目录，保持 `transcript.jsonl` 为唯一读写权威（含旧数据目录原地迁移，无双写），重命名中断返回 `unknown` 且重试复用原备份，支持显式回退并拒绝后续追加后的过期回退，拒绝损坏、重复 ID 与活跃轮次。7 项定向测试与多进程编译产物重开验证通过。
 - [x] **T5.3** 追加上下文编辑及书签。`658329c8` 经 `/history` 和 RPC `annotate_session` 使用同一原有存储写入器。当前分支应用编辑，原日志保留。已签名推理、工具配对和无 ID 的旧记录不进入编辑。Linux 测试覆盖重开、分叉、过期版本、取消和保存结果未知。
 - [x] **T5.4** DAG 重启安全续调度。`3a502b09` 用原日志 CAS 认领已退出调度者的图，保留 ID 和已确认步骤，仅派发从未交付的节点。Linux 回归覆盖并发认领、已完成子进程但后置结算未确认、旧版本未知记录和过期停止命令。当前归属证明限同一启动及进程命名空间。

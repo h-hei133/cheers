@@ -1,6 +1,7 @@
 import { normalizePathIdentity } from '../continuation/roots.js';
 import type { SessionMetadata } from '../schema/sessionMetadataCodec.js';
 import type { SessionStateSnapshot } from '../schema/sessionStateSnapshot.js';
+import { assertNoPromptIntent } from './prompt/intent.js';
 import type { SessionFileLayout } from './sessionFileLayout.js';
 import { readSessionMetadataRecord } from './sessionStore.js';
 import { readStateSnapshotRequired } from './sessionStateStore.js';
@@ -18,6 +19,7 @@ export interface SessionManagementSnapshot {
 
 /** Keep all three source identities while reading only the management payload. */
 export function readSessionManagementSnapshot(layout: SessionFileLayout, id: string): SessionManagementSnapshot {
+  assertNoPromptIntent(layout);
   const version = readSessionFileVersion(layout);
   const metadata = readSessionMetadataRecord(layout.metadataPath);
   const state = readStateSnapshotRequired(layout.statePath);
@@ -37,6 +39,7 @@ export function readSessionManagementSnapshot(layout: SessionFileLayout, id: str
     throw new Error('The saved session project identity is unavailable or inconsistent.');
   }
   if (readSessionFileVersion(layout) !== version) throw new Error('The saved session changed while reading management state.');
+  assertNoPromptIntent(layout);
   return { metadata, state, version, session: { id, createdAt: metadata.createdAt, projectRoot,
     ...(metadata.title === undefined ? {} : { title: metadata.title }), ...(metadata.pinned === true ? { pinned: true } : {}) } };
 }

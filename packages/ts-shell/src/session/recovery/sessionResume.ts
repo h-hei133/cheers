@@ -25,7 +25,7 @@ interface SessionResumeCallbacks {
   readonly sessionDirExists: (sessionId: string) => boolean;
   readonly sessionDir: (sessionId: string) => string;
   readonly loadSession: (sessionId: string) => Session;
-  readonly writeSessionMetadata: (session: Session) => void;
+  readonly writeSessionMetadata: (session: Session, requireHeld?: boolean) => void;
   readonly setCurrentSessionForProject: (
     projectRoot: string,
     sessionId: string,
@@ -80,14 +80,19 @@ export function tryResumeSession(
         capture?.(value);
       } };
     }
+    const locked = options?.expectedVersion !== undefined || activationOptions?.guard !== undefined;
+    const layout = locked
+      ? projectSessionFileLayout({ sessionsDir: dirname(callbacks.sessionDir(sessionId)), sessionId })
+      : undefined;
+    const expectedVersion = options?.expectedVersion ?? (layout && readSessionFileVersion(layout));
+    const validateVersion = (): void => {
+      if (layout && readSessionFileVersion(layout) !== expectedVersion) {
+        throw new Error('The saved session changed after the preview. Reopen the session picker.');
+      }
+    };
     const validate = (): void => {
       options?.beforeActivate?.();
-      if (options?.expectedVersion !== undefined) {
-        const layout = projectSessionFileLayout({ sessionsDir: dirname(callbacks.sessionDir(sessionId)), sessionId });
-        if (readSessionFileVersion(layout) !== options.expectedVersion) {
-          throw new Error('The saved session changed after the preview. Reopen the session picker.');
-        }
-      }
+      validateVersion();
     };
     validate();
     const session = callbacks.loadSession(sessionId);
@@ -106,29 +111,27 @@ export function tryResumeSession(
     const activate = (): SessionResumeResult => {
       validate();
       if (session.id !== sessionId) throw new Error('The stored session identity does not match the selected session.');
-      activationStarted = true;
+      if (!layout) activationStarted = true;
       activated = activateSession(callbacks, session, projectRoot, activationOptions, value => {
         publishedSession = value;
-        if (activationOptions) publishedVersion = readSessionFileVersion(projectSessionFileLayout({
-          sessionsDir: dirname(callbacks.sessionDir(sessionId)), sessionId,
-        }));
-      });
-      if (options?.expectedVersion !== undefined) {
-        activatedVersion = readSessionFileVersion(projectSessionFileLayout({
-          sessionsDir: dirname(callbacks.sessionDir(sessionId)), sessionId,
-        }));
+        if (activationOptions && layout) publishedVersion = readSessionFileVersion(layout);
+      }, layout ? () => {
+        validateVersion();
+        activationStarted = true;
+      } : undefined);
+      if (layout) {
+        activatedVersion = readSessionFileVersion(layout);
       }
       return { ok: true, session: activated };
     };
-    return options?.expectedVersion === undefined ? activate()
-      : withSessionStateLock(projectSessionFileLayout({ sessionsDir: dirname(callbacks.sessionDir(sessionId)), sessionId }),
-        activate, { requireExisting: true });
+    return layout ? withSessionStateLock(layout, activate, { requireExisting: true }) : activate();
   } catch (error) {
     if (error instanceof PromptPublicationError && !activationStarted) {
       return { ok: false, promptPublication: 'unknown', error: error.message,
         recoveryHint: 'Inspect the saved session before retrying.' };
     }
-    if (publishedSession && candidate && options?.expectedVersion !== undefined && activationOptions) {
+    const versioned = options?.expectedVersion !== undefined || activationOptions?.guard !== undefined;
+    if (publishedSession && candidate && versioned && activationOptions) {
       try {
         const layout = projectSessionFileLayout({ sessionsDir: dirname(callbacks.sessionDir(sessionId)), sessionId });
         const current = callbacks.loadSession(sessionId);
@@ -145,7 +148,7 @@ export function tryResumeSession(
       return { ok: false, activation: 'unknown', error: 'Saved session activation could not be verified after a storage failure.',
         recoveryHint: 'Restart and inspect the current saved session before continuing.' };
     }
-    if (activationStarted && options?.expectedVersion !== undefined) {
+    if (activationStarted && versioned) {
       // Cleanup can fail after publication. Reread both the exact saved files
       // and durable selection before adopting that committed activation.
       try {
@@ -174,7 +177,8 @@ export function tryResumeSession(
   }
 }
 
-function activateSession(callbacks: SessionResumeCallbacks, loaded: Session, projectRoot?: string, options?: SessionActivationOptions, prepared?: (session: Session) => void): Session {
+function activateSession(callbacks: SessionResumeCallbacks, loaded: Session, projectRoot?: string, options?: SessionActivationOptions,
+  prepared?: (session: Session) => void, validateLockedVersion?: () => void): Session {
   const session: Session = {
     ...loaded,
     projectRoot: loaded.projectRoot?.trim() ? loaded.projectRoot : projectRoot?.trim() || loaded.projectRoot,
@@ -183,8 +187,13 @@ function activateSession(callbacks: SessionResumeCallbacks, loaded: Session, pro
   };
   // Metadata stores identity and time. Durable status stays recoverable until
   // the runtime reentry boundary writes state; selection alone is not execution.
-  callbacks.writeSessionMetadata(session);
-  prepared?.(session);
-  callbacks.setCurrentSessionForProject(session.projectRoot || callbacks.cwd(), session.id, options);
+  const publishMetadata = () => {
+    validateLockedVersion?.();
+    callbacks.writeSessionMetadata(session, validateLockedVersion !== undefined);
+    prepared?.(session);
+  };
+  if (!validateLockedVersion) publishMetadata();
+  callbacks.setCurrentSessionForProject(session.projectRoot || callbacks.cwd(), session.id,
+    validateLockedVersion ? { ...options, publishMetadata } : options);
   return session;
 }

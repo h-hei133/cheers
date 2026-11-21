@@ -283,6 +283,22 @@ it('keeps invalid RPC input separate from subsequent valid controls and explicit
   expect(frames.find(frame => frame.id === 'accepted')).toMatchObject({ success: true });
 });
 
+it('keeps a valid trace parent attached to its RPC prompt until turn dispatch', async () => {
+  const stdin = new PassThrough(); inputs.push(stdin);
+  const traceParent = `00-${'1'.repeat(32)}-${'2'.repeat(16)}-01`;
+  const prompts: Array<{ readonly text: string; readonly attachments?: { readonly images: readonly unknown[]; readonly traceParent?: string } }> = [];
+  const runtime = { waitForIdle: async () => {}, getCurrentRunController: () => null } as unknown as ShellSessionRuntime;
+  const run = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
+    renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never, rpcMode: true,
+    runPrompt: async (prompt, attachments) => { prompts.push({ text: prompt, attachments }); } });
+  try {
+    stdin.write(JSON.stringify({ id: 'traced-prompt', type: 'prompt', message: 'kept only as prompt text', traceParent }) + '\n');
+    await vi.waitFor(() => expect(frames.find(frame => frame.id === 'traced-prompt')?.success).toBe(true));
+  } finally { stdin.end(); await run; }
+  expect(prompts).toEqual([{ text: 'kept only as prompt text', attachments: { images: [], traceParent } }]);
+  expect(manager.getSession(context.session.id)?.turns).toEqual([]);
+});
+
 it('leaves a pending RPC dialog live after rejecting a malformed answer and accepts its later valid answer', async () => {
   const stdin = new PassThrough(); inputs.push(stdin);
   const prompts: string[] = [];

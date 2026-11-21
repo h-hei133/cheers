@@ -3,8 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { syncBuiltinESMExports } from 'node:module';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { readCurrentSessionSelection, setCurrentSessionSelection, writeSessionRegistryStore } from './currentSessionRegistry.js';
+import { readCurrentSessionSelection, resolveCurrentSessionForProject, setCurrentSessionSelection, writeSessionRegistryStore } from './currentSessionRegistry.js';
 import type { CurrentSessionSelectionRecord } from './currentSelection.js';
+import type { Session } from '../schema/sessionRecord.js';
 import { SessionManager } from '../SessionManager.js';
 import { createSessionStoreLayout, locateExistingSessionLayout } from './sessionFileLayout.js';
 import { readSessionFileVersion } from './version.js';
@@ -46,6 +47,34 @@ it('refuses a competing source activation acquired while the caller waits for th
   lockProbe.before = () => { set(sourceRoot, 'competitor'); competitor = fs.readFileSync(file); };
   expect(() => select(captured)).toThrow('activation changed'); expect(fs.readFileSync(file)).toEqual(competitor); expect(current(destinationRoot)?.sessionId).toBe('destination');
 });
+
+it.each(['missing-session', 'load-failed', 'project-root-mismatch'] as const)(
+  'preserves a same-id reactivation acquired while clearing an observed %s selection',
+  reason => {
+    set(sourceRoot, 'target');
+    const inspected = current(sourceRoot)!;
+    let replacement: Buffer | undefined;
+    lockProbe.before = () => {
+      set(sourceRoot, inspected.sessionId, inspected.updatedAt);
+      replacement = fs.readFileSync(file);
+    };
+
+    const result = resolveCurrentSessionForProject({
+      storePath: file,
+      projectRoot: sourceRoot,
+      sessionExists: () => reason !== 'missing-session',
+      loadSession: () => {
+        if (reason === 'load-failed') throw new Error('Could not load the previous session');
+        return { id: inspected.sessionId, projectRoot: destinationRoot } as Session;
+      },
+    });
+
+    expect(result).toMatchObject({ ok: false, reason });
+    expect(replacement).toBeDefined();
+    expect(fs.readFileSync(file)).toEqual(replacement);
+    expect(current(sourceRoot)?.activationId).not.toBe(inspected.activationId);
+  },
+);
 
 it.each(['source', 'destination'] as const)('refuses an absent %s selection that becomes present', side => {
   const captured = guard(); let competitor!: Buffer;
@@ -112,6 +141,42 @@ it('passes the guarded source selection into the final resume activation', () =>
   const result = manager.tryResume(target.id, root, { mode: 'continuity-only', activation: { guard: captured } } as Parameters<typeof manager.tryResume>[2]);
   expect(result).toMatchObject({ ok: false }); expect(manager.getCurrentSessionForProject(root)?.id).toBe(source.id);
 });
+
+it.each(['competing-activation', 'changed-target'] as const)(
+  'keeps target metadata byte-identical when resume rejects a %s at publication',
+  reason => {
+    const manager = new SessionManager();
+    const source = manager.createNew(root);
+    const target = manager.createNew(root, { activate: false });
+    const store = new SessionStoreAccess();
+    const selected = store.readCurrentSessionSelection(root);
+    const layout = locateExistingSessionLayout(createSessionStoreLayout(), target.id);
+    const before = fs.readFileSync(layout.metadataPath);
+    const expectedVersion = readSessionFileVersion(layout);
+    const now = new Date(JSON.parse(before.toString()).updatedAt).getTime() + 60_000;
+    const updatedAt = new Date(now).toISOString();
+    vi.spyOn(Date.prototype, 'toISOString').mockReturnValue(updatedAt);
+    let observed = selected;
+    lockProbe.before = () => {
+      if (reason === 'competing-activation') {
+        manager.setCurrentSessionForProject(root, source.id);
+        observed = store.readCurrentSessionSelection(root);
+      } else fs.appendFileSync(layout.transcriptPath, '\n');
+    };
+
+    const result = manager.tryResume(target.id, root, {
+      mode: 'continuity-only',
+      expectedVersion,
+      activation: { guard: { source: { projectRoot: root, expected: selected }, destination: selected } },
+    });
+
+    expect(result).toMatchObject({ ok: false });
+    if (reason === 'competing-activation') expect(observed?.activationId).not.toBe(selected?.activationId);
+    else expect(readSessionFileVersion(layout)).not.toBe(expectedVersion);
+    expect(store.readCurrentSessionSelection(root)).toEqual(observed);
+    expect(fs.readFileSync(layout.metadataPath)).toEqual(before);
+  },
+);
 
 it('reports a confirmed resume activation with a warning when its own registry lock release fails', () => {
   const manager = new SessionManager(), source = manager.createNew(root), target = manager.createNew(root, { activate: false });

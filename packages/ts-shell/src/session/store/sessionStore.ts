@@ -87,6 +87,7 @@ function writeSessionFiles(input: SessionRecordWrite, mode: 'exclusive' | 'exist
 export function writeSessionMetadataRecord(input: {
   readonly session: Session;
   readonly layout: Pick<SessionFileLayout, "metadataPath" | "stateLockPath">;
+  readonly requireHeld?: boolean;
 }): void {
   withSessionMetadataLock(input.layout, () => {
   const metadata = projectSessionMetadata(input.session);
@@ -104,7 +105,7 @@ export function writeSessionMetadataRecord(input: {
     else delete metadata.pinned;
   }
   writeJsonFileAtomic(input.layout.metadataPath, metadata);
-  });
+  }, input.requireHeld);
 }
 
 export function readSessionMetadataRecord(metadataPath: string, maxBytes?: number, signal?: AbortSignal): SessionMetadata | undefined {

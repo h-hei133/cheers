@@ -12,7 +12,7 @@ import {
 } from "./currentSelection.js";
 import { normalizePathIdentity } from '../continuation/roots.js';
 import { projectCurrentSessionMetadata } from "../sessionMetadataProjection.js";
-import { captureActivationGuard, assertActivationGuard, type SessionActivationOptions } from './activation.js';
+import { captureActivationGuard, assertActivationGuard, sameSessionActivation, type SessionActivationOptions } from './activation.js';
 
 export interface SessionRegistryReadResult {
   readonly store: CurrentSessionSelectionStore;
@@ -189,6 +189,14 @@ export function resolveCurrentSessionForProject(input: {
     }).resolution;
   }
 
+  const clearInvalidSelection = () => {
+    if (!input.readOnly && !registry.readError) clearCurrentSessionSelection({
+      storePath: input.storePath,
+      normalizedProjectRoot,
+      expected: selection,
+    });
+  };
+
   if (!input.sessionExists(selection.sessionId)) {
     const missingProjection = projectCurrentSessionRegistryResolution({
       projectRoot: input.projectRoot,
@@ -197,17 +205,15 @@ export function resolveCurrentSessionForProject(input: {
       selection,
       sessionExists: false,
     });
-    if (!input.readOnly) clearCurrentSessionSelection({
-      storePath: input.storePath,
-      normalizedProjectRoot,
-    });
+    clearInvalidSelection();
     return missingProjection.resolution;
   }
 
+  let projection: ReturnType<typeof selectCurrentSession>;
   try {
     const session = input.loadSession(selection.sessionId);
     const sessionProjectRoot = session.projectRoot || normalizedProjectRoot;
-    const selectedProjection = projectCurrentSessionRegistryResolution({
+    projection = projectCurrentSessionRegistryResolution({
       projectRoot: input.projectRoot,
       normalizedProjectRoot,
       storeReadError: registry.readError,
@@ -217,15 +223,8 @@ export function resolveCurrentSessionForProject(input: {
       sessionProjectRoot,
       normalizedSessionProjectRoot: normalizePathIdentity(sessionProjectRoot),
     });
-    if (!selectedProjection.resolution.ok && !input.readOnly) {
-      clearCurrentSessionSelection({
-        storePath: input.storePath,
-        normalizedProjectRoot,
-      });
-    }
-    return selectedProjection.resolution;
   } catch (error) {
-    const failedProjection = projectCurrentSessionRegistryResolution({
+    projection = projectCurrentSessionRegistryResolution({
       projectRoot: input.projectRoot,
       normalizedProjectRoot,
       storeReadError: registry.readError,
@@ -233,12 +232,9 @@ export function resolveCurrentSessionForProject(input: {
       sessionExists: true,
       loadError: error,
     });
-    if (!input.readOnly && failedProjection.clearSelection) clearCurrentSessionSelection({
-      storePath: input.storePath,
-      normalizedProjectRoot,
-    });
-    return failedProjection.resolution;
   }
+  if (projection.clearSelection) clearInvalidSelection();
+  return projection.resolution;
 }
 
 export function setCurrentSessionSelection(input: {
@@ -266,6 +262,7 @@ export function setCurrentSessionSelection(input: {
     const read = () => readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]);
     assertActivationGuard(guard, read, normalizedProjectRoot);
     const registry = read();
+    if (input.publishMetadata && registry.readError) throw new Error('Current session activation is unavailable.');
     const current = registry.store;
     const store = projectCurrentSessionSelectionStore({
       current,
@@ -274,9 +271,16 @@ export function setCurrentSessionSelection(input: {
       updatedAt: input.updatedAt,
       activationId: candidate.activationId,
     });
-    if (guard) writeTextFileAtomic(input.storePath, JSON.stringify(store, null, 2), undefined,
-      { beforeRename: () => assertActivationGuard(guard, read, normalizedProjectRoot) });
-    else writeSessionRegistryStore({ storePath: input.storePath, store });
+    if (guard || input.publishMetadata) {
+      let publishMetadata = input.publishMetadata;
+      writeTextFileAtomic(input.storePath, JSON.stringify(store, null, 2), undefined, {
+        beforeRename: () => {
+          assertActivationGuard(guard, read, normalizedProjectRoot);
+          publishMetadata?.();
+          publishMetadata = undefined;
+        },
+      });
+    } else writeSessionRegistryStore({ storePath: input.storePath, store });
   }, { recovery: 'local-dead' });
 }
 
@@ -284,12 +288,17 @@ export function clearCurrentSessionSelection(input: {
   readonly storePath: string;
   readonly storeSearchPaths?: readonly string[];
   readonly normalizedProjectRoot: string;
+  /** Automatic cleanup compares the invalid activation it actually inspected. */
+  readonly expected?: CurrentSessionSelectionRecord;
 }): void {
   if (!input.normalizedProjectRoot) {
     return;
   }
   withFileLock(`${input.storePath}.lock`, () => {
-    const current = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]).store;
+    const registry = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]);
+    const current = registry.store;
+    if (input.expected && (registry.readError
+      || !sameSessionActivation(current.byProjectRoot[input.normalizedProjectRoot], input.expected))) return;
     const next = removeCurrentSessionSelectionFromStore({
       current,
       normalizedProjectRoot: input.normalizedProjectRoot,

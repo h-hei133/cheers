@@ -50,9 +50,11 @@ import {bindQueuedPromptInput, capturePromptInput} from './input/capture.js';
  * Images are held apart from the words because they are not part of the
  * sentence: the placeholder that stood for one in the draft expands back to
  * nothing, so the picture has to be carried here or not at all.
+ * A remote trace parent also travels with its submission and is kept out of the prompt.
  */
 export interface PromptAttachments {
   readonly images: readonly ImageContent[];
+  readonly traceParent?: string;
 }
 
 /**
@@ -293,7 +295,12 @@ export class ShellSessionRuntime {
         return '';
       }
       const effectivePrompt = preparedInput?.prompt ?? prompt;
-      const attachments = preparedInput ? preparedInput.images ? {images:preparedInput.images} : undefined : options?.attachments;
+      const traceParent = options?.attachments?.traceParent;
+      const attachments = preparedInput
+        ? preparedInput.images || traceParent
+          ? { images: preparedInput.images ?? [], ...(traceParent ? { traceParent } : {}) }
+          : undefined
+        : options?.attachments;
       const continuityState = selectPromptContinuity(this.deps.sessionManager, sessionId, effectivePrompt,
         effectivePrompt === prompt ? options : {...options, continuityState:undefined});
 

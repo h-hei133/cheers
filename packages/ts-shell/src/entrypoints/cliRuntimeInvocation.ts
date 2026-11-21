@@ -418,6 +418,7 @@ async function startTurn(
     ...(request.onPromptAccepted ? { onPromptAccepted: request.onPromptAccepted } : {}),
     ...(request.continuityContext ? { continuityContext: request.continuityContext } : {}),
     ...(request.attachments ? { attachments: request.attachments } : {}),
+    traceParent: request.attachments?.traceParent,
     workspaceRoot: request.workspaceRoot,
     workspaceRoots: decodeWorkspaceRoots(request.workspaceRoots),
     agentMode: request.agentMode,

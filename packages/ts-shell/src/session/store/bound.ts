@@ -33,17 +33,23 @@ export interface BoundSessionReadLimits { readonly metadataBytes: number; readon
 export function readBoundSessionRevision(host: BoundSessionHost, session: Session): string {
   try {
     const layout = layoutFor(host, session.id);
+    assertNoPromptIntent(layout);
     const workspace = captureWorkspaceRoot(session.projectRoot, session.projectRoot, 'read');
-    return JSON.stringify([session.id, session.createdAt, session.projectRoot, workspace.path, workspace.identity,
+    const revision = JSON.stringify([session.id, session.createdAt, session.projectRoot, workspace.path, workspace.identity,
       pathIdentity(layout.sessionDir), realpathSync(layout.sessionDir), readSessionFileVersion(layout)]);
+    assertNoPromptIntent(layout);
+    return revision;
   } catch (error) { throw error instanceof SessionPublicationError ? error : new SessionPublicationError('unavailable'); }
 }
 
 export function readBoundSessionState(host: BoundSessionHost, session: Session, limits?: BoundSessionReadLimits): BoundSessionState {
   try {
-    const layout = layoutFor(host, session.id); const version = readSessionFileVersion(layout);
+    const layout = layoutFor(host, session.id);
+    assertNoPromptIntent(layout);
+    const version = readSessionFileVersion(layout);
     const current = readCurrent(layout, session, limits);
     if (readSessionFileVersion(layout) !== version) throw new SessionPublicationError('conflict');
+    assertNoPromptIntent(layout);
     return new BoundState(layout, directoryIdentity(layout), current.scope, current.state);
   } catch (error) { throw error instanceof SessionPublicationError ? error : new SessionPublicationError('unavailable'); }
 }
@@ -56,14 +62,17 @@ export async function readBoundSessionStateAsync(
   signal?: AbortSignal,
 ): Promise<BoundSessionState> {
   try {
-    const layout = layoutFor(host, session.id); const version = readSessionFileVersion(layout);
     signal?.throwIfAborted();
+    const layout = layoutFor(host, session.id);
+    assertNoPromptIntent(layout);
+    const version = readSessionFileVersion(layout);
     const metadata = await readSessionMetadataRecordAsync(layout.metadataPath, limits?.metadataBytes, signal);
     const state = await readStateSnapshotRequiredAsync(layout.statePath, limits?.stateBytes, signal);
     signal?.throwIfAborted();
     const current = projectBoundRead(metadata, state, session);
     signal?.throwIfAborted();
     if (readSessionFileVersion(layout) !== version) throw new SessionPublicationError('conflict');
+    assertNoPromptIntent(layout);
     return new BoundState(layout, directoryIdentity(layout), current.scope, current.state);
   } catch (error) {
     if (signal?.aborted) signal.throwIfAborted();

@@ -79,6 +79,32 @@ it('keeps exact product outcomes and exits normally after asynchronous settlemen
   expect(result).toEqual({ exitCode: 0, signal: null, killed: false, reports: [true, true] });
 }, 10_000);
 
+it('persists the received trace context with the runtime scope in a child process', async () => {
+  const directory = temporaryDirectory();
+  const report = JSON.stringify({ received: true, sharedTrace: true, parentRetained: true, localScope: true });
+  const traceId = '1'.repeat(32), parentSpanId = '2'.repeat(16);
+  const source = String.raw`
+    import assert from 'node:assert/strict';
+    import { getGlobalRotatingFileSink } from ${JSON.stringify(new URL('../rotatingFileSink.ts', import.meta.url).href)};
+    import { JsonlTraceStore } from ${JSON.stringify(new URL('./jsonlStore.ts', import.meta.url).href)};
+    import { runSessionTrace } from ${JSON.stringify(new URL('./runtime.ts', import.meta.url).href)};
+    assert.equal(process.env.VITEST, undefined);
+    await runSessionTrace({ sessionId: 'rpc-receiver', workspaceRoot: process.cwd() }, async () => {}, undefined,
+      '00-${traceId}-${parentSpanId}-01');
+    const sink = getGlobalRotatingFileSink();
+    const spans = new JsonlTraceStore({ sink, sessionId: 'rpc-receiver', workspaceRoot: process.cwd() }).readAllSpans();
+    const span = spans.find(candidate => candidate.name === 'session.run');
+    assert.ok(span);
+    assert.equal(span.traceId, '${traceId}');
+    assert.equal(span.parentId, '${parentSpanId}');
+    assert.equal(span.attributes.sessionId, 'rpc-receiver');
+    assert.equal(span.attributes.workspaceRoot, process.cwd());
+    console.log(${JSON.stringify(report)});
+  `;
+  const result = await runChild(source, directory, [report]);
+  expect(result).toEqual({ exitCode: 0, signal: null, killed: false, reports: [true] });
+}, 10_000);
+
 it('keeps late ordinary logs in the captured sink when a custom recorder run outlives sink replacement', async () => {
   const directory = temporaryDirectory();
   const report = JSON.stringify({ originalLate: 1, successorLate: 0, successorCurrent: 1 });

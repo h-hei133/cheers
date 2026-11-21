@@ -84,7 +84,9 @@ export async function handleRpcCommand(command: RpcCommand, host: RpcHost, signa
           response = buildResponse(command.id, command.type, false, { error: "Prompt message cannot be empty." });
           break;
         }
-        if (host.isStreaming() && command.streamingBehavior === "steer" && host.steer) {
+        if (command.traceParent) {
+          host.enqueuePrompt(command.message, images, command.traceParent);
+        } else if (host.isStreaming() && command.streamingBehavior === "steer" && host.steer) {
           host.steer(command.message, images);
         } else if (host.isStreaming() && command.streamingBehavior === "followUp" && host.followUp) {
           host.followUp(command.message, images);

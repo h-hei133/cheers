@@ -6,6 +6,7 @@ import { workspaceIdentity } from './scope.js';
 import { MAX_SPAN_ATTRIBUTES } from './records.js';
 import type { SpanAttributes } from './types.js';
 import type { OperationName, OperationOptions, OperationSpan } from './operations.js';
+import { traceIdentity } from './carrier.js';
 
 /** The sink is captured by the run owner, including its profile storage scope. */
 export interface TraceLogSink {
@@ -41,17 +42,6 @@ interface ActiveTrace {
 
 const activeTrace = new AsyncLocalStorage<ActiveTrace>();
 
-/** Read recorder-owned properties inside the instrumentation boundary. */
-function identity(carrier: TelemetryCarrier | undefined): { traceId?: string; spanId?: string } {
-  try {
-    const traceId = carrier?.['cheers-trace-id'];
-    const spanId = carrier?.['cheers-span-id'];
-    if (typeof traceId !== 'string' || !/^[a-f0-9]{32}$/.test(traceId) || /^0+$/.test(traceId)
-      || typeof spanId !== 'string' || !/^[a-f0-9]{16}$/.test(spanId) || /^0+$/.test(spanId)) return {};
-    return { traceId, spanId };
-  } catch { return {}; }
-}
-
 export function currentTrace(): ActiveTrace | undefined {
   return activeTrace.getStore();
 }
@@ -67,11 +57,19 @@ export function runTraceScope<T>(
   scope: TraceScope,
   options: SpanOptions,
   callback: (span: TelemetrySpan) => T | Promise<T>,
+  carrier?: TelemetryCarrier,
 ): Promise<T> {
   const captured = Object.freeze({ ...scope, workspaceIdentity: workspaceIdentity(scope.workspaceRoot) });
-  return recordSpan(recorder, { ...options, attributes: scopedAttributes(options.attributes, captured) }, span => {
-    const carrier = span.propagation?.inject(span);
-    return activeTrace.run({ span, scope: captured, ...identity(carrier),
+  const remote = traceIdentity(carrier);
+  let context = recorder;
+  if (remote) {
+    try { context = recorder.propagation?.extract(carrier) ?? recorder; }
+    catch { /* A recorder without working extraction still records the local run. */ }
+  }
+  return recordSpan(context, { ...options, attributes: scopedAttributes(options.attributes, captured) }, span => {
+    const local = traceIdentity(span.propagation?.inject(span));
+    return activeTrace.run({ span, scope: captured, ...local,
+      parentSpanId: remote && local?.traceId === remote.traceId ? remote.spanId : undefined,
       toolRequests: new Map(),
     }, () => callback(span));
   });
@@ -86,7 +84,7 @@ export function traceOperation<Name extends OperationName, T>(
   if (!parent) return Promise.resolve().then(() => callback(undefined));
   return parent.span.startSpan({ ...options, attributes: scopedAttributes(options.attributes, parent.scope) }, span => {
     const carrier = span.propagation?.inject(span);
-    return activeTrace.run({ span, scope: parent.scope, ...identity(carrier), parentSpanId: parent.spanId,
+    return activeTrace.run({ span, scope: parent.scope, ...traceIdentity(carrier), parentSpanId: parent.spanId,
       toolRequests: parent.toolRequests,
     }, async () => {
       try { return await callback(span as OperationSpan<Name>); }

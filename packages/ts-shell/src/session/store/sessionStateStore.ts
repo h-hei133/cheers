@@ -74,8 +74,14 @@ export function withSessionStateLock<T>(
 }
 
 /** Metadata delegates to an existing synchronous state owner; other state lock calls remain nonreentrant. */
-export function withSessionMetadataLock<T>(layout: Pick<SessionFileLayout, 'stateLockPath'>, action: () => T): T {
-  return heldStateLocks.has(resolve(layout.stateLockPath)) ? action() : withSessionStateLock(layout, action);
+export function withSessionMetadataLock<T>(
+  layout: Pick<SessionFileLayout, 'stateLockPath'>,
+  action: () => T,
+  requireHeld?: boolean,
+): T {
+  if (heldStateLocks.has(resolve(layout.stateLockPath))) return action();
+  if (requireHeld) throw new Error('The session storage lock is unavailable for activation.');
+  return withSessionStateLock(layout, action);
 }
 
 export function writeSessionState(input: {

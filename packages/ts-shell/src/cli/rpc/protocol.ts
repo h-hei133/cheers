@@ -4,6 +4,7 @@ import type { CompactionOutcome } from "../../core/shell/compaction.js";
 import type { SessionNavigationResult } from "../runtime/navigation.js";
 import { isAnnotationChange, isAnnotationEntryId, type AnnotationChange } from '../../session/context/annotations.js';
 import type { AnnotationResult } from '../runtime/session/annotations.js';
+import { traceParentCarrier } from '../../observability/tracing/carrier.js';
 
 export interface RpcUiDialogOptions {
   readonly signal?: AbortSignal;
@@ -45,6 +46,8 @@ export type RpcCommand =
       readonly message: string;
       readonly images?: readonly RpcImageAttachment[];
       readonly streamingBehavior?: "steer" | "followUp";
+      /** Version 00 traceparent for this prompt's new run. Omit streamingBehavior when provided. */
+      readonly traceParent?: string;
     }
   | { readonly id?: string; readonly type: "steer"; readonly message: string; readonly images?: readonly RpcImageAttachment[] }
   | { readonly id?: string; readonly type: "follow_up"; readonly message: string; readonly images?: readonly RpcImageAttachment[] }
@@ -165,7 +168,7 @@ export interface RpcHost {
   readonly workspaceRoot: string;
   readonly isStreaming: () => boolean;
   readonly getMessages: () => readonly SessionMessage[];
-  readonly enqueuePrompt: (prompt: string, images?: readonly ImageContent[]) => void;
+  readonly enqueuePrompt: (prompt: string, images?: readonly ImageContent[], traceParent?: string) => void;
   readonly steer?: (message: string, images?: readonly ImageContent[]) => void;
   readonly followUp?: (message: string, images?: readonly ImageContent[]) => void;
   readonly clearQueue?: () => number | { readonly cleared: number; readonly steering: readonly string[]; readonly followUp: readonly string[] };
@@ -271,17 +274,21 @@ export function tryParseRpcCommand(line: string): RpcCommand | undefined {
   const parsed = parseJsonLine(line);
   if (!parsed || typeof parsed.type !== "string" || !RPC_COMMAND_TYPES.has(parsed.type)) return undefined;
   if (parsed.id !== undefined && typeof parsed.id !== "string") return undefined;
+  if (parsed.type !== 'prompt' && parsed.traceParent !== undefined) return undefined;
   const id = typeof parsed.id === "string" ? parsed.id : undefined;
   const base = id !== undefined ? { id } : {};
   switch (parsed.type) {
     case "prompt": {
       if (typeof parsed.message !== "string") return undefined;
       if (parsed.streamingBehavior !== undefined && parsed.streamingBehavior !== "steer" && parsed.streamingBehavior !== "followUp") return undefined;
+      const traceParent = parsed.traceParent;
+      if (traceParent !== undefined && (typeof traceParent !== 'string' || parsed.streamingBehavior !== undefined || !traceParentCarrier(traceParent))) return undefined;
       const images = parsed.images !== undefined ? parseImages(parsed.images) : undefined;
       if (parsed.images !== undefined && !images) return undefined;
       return {
         ...base, type: "prompt", message: parsed.message,
         ...(images ? { images } : {}),
+        ...(traceParent !== undefined ? { traceParent } : {}),
         ...(parsed.streamingBehavior === "steer" || parsed.streamingBehavior === "followUp" ? { streamingBehavior: parsed.streamingBehavior } : {}),
       };
     }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { rpcInputFailure, tryParseRpcCommand } from './protocol.js';
 
+const traceParent = `00-${'1'.repeat(32)}-${'2'.repeat(16)}-01`;
+
 describe('RPC command input', () => {
   it.each([
     { type: 'get_messages', field: 'id', frame: { type: 'get_messages', id: 17 } },
@@ -25,6 +27,7 @@ describe('RPC command input', () => {
 
   it.each([
     { type: 'prompt', id: 'submit', message: 'explicit input', streamingBehavior: 'followUp' },
+    { type: 'prompt', id: 'traced', message: 'explicit input', traceParent },
     { type: 'bash', id: 'shell', command: 'printf private-output', excludeFromContext: true },
     { type: 'navigate_tree', id: 'navigation', entryId: 'old-entry', expectedVersion: 'captured-version' },
     { type: 'annotate_session', id: 'edit', entryId: 'old-entry', expectedVersion: 'captured-version', change: { type: 'context-edit', edit: { kind: 'replace', text: 'line 1\nline 2' } } },
@@ -34,6 +37,21 @@ describe('RPC command input', () => {
     { type: 'new_session', id: 'new', parentSession: 'source-session' },
   ])('preserves explicit optional values for $type', frame => {
     expect(tryParseRpcCommand(JSON.stringify(frame))).toEqual(frame);
+  });
+
+  it.each([null, 17, `${traceParent}\n`, traceParent.replace('00-', 'ff-'),
+    traceParent.replace(/1{32}/, '0'.repeat(32)), traceParent.replace(/2{16}/, '0'.repeat(16)),
+  ])('rejects an invalid trace parent', value => {
+    expect(tryParseRpcCommand(JSON.stringify({ type: 'prompt', message: 'test', traceParent: value }))).toBeUndefined();
+  });
+
+  it.each(['steer', 'followUp'])('rejects trace propagation with streaming behavior %s', streamingBehavior => {
+    expect(tryParseRpcCommand(JSON.stringify({ type: 'prompt', message: 'test', traceParent,
+      streamingBehavior }))).toBeUndefined();
+  });
+
+  it.each(['steer', 'follow_up', 'get_state'])('rejects a trace parent on %s', type => {
+    expect(tryParseRpcCommand(JSON.stringify({ type, message: 'test', traceParent }))).toBeUndefined();
   });
 
   it('accepts unknown metadata fields without using them as command parameters', () => {

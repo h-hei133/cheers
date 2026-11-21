@@ -56,6 +56,7 @@ export interface TurnOptions {
   readonly modelCatalog?: ToolGateOptions['modelCatalog'];
   /** Optional recorder; CLI and SDK runs otherwise use their captured log owner. */
   readonly telemetry?: TelemetryContext;
+  readonly traceParent?: string;
   readonly configScope?: ToolGateOptions['configScope'];
   /** Observes kernel facts after the ordinary transcript writer and projection have accepted them. */
   readonly observe?: import('../core/agent/events.js').AgentEventListener;
@@ -540,7 +541,7 @@ export function runTurn(options: TurnOptions): TurnRun {
       span.setStatus({ status: 'error', error: { name: 'AbortError', message: 'Session run aborted.' } });
     }
     span.setAttributes({ steps: projection.stepCount });
-  }, options.telemetry).catch(() => undefined).finally(() => channel.close());
+  }, options.telemetry, options.traceParent).catch(() => undefined).finally(() => channel.close());
 
   return {
     events: {

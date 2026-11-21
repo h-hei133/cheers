@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { compareCodeUnits, formatSpanErrorStatus, queryStoredTraces } from "./query.js";
 import { copyAttributes, copyStatus, copyStoredSpan, MAX_SPAN_EVENTS, MAX_SPAN_LINKS } from './records.js';
+import { traceIdentity } from './carrier.js';
 
 import type {
   SpanLink,
@@ -84,14 +85,13 @@ export class InMemoryTraceStore implements TelemetryContext, TelemetryPropagatio
   }
 
   extract(carrier: TelemetryCarrier | undefined): TelemetryContext {
-    const traceId = carrier?.["cheers-trace-id"];
-    const spanId = carrier?.["cheers-span-id"];
-    if (!traceId || !spanId || !/^[0-9a-f]{32}$/.test(traceId) || !/^[0-9a-f]{16}$/.test(spanId)) return this;
+    const identity = traceIdentity(carrier);
+    if (!identity) return this;
     const extracted: TelemetryContext = {
       propagation: this,
-      startSpan: (options, callback) => this.#runSpan({ traceId, spanId }, options, callback),
+      startSpan: (options, callback) => this.#runSpan(identity, options, callback),
     };
-    this.#refs.set(extracted, { traceId, spanId });
+    this.#refs.set(extracted, identity);
     return extracted;
   }
 

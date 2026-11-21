@@ -15,8 +15,9 @@ export function inputHost(options: RuntimeRpcHostOptions, manager: SessionManage
   return {
     isStreaming: options.isStreaming,
     getMessages: () => readRpcSession(runtimeContext, manager).turns,
-    enqueuePrompt: (prompt, images?: readonly ImageContent[]) => {
-      options.enqueuePrompt(prompt, images?.length ? { images } : undefined);
+    enqueuePrompt: (prompt, images, traceParent) => {
+      options.enqueuePrompt(prompt, images?.length || traceParent
+        ? { images: images ?? [], ...(traceParent ? { traceParent } : {}) } : undefined);
     },
     steer: (msg, images?: readonly ImageContent[]) => {
       const activeInput = options.inputReady?.() === false ? undefined : sessionRuntime.input?.();

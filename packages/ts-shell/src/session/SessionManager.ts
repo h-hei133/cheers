@@ -107,8 +107,8 @@ export class SessionManager extends SessionReentrySurface {
         this.host.store.sessionExists(sessionId),
       sessionDir: (sessionId: string) => this.host.store.sessionDir(sessionId),
       loadSession: (sessionId: string) => this.host.store.load(sessionId),
-      writeSessionMetadata: (session: Session) =>
-        this.host.store.writeSessionMetadata(session),
+      writeSessionMetadata: (session: Session, requireHeld?: boolean) =>
+        this.host.store.writeSessionMetadata(session, requireHeld),
       setCurrentSessionForProject: (projectRoot: string, sessionId: string, options?: SessionActivationOptions) =>
         this.setCurrentSessionForProject(projectRoot, sessionId, options),
       readCurrentSessionSelection: (projectRoot: string) => this.host.store.readCurrentSessionSelection(projectRoot),

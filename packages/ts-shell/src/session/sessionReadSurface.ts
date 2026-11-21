@@ -150,11 +150,12 @@ export abstract class SessionReadSurface extends SessionLifecycleWrites {
   }
 
   getRecoverySnapshot(sessionId: string): RecoverySnapshot {
+    const { session, state, events } = this.host.store.readSnapshot(sessionId);
     return buildRecoverySnapshotForSession({
       sessionId,
-      session: this.host.store.load(sessionId),
-      state: this.host.store.readStateSnapshotRequired(this.host.store.statePath(sessionId)),
-      transcriptEvents: this.getTranscriptEvents(sessionId),
+      session,
+      state,
+      transcriptEvents: events,
     });
   }
 

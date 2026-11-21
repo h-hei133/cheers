@@ -14,6 +14,8 @@ export interface SessionActivationOptions {
   readonly guard?: SessionActivationGuard;
   /** Captures a prepared identity; a callback is not evidence of publication. */
   readonly captureSelection?: (candidate: CurrentSessionSelectionRecord) => void;
+  /** Resume holds the session lock before publishing its metadata under the registry lock. */
+  readonly publishMetadata?: () => void;
 }
 
 function record(value: unknown): CurrentSessionSelectionRecord | undefined {
@@ -44,9 +46,9 @@ function selection(store: CurrentSessionSelectionStore, root: string): CurrentSe
   return record(Object.hasOwn(store.byProjectRoot, key) ? store.byProjectRoot[key] : undefined);
 }
 
-function equal(left: CurrentSessionSelectionRecord | undefined, right: CurrentSessionSelectionRecord | undefined): boolean {
-  return left === undefined ? right === undefined : right !== undefined && left.sessionId === right.sessionId
-    && left.updatedAt === right.updatedAt && left.activationId === right.activationId;
+export function sameSessionActivation(left: CurrentSessionSelectionRecord | undefined, right: CurrentSessionSelectionRecord | undefined): boolean {
+  return left === right || !!(left && right && left.sessionId === right.sessionId
+    && left.updatedAt === right.updatedAt && left.activationId === right.activationId);
 }
 
 /** Final comparison runs against the fresh locked registry, immediately before publication. */
@@ -62,7 +64,7 @@ export function assertActivationGuard(guard: SessionActivationGuard | undefined,
   if (rechecked) throw new Error(rechecked);
   const { store, readError } = read();
   if (readError) throw new Error('Current session activation is unavailable.');
-  if (!equal(selection(store, guard.source.projectRoot), guard.source.expected)
-    || !equal(selection(store, destinationRoot), guard.destination)) throw new Error('Current session activation changed while preparing the switch.');
+  if (!sameSessionActivation(selection(store, guard.source.projectRoot), guard.source.expected)
+    || !sameSessionActivation(selection(store, destinationRoot), guard.destination)) throw new Error('Current session activation changed while preparing the switch.');
   if (guard.signal) AbortSignal.prototype.throwIfAborted.call(guard.signal);
 }

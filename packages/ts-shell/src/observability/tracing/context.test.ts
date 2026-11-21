@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createComponentLogger, setStructuredLogSink } from '../structuredLogger.js';
 import type { StructuredLogEntry } from '../types.js';
+import { traceParentCarrier } from './carrier.js';
 import { currentTrace, runTraceScope, traceOperation } from './context.js';
 import { InMemoryTraceStore } from './span.js';
 import { JsonlTraceStore } from './jsonlStore.js';
@@ -35,6 +36,54 @@ afterEach(() => {
 });
 
 describe('bound tracing', () => {
+  it('links incoming trace context to run and child logs in the receiving scope', async () => {
+    const store = new InMemoryTraceStore();
+    const traceId = '1'.repeat(32);
+    const parentId = '2'.repeat(16);
+    const carrier = traceParentCarrier(`00-${traceId}-${parentId}-01`);
+    const scope = { sessionId: 'receiver', workspaceRoot: '/receiver' };
+    const logger = createComponentLogger('receiving-process');
+    const logged: StructuredLogEntry[] = [];
+    setStructuredLogSink(entry => logged.push(entry));
+
+    await runTraceScope(store, scope, { name: 'session.run' }, async () => {
+      logger.info('run');
+      await traceOperation({ name: 'provider.request' }, () => logger.info('request'));
+    }, carrier);
+
+    const run = store.snapshot().find(span => span.name === 'session.run');
+    expect(run).toMatchObject({ traceId, parentId, attributes: scope });
+    expect(logged[0]).toMatchObject({ traceId, spanId: run?.id, parentSpanId: parentId, fields: scope });
+    expect(logged[1]).toMatchObject({ traceId, parentSpanId: run?.id, fields: scope });
+    expect(currentTrace()).toBeUndefined();
+  });
+
+  it('records a local root and preserves the product result when extraction throws', async () => {
+    const store = new InMemoryTraceStore();
+    const traceId = '1'.repeat(32);
+    const recorder: TelemetryContext = {
+      startSpan: (options, callback) => store.startSpan(options, callback),
+      propagation: {
+        inject: context => store.inject(context),
+        extract: () => { throw new Error('fixture extraction failed'); },
+      },
+    };
+    const carrier = traceParentCarrier(`00-${traceId}-${'2'.repeat(16)}-01`);
+    const scope = { sessionId: 'receiver', workspaceRoot: '/receiver' };
+    let calls = 0;
+
+    await expect(runTraceScope(recorder, scope, { name: 'session.run' }, () => {
+      expect(currentTrace()?.parentSpanId).toBeUndefined();
+      return ++calls;
+    }, carrier)).resolves.toBe(1);
+
+    const [run] = store.snapshot();
+    expect(run).toMatchObject({ name: 'session.run', attributes: scope });
+    expect(run?.traceId).not.toBe(traceId);
+    expect(run?.parentId).toBeUndefined();
+    expect(calls).toBe(1);
+  });
+
   it.each(['getter', 'proxy'] as const)('preserves the root callback value and original error with a throwing carrier %s', async kind => {
     const recorder = carrierFailureRecorder(kind, 'session.run');
     const scope = { sessionId: 'carrier-root', workspaceRoot: '/carrier-root' };
