@@ -4,6 +4,7 @@ import {
 } from "./config.js";
 import { CoreMcpConnectionManager } from "./connectionManager.js";
 import { McpBackgroundDiscovery, type AvailableMcpSnapshot } from './background.js';
+import { McpOperationQueue } from './queue.js';
 import { projectTrust } from "../security/projectTrust.js";
 import { assertAdmission, type Admission } from '../network/admission.js';
 import type { McpContentRequest, McpContentResponse, McpNotificationSnapshot } from "./content/types.js";
@@ -39,9 +40,7 @@ export interface McpDefinitionSource {
 export class CoreMcpGateway {
   private workspaceRoot: string;
   private readonly connectionManager: CoreMcpConnectionManager;
-  private queue: Promise<unknown> = Promise.resolve();
-  private readonly pending = new Set<() => void>();
-  private closed = false;
+  private readonly operations = new McpOperationQueue();
   private closing?: Promise<void>;
   private readonly contentLifetime = new McpContentLifetime();
   private readonly background: McpBackgroundDiscovery;
@@ -55,7 +54,7 @@ export class CoreMcpGateway {
       (name, config, workspaceRoot) => this.connectionAdmission(name, config, workspaceRoot));
     this.background = new McpBackgroundDiscovery(this.connectionManager, this.snapshotTimeoutMs);
     this.unsubscribeDefinitions = definitions?.subscribe(() => {
-      if (!this.closed) void this.configurationChanged().catch(() => {});
+      if (!this.operations.closed) void this.configurationChanged().catch(() => {});
     }, () => this.workspaceRoot);
   }
 
@@ -75,7 +74,7 @@ export class CoreMcpGateway {
   }
 
   snapshot(admission = this.admissionForOperation?.(), signal?: AbortSignal, filter?: McpServerFilter): Promise<McpClientSnapshot> {
-    return this.run(async () => {
+    return this.operations.run(async () => {
       signal?.throwIfAborted();
       assertAdmission(admission);
       const configs = await this.prepare(admission);
@@ -86,12 +85,12 @@ export class CoreMcpGateway {
 
   /** Start discovery without making broad tool searches wait for transport I/O. */
   availableSnapshot(admission = this.admissionForOperation?.(), signal?: AbortSignal, filter?: McpServerFilter): Promise<AvailableMcpSnapshot> {
-    return this.run(async () => {
+    return this.operations.run(async () => {
       await this.prepare(admission);
       const root = this.workspaceRoot;
       return this.background.discover({ root, admission, signal, current: () => {
         const currentRoot = typeof this.root === 'string' ? this.root : this.root();
-        if (this.closed || root !== this.workspaceRoot || root !== currentRoot) throw new Error('MCP workspace changed during discovery.');
+        if (this.operations.closed || root !== this.workspaceRoot || root !== currentRoot) throw new Error('MCP workspace changed during discovery.');
         return this.loadConfigs();
       } }, filter);
     }, signal);
@@ -100,7 +99,7 @@ export class CoreMcpGateway {
   /** Read existing catalogs only; workspace reconciliation belongs to explicit operations. */
   peekSnapshot(filter?: McpServerFilter): McpClientSnapshot | undefined {
     const currentRoot = typeof this.root === "string" ? this.root : this.root();
-    if (this.closed || currentRoot !== this.workspaceRoot) return undefined;
+    if (this.operations.closed || currentRoot !== this.workspaceRoot) return undefined;
     return this.connectionManager.peekSnapshot(selectMcpServers(this.loadConfigs(), filter));
   }
 
@@ -110,7 +109,7 @@ export class CoreMcpGateway {
     const all = !options?.exactTarget && !options?.expectedConfig && (!name || name.toLowerCase() === 'all');
     const admission = mcpSelectionAdmission(this.loadConfigs.bind(this), name, options?.expectedConfig,
       options?.admission ?? this.admissionForOperation?.(), options?.signal);
-    return this.run(async () => {
+    return this.operations.run(async () => {
       assertAdmission(admission);
       const configs = await this.prepare(admission);
       assertAdmission(admission);
@@ -136,11 +135,11 @@ export class CoreMcpGateway {
     // The normal admission fence rejects its late result without replay.
     try { if (target) await this.connectionManager.close(target); await this.connectionManager.reconcile(this.loadConfigs()); }
     catch (error) { await this.connectionManager.close(); throw error; }
-    await this.run(async () => { await this.prepare(); });
+    await this.operations.run(async () => { await this.prepare(); });
   }
 
   invokeTool(serverName: string, toolName: string, args: Record<string, unknown>, admission = this.admissionForOperation?.(), options?: McpToolInvocation): Promise<McpToolCallResult> {
-    return this.run(async () => {
+    return this.operations.run(async () => {
       options?.signal?.throwIfAborted();
       assertAdmission(admission);
       const configs = await this.prepare(admission);
@@ -181,7 +180,7 @@ export class CoreMcpGateway {
     const admission = this.admissionForOperation?.();
     const root = typeof this.root === "string" ? this.root : this.root();
     const lifetime = this.contentLifetime.begin(signal);
-    return this.run(async () => {
+    return this.operations.run(async () => {
       lifetime.signal.throwIfAborted();
       assertAdmission(admission);
       const configs = await this.prepare();
@@ -214,7 +213,7 @@ export class CoreMcpGateway {
 
   /** Inspect only the current connection's bounded metadata; no discovery or authentication. */
   notifications(target?: string): McpNotificationSnapshot[] {
-    if (this.closed) throw new Error("MCP gateway is closed");
+    if (this.operations.closed) throw new Error("MCP gateway is closed");
     const configs = this.loadConfigs();
     if (target && !Object.hasOwn(configs, target)) throw unknownServer(target);
     const root = typeof this.root === "string" ? this.root : this.root();
@@ -223,46 +222,15 @@ export class CoreMcpGateway {
 
   /** Called after a shell root transition, also checked on every request. */
   syncWorkspace(): Promise<void> {
-    return this.run(() => this.synchronizeWorkspace());
+    return this.operations.run(() => this.synchronizeWorkspace());
   }
 
   close(): Promise<void> {
     if (this.closing) return this.closing;
-    this.closed = true;
+    const drained = this.operations.close();
     this.unsubscribeDefinitions?.();
-    for (const cancel of this.pending) cancel();
     this.contentLifetime.cancel();
-    return this.closing = Promise.all([this.background.close(), this.connectionManager.shutdown(), this.queue]).then(() => {});
-  }
-
-  private run<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
-    if (this.closed) return Promise.reject(new Error("MCP gateway is closed"));
-    if (signal?.aborted) return Promise.reject(signal.reason);
-    return new Promise<T>((resolve, reject) => {
-      const abort = (): void => {
-        finish();
-        reject(signal?.aborted ? signal.reason : new Error("MCP gateway is closed"));
-      };
-      const finish = (): void => {
-        this.pending.delete(abort);
-        signal?.removeEventListener("abort", abort);
-      };
-      this.pending.add(abort);
-      const queued = this.queue.then(() => {
-        // Once active, the operation owns cancellation and its outcome.
-        finish();
-        if (this.closed) throw new Error("MCP gateway is closed");
-        signal?.throwIfAborted();
-        return operation();
-      });
-      this.queue = queued.catch(() => {});
-      signal?.addEventListener("abort", abort, { once: true });
-      if (signal?.aborted) abort();
-      queued.then(
-        value => { finish(); resolve(value); },
-        error => { finish(); reject(error); },
-      );
-    });
+    return this.closing = Promise.all([this.background.close(), this.connectionManager.shutdown(), drained]).then(() => {});
   }
 
   private async synchronizeWorkspace(): Promise<void> {
@@ -277,7 +245,7 @@ export class CoreMcpGateway {
     const expected = JSON.stringify(config);
     return () => {
       const current = typeof this.root === 'string' ? this.root : this.root();
-      if (this.closed || current !== root || this.workspaceRoot !== root || JSON.stringify(this.loadConfigs()[name]) !== expected) {
+      if (this.operations.closed || current !== root || this.workspaceRoot !== root || JSON.stringify(this.loadConfigs()[name]) !== expected) {
         return 'MCP workspace or server definition changed during the request.';
       }
       return this.admissionForOperation?.()();
