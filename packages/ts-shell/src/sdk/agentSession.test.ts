@@ -116,6 +116,7 @@ describe("createAgentSession & AgentSession", () => {
   it('keeps a caller-owned MCP connection usable by two SDK sessions and after their disposal', async () => {
     const { work } = makeEnv();
     const name = 'configured-server';
+    const extensionName = 'session-only';
     fs.writeFileSync(path.join(work, '.cheers.mcp.json'), JSON.stringify({ mcpServers: { [name]: { url: 'http://127.0.0.1:8009/mcp' } } }));
     const gateway = new CoreMcpGateway(work);
     const trust = vi.spyOn(projectTrust, 'isProjectUntrusted').mockReturnValue(false);
@@ -125,22 +126,26 @@ describe("createAgentSession & AgentSession", () => {
       ? { tools: [{ name: 'inspect', inputSchema: { type: 'object' } }] }
       : { content: [{ type: 'text', text: 'answer' }] });
     const loader = new DefaultResourceLoader({ cwd: work, noContextFiles: true, extensionFactories: [api => {
-      api.registerMessageRenderer('custom-note', () => 'Configured SDK note');
+      api.registerMcpServer(extensionName, { url: 'http://127.0.0.1:8010/mcp' });
     }] });
     const sessions: Array<Awaited<ReturnType<typeof createAgentSession>>['session']> = [];
     try {
       await loader.reload();
       sessions.push((await createAgentSession({ cwd: work, mcpGateway: gateway })).session);
-      sessions.push((await createAgentSession({ cwd: work, mcpGateway: gateway, resourceLoader: loader })).session);
+      sessions.push((await createAgentSession({ cwd: work, mcpGateway: gateway, resourceLoader: loader,
+        tools: [`mcp__${extensionName}__inspect`], runtimeConfigOverrides: { toolDiscovery: 'full' } })).session);
       const snapshot = await gateway.snapshot(undefined, undefined, candidate => candidate === name);
       expect(snapshot.tools.map(tool => tool.qualifiedName)).toEqual([`mcp__${name}__inspect`]);
       const contractId = snapshot.tools[0]?.contractId;
       expect(contractId).toBeTruthy();
+      await sessions[1]!.prompt('Use the session catalog.');
+      await sessions[1]!.waitForIdle();
+      expect(gateway.loadConfigs()).not.toHaveProperty(extensionName);
       for (const session of sessions) {
         await session.dispose();
         await expect(gateway.invokeTool(name, 'inspect', {}, undefined, { contractId })).resolves.toEqual({ content: 'answer' });
       }
-      expect(connect).toHaveBeenCalledTimes(1);
+      expect(connect).toHaveBeenCalledTimes(2);
     } finally {
       await Promise.allSettled(sessions.map(session => session.dispose()));
       await gateway.close();
@@ -291,6 +296,60 @@ describe("createAgentSession & AgentSession", () => {
       expect(readSessionModel(session.sessionId)).toEqual(persisted);
     } finally { await session.dispose(); }
     await expect(captured!.setThinkingLevel('high')).rejects.toThrow(/retired/);
+  });
+
+  it('adopts only model and thinking writes from the controlled successor startup', async () => {
+    const { work } = makeEnv();
+    const updates: Array<ExtensionModelUpdate | ExtensionThinkingUpdate> = [];
+    const refused: unknown[] = [];
+    const blocked: unknown[] = [];
+    const published: string[] = [];
+    const startupFailure: string[] = [];
+    let latest!: ExtensionAPI;
+    const options = { cwd: work, noContextFiles: false, extensionFactories: [(api: ExtensionAPI) => {
+      latest = api;
+      api.registerVirtualModel({ provider: 'adaptive', id: 'next', name: 'Next', thinkingLevels: ['high'],
+        route: () => ({ provider: 'openai', modelId: 'physical' }) });
+      api.registerVirtualModel({ provider: 'adaptive', id: 'blocked', name: 'Blocked',
+        route: () => ({ provider: 'openai', modelId: 'physical' }) });
+      api.on('PreModelSwitch', async event => {
+        if ((event as { toModel: string }).toModel === 'adaptive/blocked') return { decision: 'block' };
+        try { await api.setThinkingLevel(null); } catch (error) { refused.push(error); }
+      });
+      api.on('PostModelSwitch', event => { published.push((event as { toModel: string }).toModel); });
+      api.on('session_start', async event => {
+        if (event.reason !== 'reload') return;
+        try {
+          updates.push(await api.setModel('adaptive/next'));
+          updates.push(await api.setThinkingLevel('high'));
+          try { await api.setModel('adaptive/blocked'); } catch (error) { blocked.push(error); }
+        } catch (error) { startupFailure.push(error instanceof Error ? error.message : 'Unknown startup failure'); }
+      });
+    }] };
+    const resourceLoader = new DefaultResourceLoader(options);
+    await resourceLoader.reload();
+    const { session } = await createAgentSession({ cwd: work, resourceLoader, tools: ['read'],
+      runtimeConfigOverrides: { instructionBudgetBytes: 4096 } });
+    try {
+      const original = latest;
+      await session.prompt('establish the prompt hook binding');
+      await session.waitForIdle();
+      expect(session.runtimeContext.configuration.current.binding.overrides.instructionBudgetBytes).toBe(4096);
+      options.noContextFiles = true;
+      const result = await session.reload();
+      expect(result, 'reason' in result ? result.reason : undefined).toMatchObject({ status: 'reloaded' });
+      expect(startupFailure).toEqual([]);
+      expect(updates).toEqual([{ status: 'applied', model: 'adaptive/next' }, { status: 'applied', level: 'high' }]);
+      expect(refused).toHaveLength(2);
+      for (const error of refused) expect(error).toMatchObject({ message: expect.stringContaining('Finish the current session operation') });
+      expect(blocked).toEqual([expect.objectContaining({ message: expect.stringContaining('blocked by hook policy') })]);
+      expect(published).toEqual(['adaptive/next', 'adaptive/next']);
+      expect(readSessionModel(session.sessionId)?.virtualModel).toEqual({ provider: 'adaptive', model: 'next', thinkingEffort: 'high' });
+      expect(session.runtimeContext.configuration.current.config.allowedTools).toEqual(['read']);
+      expect(session.runtimeContext.configuration.current.config.instructionBudgetBytes).toBe(0);
+      expect(session.runtimeContext.configuration.current.binding.overrides.instructionBudgetBytes).toBe(0);
+      await expect(original.setModel('adaptive/next')).rejects.toThrow(/retired/);
+    } finally { await session.dispose(); }
   });
 
   it('selects a staged virtual startup option without inventing a physical model or replacing provider authority', async () => {

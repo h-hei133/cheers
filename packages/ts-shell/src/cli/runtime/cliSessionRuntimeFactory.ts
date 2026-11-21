@@ -11,7 +11,7 @@ import { endpointShape } from '../../provider/endpoints/index.js';
 import { buildCompactionWiring, routedCompactionWiring, nativeCompactionAuthority, toCompactionMessages } from './compaction.js';
 import { profileScope } from '../../core/paths/profile/scope.js';
 import { configurationOperation } from '../../core/shell/scope.js';
-import type { CoreMcpGateway } from "../../core/mcp/gateway.js";
+import type { McpGateway } from "../../core/mcp/gateway.js";
 import { messageToText } from "../../model-adapters/multimodal.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 import process from "node:process";
@@ -91,7 +91,7 @@ import { captureThinkingPreference } from '../../core/models/preference.js';
 
 export function createCliSessionRuntime(input: {
   readonly sessionManager: SessionManager;
-  readonly mcpGateway?: CoreMcpGateway;
+  readonly mcpGateway?: McpGateway;
   readonly renderer: StreamingRenderer;
   readonly runtimeContext: ShellRuntimeContext;
   readonly options: CliOptions;

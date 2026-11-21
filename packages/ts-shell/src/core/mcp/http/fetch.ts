@@ -80,7 +80,11 @@ export function mcpFetch(serverUrl: string, options: {
           try { scope.check(); const next = await reader.read(); scope.check();
             if (next.done) { dispose(); reader.releaseLock(); controller.close(); }
             else controller.enqueue(next.value);
-          } catch (error) { dispose(); void reader.cancel().catch(() => {}); controller.error(error); }
+          } catch (error) {
+            dispose(); void reader.cancel().catch(() => {});
+            if (request?.signal.aborted && !init?.signal?.aborted) controller.close();
+            else controller.error(error);
+          }
         },
         async cancel() { dispose(); await reader.cancel(); reader.releaseLock(); },
       }), { status: response.status, headers: response.headers });

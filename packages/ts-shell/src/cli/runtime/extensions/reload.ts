@@ -5,6 +5,7 @@ import { extensionHostFor } from './host.js';
 import { prepareSessionSurface } from '../session/surface.js';
 import type { ExtensionHostBridge } from '../../../extensions/runtime/inProcessLoader.js';
 import type { ConfigPublication } from '../../../config/state.js';
+import { reloadPreferences, type ReloadPreference } from './preference.js';
 
 export type ExtensionReloadResult<Diagnostic = string> = { readonly status: 'reloaded'; readonly diagnostics: readonly Diagnostic[] }
   | { readonly status: 'partial'; readonly diagnostics: readonly Diagnostic[] }
@@ -18,6 +19,9 @@ interface ReloadOwner<Diagnostic> {
   readonly retire: () => Promise<void>;
   readonly replace: (signal: AbortSignal) => Promise<void | { readonly host: ExtensionHostBridge; readonly publication?: ConfigPublication }>;
   readonly start: (signal: AbortSignal) => Promise<void>;
+  readonly publishPreferenceState?: ReloadPreference['publishState'];
+  readonly acceptPreference?: (prior: ConfigPublication, next: ConfigPublication) => void;
+  readonly preferenceDiagnostic: (message: string) => Diagnostic;
   readonly diagnostics: () => readonly Diagnostic[];
 }
 
@@ -37,7 +41,7 @@ export function createExtensionReload<Diagnostic = string>(context: ShellRuntime
       if (context.session !== session || session.id !== id || session.createdAt !== createdAt || session.projectRoot !== projectRoot
         || context.cwd !== cwd || context.projectRoot !== root || context.configuration !== configuration
         || configuration.current !== revision || extensionHostFor(context) !== host) throw new Error('Extension reload source changed during capture.');
-      task = prepareReload(context, owner);
+      task = prepareReload(context, runtime, owner);
     }
     catch { return Promise.resolve({ status: 'refused', reason: 'Extension reload ownership could not be verified.' }); }
     if (runtime.isRunning()) return Promise.resolve({status:'refused', reason:'A session operation is still running.'});
@@ -47,7 +51,8 @@ export function createExtensionReload<Diagnostic = string>(context: ShellRuntime
   };
 }
 
-function prepareReload<Diagnostic>(context: ShellRuntimeContext, owner: ReloadOwner<Diagnostic>): (signal: AbortSignal) => Promise<ExtensionReloadResult<Diagnostic>> {
+function prepareReload<Diagnostic>(context: ShellRuntimeContext, runtime: ShellSessionRuntime,
+  owner: ReloadOwner<Diagnostic>): (signal: AbortSignal) => Promise<ExtensionReloadResult<Diagnostic>> {
   const session = context.session, id = session.id, createdAt = session.createdAt, sessionRoot = session.projectRoot;
   const cwd = context.cwd, root = context.projectRoot, configuration = context.configuration;
   let revision = configuration.current;
@@ -57,12 +62,16 @@ function prepareReload<Diagnostic>(context: ShellRuntimeContext, owner: ReloadOw
   const sourceCurrent = () => context.session === session && session.id === id && session.createdAt === createdAt && session.projectRoot === sessionRoot
     && context.cwd === cwd && context.projectRoot === root && context.configuration === configuration && configuration.current === revision;
   return async signal => {
-    const check = () => {
+    const checkCurrent = () => {
       signal.throwIfAborted();
       const refused = configured();
-      if (refused || !owner.current() || !sourceCurrent() || extensionHostFor(context) !== host) throw new Error(refused ?? 'Extension reload owner changed.');
+      if (refused || !owner.current() || !sourceCurrent() || extensionHostFor(context) !== host
+        || runtime.commands.current?.controller.signal !== signal) throw new Error(refused ?? 'Extension reload owner changed.');
+    };
+    const check = () => {
+      checkCurrent();
       owner.admission?.();
-      signal.throwIfAborted();
+      checkCurrent();
     };
     try {
       check(); await owner.ready(); check();
@@ -78,8 +87,32 @@ function prepareReload<Diagnostic>(context: ShellRuntimeContext, owner: ReloadOw
       } else host = extensionHostFor(context);
       check();
       prepareSessionSurface(context); check();
-      await owner.start(signal); check();
+      if (!host) throw new Error('The successor extension host is unavailable.');
+      let written: { readonly verify: () => void; applied: boolean } | undefined;
+      const preference: ReloadPreference = { host, signal, check: checkCurrent, running: false,
+        verify: () => {
+          check();
+          if (!preference.running && written && !written.applied) throw new Error('A saved extension model preference is still awaiting configuration publication.');
+        },
+        publishState: owner.publishPreferenceState,
+        committed: verify => { written = { verify, applied: false }; },
+        accept: (prior, next) => {
+          if (!written || written.applied || prior !== revision || configuration.current !== next || next.revision !== prior.revision + 1 || next.admissionBlocked) {
+            throw new Error('Extension model configuration publication changed.');
+          }
+          owner.acceptPreference?.(prior, next);
+          revision = next;
+          check();
+          written.applied = true;
+        } };
+      reloadPreferences.set(context, preference);
+      try { await owner.start(signal); }
+      finally { if (reloadPreferences.get(context) === preference) reloadPreferences.delete(context); }
+      check();
       const diagnostics = [...owner.diagnostics()]; check();
+      if (written?.applied) written.verify();
+      else if (written) diagnostics.push(owner.preferenceDiagnostic('An extension model preference was saved. Configuration application remains unverified.'));
+      checkCurrent();
       return diagnostics.length ? { status: 'partial', diagnostics } : { status: 'reloaded', diagnostics };
     } catch (error) {
       if (quiesced) {

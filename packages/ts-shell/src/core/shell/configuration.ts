@@ -1,6 +1,7 @@
 import { ConfigState, type ConfigBinding, type ConfigPublication, type ConfigReloadResult } from '../../config/state.js';
 import { getRuntimeConfig, type RuntimeConfigOverrides } from '../../config/runtimeConfig.js';
-import { projectSessionModel } from '../../session/model/projection.js';
+import { projectModelSelection, projectSessionModel } from '../../session/model/projection.js';
+import type { SessionModelReceipt } from '../../session/model/state.js';
 import { prepareThemeSelection } from '../../presentation/theme/selection.js';
 import { projectTrust } from '../security/projectTrust.js';
 import { identifyProject } from '../security/trust/identity.js';
@@ -51,9 +52,26 @@ export function initialConfiguration(context: Omit<ConfigurationContext, 'config
 
 function validateCandidate(config: RuntimeConfig, context: Pick<ConfigurationContext, 'session' | 'resolveConfigTarget' | 'deferredModel'>, catalog: readonly CatalogProvider[]): RuntimeConfig {
   const candidate = projectSessionModel(config, context.session.id);
+  return validateModelConfiguration(candidate, context, catalog, Boolean(readLogicalModel(context.session.id)));
+}
+
+function validateModelConfiguration(candidate: RuntimeConfig, context: Pick<ConfigurationContext, 'session' | 'resolveConfigTarget' | 'deferredModel'>,
+  catalog: readonly CatalogProvider[], logical: boolean): RuntimeConfig {
   const target = context.resolveConfigTarget?.(candidate, context.session.id)
     ?? resolveProviderCredential({ runtimeConfig: candidate, pool: { sessionId: context.session.id } });
-  return constrainRuntimeConfig(candidate, context.deferredModel?.() || readLogicalModel(context.session.id) ? undefined : target, catalog);
+  return constrainRuntimeConfig(candidate, context.deferredModel?.() || logical ? undefined : target, catalog);
+}
+
+/** Apply the saved preference to the accepted configuration, including the resource owner's policy. */
+export function publishReloadModel(context: ConfigurationContext, prior: ConfigPublication, receipt: SessionModelReceipt,
+  check: () => void): ConfigReloadResult {
+  const state = context.configuration;
+  const selection = receipt.after.selection;
+  const candidate = validateModelConfiguration(projectModelSelection(prior.requested, selection), context, prior.catalog, Boolean(selection?.virtualModel));
+  check();
+  if (!candidate.configValidation.valid) throw new Error('The saved model preference could not be applied.');
+  const binding = prior.binding;
+  return state.publish(state.begin(binding), candidate, binding, check);
 }
 
 /**

@@ -27,8 +27,8 @@ export class McpHttpRequests {
 
   cancel(id: RequestId): void {
     const entry = this.pending.get(id);
-    if (entry?.finish) entry.finish();
-    else entry?.abort.abort();
+    entry?.abort.abort();
+    entry?.finish?.();
     // Keep the aborted entry until a delayed fetch has observed its signal.
   }
 

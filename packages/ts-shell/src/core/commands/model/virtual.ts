@@ -54,17 +54,18 @@ export async function setVirtualModel(target: SessionVirtualModelSelection, cont
     const previous = projectLogicalModel(baseline.selection);
     const fromModel = previous ? `${previous.provider}/${previous.model}` : 'default';
     const toModel = `${target.provider}/${target.model}`;
-    const hook = await defaultHookDispatcher.dispatch({ eventName: 'PreModelSwitch', sessionId,
+    const hooks = context.modelHooks ?? defaultHookDispatcher;
+    const hook = await hooks.dispatch({ eventName: 'PreModelSwitch', sessionId,
       workspaceRoot: root, timestamp: new Date().toISOString(), fromModel, toModel });
     if (hook?.decision === 'block') return 'Model switch blocked by hook policy.';
     if (!current()) return 'Model switch blocked: session, configuration or virtual model registration changed.';
-    writeSessionModel(sessionId, next, baseline, current);
+    writeSessionModel(sessionId, next, baseline, current, context.modelPublication);
     if (!sameValue(readSessionModelStrict(sessionId), next)) return 'Model selection publication is unverified; inspect the saved session before retrying.';
     invalidatePromptMeasurement(sessionId);
     const application = configurationApplicationNotice(context);
     if (application) return `Model preference saved for ${toModel}; reasoning effort: ${target.thinkingEffort ?? 'auto'}.\n${application}`;
     try {
-      await defaultHookDispatcher.dispatch({ eventName: 'PostModelSwitch', sessionId,
+      await hooks.dispatch({ eventName: 'PostModelSwitch', sessionId,
         workspaceRoot: root, timestamp: new Date().toISOString(), fromModel, toModel });
     } catch { return `Model preference saved for ${toModel}. Post-switch hook outcome is unverified.`; }
     return `Model switched to ${toModel}.\nReasoning effort: ${target.thinkingEffort ?? 'auto'}.\nScope: current session (saved for resume).`;

@@ -1,7 +1,7 @@
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { CommandContext, LocalCommandResult } from '../../core/commands/types.js';
 import type { ToolGateOptions } from '../../turn/tools.js';
-import type { CoreMcpGateway } from '../../core/mcp/gateway.js';
+import type { McpGateway } from '../../core/mcp/gateway.js';
 import { addMcpDefinition, runMcpConfigCommand, type McpConfigHost } from '../mcp/config.js';
 import type { McpConfigScope } from '../../core/mcp/types.js';
 import { assertSourceAccess } from '../../core/query/sourcePolicy.js';
@@ -11,12 +11,12 @@ import { parseSyntax } from '../../core/commands/syntax/parse.js';
 import { mcpSyntax } from '../../core/commands/mcp/syntax.js';
 import { runMcpAuthCommand } from '../mcp/auth/command.js';
 
-const hosts = new WeakMap<ShellRuntimeContext, { gate: () => ToolGateOptions; gateway: CoreMcpGateway; onAuthorizeUrl?: (url: string) => void }>();
+const hosts = new WeakMap<ShellRuntimeContext, { gate: () => ToolGateOptions; gateway: Pick<McpGateway, 'configurationChanged'>; onAuthorizeUrl?: (url: string) => void }>();
 const pending = new WeakMap<ShellRuntimeContext, AbortController>();
 
 export function cancelMcpFor(context: ShellRuntimeContext): void { pending.get(context)?.abort(); }
 
-export function installMcpRuntime(context: ShellRuntimeContext, gateway: CoreMcpGateway, gate: (tool?: string) => ToolGateOptions, onAuthorizeUrl?: (url: string) => void): void {
+export function installMcpRuntime(context: ShellRuntimeContext, gateway: Pick<McpGateway, 'configurationChanged'>, gate: (tool?: string) => ToolGateOptions, onAuthorizeUrl?: (url: string) => void): void {
   hosts.set(context, { gateway, gate: () => gate('apply_patch'), onAuthorizeUrl });
 }
 

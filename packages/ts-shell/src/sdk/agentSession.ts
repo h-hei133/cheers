@@ -12,7 +12,9 @@ import { closeSshFor } from "../cli/runtime/ssh.js";
 import { createCliSessionRuntime } from "../cli/runtime/cliSessionRuntimeFactory.js";
 import { getRuntimeConfig, type RuntimeConfig, type RuntimeConfigOverrides, type RuntimeProvider } from "../config/runtimeConfig.js";
 import { registerCatalogContribution } from "../core/catalog/contributions.js";
-import type { CoreMcpGateway } from "../core/mcp/gateway.js";
+import type { CoreMcpGateway, McpGateway } from "../core/mcp/gateway.js";
+import { McpSessionGateway } from '../core/mcp/scope.js';
+import { sessionMcpDefinitions } from '../core/catalog/mcp.js';
 import type { QueryEventObserver } from "../core/shell/sessionRuntime.js";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import { bootstrapShellRuntime } from "../core/shell/bootstrap.js";
@@ -99,7 +101,7 @@ export class AgentSession {
     readonly sessionRuntime: ShellSessionRuntime,
     readonly sessionManager: SessionManager,
     readonly resourceLoader: ResourceLoader,
-    private readonly mcpGateway: CoreMcpGateway | undefined,
+    private readonly mcpGateway: McpGateway | undefined,
     private readonly ownsMcpGateway: boolean,
     private readonly contributionCleanups: readonly (() => void)[],
     private readonly retireResources?: () => void,
@@ -366,8 +368,10 @@ export async function createAgentSession(
     runtimeContext.sdkSkills = new Map(loadedSkills.map((s) => [s.name, s]));
   }
 
-  const ownsMcpGateway = options.mcpGateway === undefined;
-  const mcpGateway = options.mcpGateway ?? createCliMcpGateway(() => runtimeContext.cwd, () => configurationAdmission(runtimeContext), () => runtimeContext.session.id);
+  const mcpGateway = options.mcpGateway
+    ? new McpSessionGateway(options.mcpGateway, () => runtimeContext.cwd, () => configurationAdmission(runtimeContext),
+      sessionMcpDefinitions(() => runtimeContext.session.id))
+    : createCliMcpGateway(() => runtimeContext.cwd, () => configurationAdmission(runtimeContext), () => runtimeContext.session.id);
   const cleanups: Array<() => void> = [];
 
   let sessionRuntime: ShellSessionRuntime | undefined;
@@ -457,7 +461,7 @@ export async function createAgentSession(
       sessionManager,
       resourceLoader,
       mcpGateway,
-      ownsMcpGateway,
+      true,
       cleanups,
       retireResources,
       sessionUi,
@@ -492,7 +496,7 @@ export async function createAgentSession(
     for (const unregister of resourceCleanups.splice(0)) {
       try { unregister(); } catch { /* Keep cleaning up after the initialization failure. */ }
     }
-    if (ownsMcpGateway) await mcpGateway.close().catch(() => {});
+    await mcpGateway.close().catch(() => {});
     try { sessionRuntime?.terminate(runtimeContext.session.id); } catch { /* Keep the initialization failure. */ }
     throw error;
   }

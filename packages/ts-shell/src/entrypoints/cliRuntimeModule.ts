@@ -1,6 +1,6 @@
 import { configurationAdmission } from "../core/shell/configuration.js";
 import { refreshShellRuntimeConfig } from "../core/shell/runtimeContext.js";
-import type { CoreMcpGateway } from "../core/mcp/gateway.js";
+import type { McpGateway } from "../core/mcp/gateway.js";
 import type { PromptAttachments } from "../core/shell/sessionRuntime.js";
 import { parseTransportPrompts } from '../core/shell/printPromptInput.js';
 import fs from "node:fs";
@@ -70,7 +70,7 @@ import { runPrintSessionAction } from "../cli/print/actions.js";
 export async function runNonTtyPromptStream(options: {
   stopRequested?: () => boolean;
   sessionManager: SessionManager;
-  mcpGateway?: CoreMcpGateway;
+  mcpGateway?: McpGateway;
   runtimeContext: ShellRuntimeContext;
   renderer: StreamingRenderer;
   sessionRuntime: ShellSessionRuntime;
@@ -108,7 +108,7 @@ export async function runNonInteractivePrompt(options: {
   prompt: string;
   attachments?: PromptAttachments;
   sessionManager: SessionManager;
-  mcpGateway?: CoreMcpGateway;
+  mcpGateway?: McpGateway;
   runtimeContext: ShellRuntimeContext;
   renderer: StreamingRenderer;
   sessionRuntime: ShellSessionRuntime;
@@ -526,7 +526,7 @@ export async function executeResolvedPromptTurn(options: {
 export async function runReplayPromptScript(options: {
   replayFile: string;
   sessionManager: SessionManager;
-  mcpGateway?: CoreMcpGateway;
+  mcpGateway?: McpGateway;
   runtimeContext: ShellRuntimeContext;
   renderer: StreamingRenderer;
   sessionRuntime: ShellSessionRuntime;

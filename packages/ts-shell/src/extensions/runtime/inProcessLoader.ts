@@ -15,7 +15,7 @@ import type { VersionRecord } from '../model.js'
 import { EXTENSION_WORKER_SOURCE } from './workerSource.js'
 import { ExtensionInitialization, type ExtensionInitializationOptions } from './initialization.js'
 import { resolveUiHost, type ExtensionUiHost, type ExtensionUiApi } from './ui.js'
-import { currentExtensionInvocation, renderExtensionMessage, runExtensionInvocation } from './context.js'
+import { currentExtensionInvocation, reloadStartupSignal, renderExtensionMessage, runExtensionInvocation } from './context.js'
 import { captureMessageRenderer, createMessageRendererBridge, invokeMessageRenderer, MAX_MESSAGE_RENDERERS, type ExtensionMessageRenderer, type RegisteredMessageRenderer } from './renderer.js'
 import { captureExtensionMcpServer, MAX_EXTENSION_MCP_SERVERS, type ExtensionMcpServer, type RegisteredMcpServer } from './mcp.js'
 import { captureExtensionProvider, MAX_EXTENSION_PROVIDERS, type ExtensionProvider } from './provider.js'
@@ -356,7 +356,7 @@ function createExtensionApiCollector(options: {
               ...(guardedInput ? { invalid: () => new InputRefusal(), failed: () => new InputRefusal(), cancelled: () => new InputRefusal() } : {}),
             })).then(envelope => envelope.value)
         }
-        return runExtensionInvocation(inherited ? inherited.ui : options.host?.ui, signal, operation)
+        return runExtensionInvocation(inherited ? inherited.ui : options.host?.ui, signal, operation, reloadStartupSignal(event, payload))
       })
       handlers.set(event, list)
     }, collecting),

@@ -11,23 +11,15 @@ import type { McpContentRequest, McpContentResponse, McpNotificationSnapshot } f
 import { McpContentLifetime } from "./content/lifetime.js";
 import { mcpSelectionAdmission, selectMcpServers } from './config/selection.js';
 import type { McpHttpAuthorization } from './http/fetch.js';
+import { readMcpSnapshot } from './snapshot.js';
 import type {
   McpClientSnapshot,
-  McpConnectionState,
   McpServerFilter,
   McpToolCallResult,
   McpToolInvocation,
   ScopedMcpServerConfig,
 } from "./types.js";
-import {
-  classifyMcpFailure,
-} from "./errorTaxonomy.js";
-import {
-  MCP_CATALOG_BYTES,
-  MCP_CATALOG_TIMEOUT_MS,
-  MCP_CATALOG_TOOLS,
-  McpCatalogLimitError,
-} from './catalogLimit.js';
+import { MCP_CATALOG_TIMEOUT_MS } from './catalogLimit.js';
 
 export { describeMcpConnectionState, McpGatewayBlockedError, type McpGatewayBlockerKind } from "./status.js";
 import { McpGatewayBlockedError, unavailableServer, unknownServer } from "./status.js";
@@ -36,6 +28,11 @@ export interface McpDefinitionSource {
   read(workspaceRoot: string): Record<string, ScopedMcpServerConfig>;
   subscribe(changed: () => void, workspaceRoot: () => string): () => void;
 }
+
+export type McpGateway = Omit<CoreMcpGateway, 'admissionForOperation' | 'content' | 'loadConfigs'> & {
+  readonly content: (server: string, request: McpContentRequest, signal?: AbortSignal) => Promise<McpContentResponse>;
+  readonly loadConfigs: () => Record<string, ScopedMcpServerConfig>;
+};
 
 export class CoreMcpGateway {
   private workspaceRoot: string;
@@ -46,9 +43,10 @@ export class CoreMcpGateway {
   private readonly background: McpBackgroundDiscovery;
   private readonly unsubscribeDefinitions?: () => void;
 
-  constructor(private readonly root: string | (() => string), private readonly admissionForOperation?: () => Admission,
+  constructor(private readonly root: string | (() => string), readonly admissionForOperation?: () => Admission,
     authorizationFor?: (name: string, config: ScopedMcpServerConfig) => McpHttpAuthorization | undefined,
-    private readonly snapshotTimeoutMs = MCP_CATALOG_TIMEOUT_MS, private readonly definitions?: McpDefinitionSource) {
+    private readonly snapshotTimeoutMs = MCP_CATALOG_TIMEOUT_MS, private readonly definitions?: McpDefinitionSource,
+    private readonly loadConfigured: typeof loadMcpConfigs = loadMcpConfigs) {
     this.workspaceRoot = typeof root === "string" ? root : root();
     this.connectionManager = new CoreMcpConnectionManager(authorizationFor,
       (name, config, workspaceRoot) => this.connectionAdmission(name, config, workspaceRoot));
@@ -62,11 +60,13 @@ export class CoreMcpGateway {
     return this.connectionManager.subscribe(changed);
   }
 
-  loadConfigs(): Record<string, ScopedMcpServerConfig> {
-    const trusted = !projectTrust.isProjectUntrusted(this.workspaceRoot);
-    const configs = loadMcpConfigs(this.workspaceRoot, trusted);
+  loadConfigs(source: 'bound' | 'current' = 'bound'): Record<string, ScopedMcpServerConfig> {
+    if (source === 'current' && this.operations.closed) throw new Error('MCP gateway is closed');
+    const root = source === 'bound' ? this.workspaceRoot : typeof this.root === 'string' ? this.root : this.root();
+    const trusted = !projectTrust.isProjectUntrusted(root);
+    const configs = this.loadConfigured(root, trusted);
     if (trusted && this.definitions) {
-      for (const [name, config] of Object.entries(this.definitions.read(this.workspaceRoot))) {
+      for (const [name, config] of Object.entries(this.definitions.read(root))) {
         if (!Object.hasOwn(configs, name)) configs[name] = config;
       }
     }
@@ -79,7 +79,9 @@ export class CoreMcpGateway {
       assertAdmission(admission);
       const configs = await this.prepare(admission);
       signal?.throwIfAborted();
-      return this.readSnapshot(selectMcpServers(configs, filter), admission, signal);
+      return readMcpSnapshot(this.connectionManager, selectMcpServers(configs, filter), {
+        workspaceRoot: this.workspaceRoot, timeoutMs: this.snapshotTimeoutMs, admission, signal,
+      });
     }, signal);
   }
 
@@ -119,7 +121,9 @@ export class CoreMcpGateway {
       try {
         await this.connectionManager.close(all ? undefined : name);
         assertAdmission(admission);
-        return await this.readSnapshot(all ? configs : { [name]: configs[name]! }, admission, options?.signal);
+        return await readMcpSnapshot(this.connectionManager, all ? configs : { [name]: configs[name]! }, {
+          workspaceRoot: this.workspaceRoot, timeoutMs: this.snapshotTimeoutMs, admission, signal: options?.signal,
+        });
       } catch (error) {
         // A rejected or cancelled refresh must not retain its newly opened transport.
         await this.connectionManager.close(all ? undefined : name);
@@ -176,35 +180,46 @@ export class CoreMcpGateway {
     }, options?.signal);
   }
 
-  content(serverName: string, request: McpContentRequest, signal?: AbortSignal): Promise<McpContentResponse> {
-    const admission = this.admissionForOperation?.();
+  content(serverName: string, request: McpContentRequest, signal?: AbortSignal,
+    scope?: { readonly admission: Admission; readonly shared?: true }): Promise<McpContentResponse> {
+    const configured = this.admissionForOperation?.();
+    const admission = () => configured?.() ?? scope?.admission();
     const root = typeof this.root === "string" ? this.root : this.root();
-    const lifetime = this.contentLifetime.begin(signal);
+    const lifetime = this.contentLifetime.begin(scope?.shared ? undefined : signal);
+    const scopedRefusal = scope?.shared ? new AbortController() : undefined;
+    const requestSignal = scopedRefusal ? AbortSignal.any([lifetime.signal, scopedRefusal.signal, ...(signal ? [signal] : [])]) : lifetime.signal;
     return this.operations.run(async () => {
-      lifetime.signal.throwIfAborted();
+      requestSignal.throwIfAborted();
       assertAdmission(admission);
-      const configs = await this.prepare();
+      const configs = await this.prepare(admission);
       const config = Object.hasOwn(configs, serverName) ? configs[serverName] : undefined;
       if (!config) throw unknownServer(serverName);
-      const current = () => {
-        assertAdmission(admission);
+      const connection = () => {
+        assertAdmission(configured);
         if (root !== this.workspaceRoot || root !== (typeof this.root === "string" ? this.root : this.root())) return "MCP workspace changed during request";
         if (JSON.stringify(this.loadConfigs()[serverName]) !== JSON.stringify(config)) return "MCP configuration changed during request";
         return undefined;
       };
+      const current = () => {
+        const refusal = connection();
+        if (refusal) return refusal;
+        try { assertAdmission(scope?.admission); }
+        catch (error) { scopedRefusal?.abort(); throw error; }
+        return undefined;
+      };
       try {
-        const result = await this.connectionManager.get(serverName, config, root).content(request, current, lifetime.signal);
+        const result = await this.connectionManager.get(serverName, config, root).content(request, current, requestSignal);
+        requestSignal.throwIfAborted();
         assertAdmission(current);
         return { serverName, scope: config.scope, transport: config.transport, result };
       } catch (error) {
-        // Preserve a healthy connection and subscriptions on ordinary request rejection.
-        // Cancellation and invalid authority must also revoke the physical connection.
+        // The caller-owned connection survives a scoped cancellation. Shared revocation still closes it.
         let invalid = lifetime.signal.aborted;
-        try { invalid ||= current() !== undefined; } catch { invalid = true; }
+        try { invalid ||= (scope?.shared ? connection : current)() !== undefined; } catch { invalid = true; }
         if (invalid) await this.connectionManager.close(serverName);
         throw error;
       }
-    }).finally(lifetime.dispose);
+    }, requestSignal).finally(lifetime.dispose);
   }
 
   cancelContent(): void {
@@ -270,70 +285,6 @@ export class CoreMcpGateway {
     assertAdmission(admission);
     await this.connectionManager.reconcile(configs);
     return configs;
-  }
-
-  private async readSnapshot(configs: Record<string, ScopedMcpServerConfig>, admission?: Admission, signal?: AbortSignal): Promise<McpClientSnapshot> {
-    const clients: McpConnectionState[] = [];
-    const tools: McpClientSnapshot["tools"] = [];
-    const deadline = Date.now() + this.snapshotTimeoutMs;
-    const timeout = new AbortController();
-    const timer = setTimeout(() => timeout.abort(new McpCatalogLimitError('deadline')), Math.max(0, deadline - Date.now()));
-    const lifecycle = signal ? AbortSignal.any([signal, timeout.signal]) : timeout.signal;
-    let bytes = 0;
-    try {
-      for (const [name, config] of Object.entries(configs)) {
-        await this.connectionManager.withToolDiscovery(name, async () => {
-          lifecycle.throwIfAborted();
-          assertAdmission(admission);
-          const client = this.connectionManager.get(name, config, this.workspaceRoot);
-          let state = await client.connect(admission, lifecycle);
-          if (state.type === "connected") {
-            lifecycle.throwIfAborted();
-            assertAdmission(admission);
-            try {
-              const listed = await client.listTools(admission, lifecycle, { deadline });
-              const listedBytes = Buffer.byteLength(JSON.stringify(listed), 'utf8');
-              if (bytes + listedBytes > MCP_CATALOG_BYTES) throw new McpCatalogLimitError('bytes');
-              if (tools.length + listed.length > MCP_CATALOG_TOOLS) throw new McpCatalogLimitError('tools');
-              bytes += listedBytes;
-              tools.push(...listed);
-            } catch (error) {
-              if (error instanceof McpCatalogLimitError || lifecycle.aborted) throw error;
-              await this.connectionManager.close(name);
-              state = { type: "failed", name, config, error: classifyMcpFailure({
-                failureClass: "protocol",
-                detail: error instanceof Error ? error.message : String(error),
-              }).safeDetail };
-            }
-          }
-          clients.push(state);
-        }, lifecycle);
-      }
-      lifecycle.throwIfAborted();
-      assertAdmission(admission);
-      return { clients, tools };
-    } catch (error) {
-      const limit = error instanceof McpCatalogLimitError ? error
-        : timeout.signal.aborted && timeout.signal.reason instanceof McpCatalogLimitError
-          ? timeout.signal.reason
-          : undefined;
-      if (limit) {
-        let cleanupUnconfirmed = false;
-        try { await this.connectionManager.close(new Set(Object.keys(configs))); }
-        catch { cleanupUnconfirmed = true; }
-        throw new McpGatewayBlockedError({
-          message: limit.message + (cleanupUnconfirmed ? '; MCP connection cleanup could not be confirmed.' : ''),
-          blockerKind: 'environment-not-ready',
-          mcpFailureClass: limit.failureClass,
-          doNext: limit.kind === 'deadline'
-            ? 'Run /mcp refresh all after slow or unavailable servers respond, or reduce the configured server set.'
-            : 'Reduce configured MCP servers or exposed tools, then run /mcp refresh all.',
-        });
-      }
-      throw error;
-    } finally {
-      clearTimeout(timer);
-    }
   }
 
 }

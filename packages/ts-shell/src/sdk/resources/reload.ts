@@ -92,15 +92,19 @@ export class SessionResources {
     const store = new SessionStoreAccess(), selection = store.readCurrentSessionSelection(root);
     let receipt: ResourceReloadReceipt | undefined, successorHost: typeof host | undefined;
     let expectedRevision = revision, intentionallyRetired = false, retired = false;
-    const sourceCheck = () => {
+    const checkOwner = (expected = expectedRevision) => {
       const refused = configured();
       if (this.closed || refused || context.session !== session || session.id !== id || session.createdAt !== createdAt || session.projectRoot !== sessionRoot
         || context.configuration !== configuration
-        || configuration.current !== expectedRevision || context.projectRoot !== root || context.cwd !== cwd
+        || configuration.current !== expected || context.projectRoot !== root || context.cwd !== cwd
         || extensionHostFor(context) !== (successorHost ?? host) || !owner.current()) throw new Error('SDK resource reload owner changed.');
-      saved(() => {
-        if (!sameValue(store.readCurrentSessionSelection(root), selection)) throw new Error('SDK saved session selection changed.');
-      });
+    };
+    const checkSelection = () => {
+      if (!sameValue(store.readCurrentSessionSelection(root), selection)) throw new Error('SDK saved session selection changed.');
+    };
+    const sourceCheck = () => {
+      checkOwner();
+      saved(checkSelection);
     };
     sourceCheck(); lease.assertCurrent(host); sourceCheck();
     const checkLease = () => {
@@ -133,6 +137,14 @@ export class SessionResources {
     };
     return {
       current:() => owner.current(), admission:() => {sourceCheck(); checkLease();}, ready:owner.ready,
+      publishPreferenceState: (snapshot: Parameters<typeof saved.publishState>[0], publish: () => void) => {
+        saved.publishState(snapshot, publish, () => {checkOwner(); checkSelection(); checkLease();});
+      },
+      acceptPreference: (prior: typeof revision, next: typeof revision) => {
+        if (expectedRevision !== prior) throw new Error('SDK resource preference source changed.');
+        checkOwner(next); checkLease();
+        expectedRevision = next;
+      },
       shutdown:async (signal: AbortSignal) => {
         this.active = true;
         ui.beginReload();
@@ -158,6 +170,7 @@ export class SessionResources {
         return {host:successorHost, publication:expectedRevision};
       },
       start:async (signal: AbortSignal) => {await owner.start('reload', signal); sourceCheck(); checkLease();},
+      preferenceDiagnostic: (message: string): ResourceDiagnostic => ({kind:'warning', message}),
       diagnostics:() => [...(receipt?.snapshot.extensions.errors ?? []).map(error => ({kind:'error' as const, path:resourceReport(error.path), message:resourceReport(error.error)})),
         ...captureDiagnostics(receipt?.snapshot.skills.diagnostics ?? []), ...captureDiagnostics(receipt?.snapshot.themes.diagnostics ?? []),
         ...owner.diagnostics().map(message => ({kind:'warning' as const, message:resourceReport(message)}))],

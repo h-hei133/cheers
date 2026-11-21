@@ -3,6 +3,7 @@ import { configurationAdmission } from '../../../core/shell/configuration.js';
 import { dispatchExtensionEvent, getExtensionEventRunners, type ExtensionEventRunner } from '../../../core/hooks/extensionBridge.js';
 import type { ExtensionSessionEvent } from '../../../extensions/events/model.js';
 import { extensionHostFor, quiesceExtensionHost } from './host.js';
+import { dispatchReloadStartup } from '../../../extensions/runtime/context.js';
 
 /** Own the two notifications for one admitted session and extension generation. */
 export class ExtensionSessionLifecycle {
@@ -67,8 +68,11 @@ export class ExtensionSessionLifecycle {
   }
 
   private async publish(event: ExtensionSessionEvent, signal?: AbortSignal): Promise<void> {
-    await dispatchExtensionEvent(this.root, this.sessionId, event.type, Object.freeze(event), {
+    Object.freeze(event);
+    const dispatch = async () => { await dispatchExtensionEvent(this.root, this.sessionId, event.type, event, {
       runners: this.audience, admission: () => this.admission(), ...(signal ? { signal } : {}),
-    });
+    }); };
+    if (event.type === 'session_start' && event.reason === 'reload' && signal) await dispatchReloadStartup(event, signal, dispatch);
+    else await dispatch();
   }
 }

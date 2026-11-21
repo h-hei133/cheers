@@ -187,6 +187,10 @@ export interface CommandContext {
   readonly configurationRevocation?: () => number
   /** Model selection may defer only target-specific checks while preserving configuration safety. */
   readonly logicalModelAdmission?: () => string | undefined
+  /** Model switch hooks can be scoped to the enclosing session operation. */
+  readonly modelHooks?: Pick<import('../hooks/hookDispatcher.js').HookDispatcher, 'dispatch'>
+  /** An enclosing session transition can verify the exact model state write. */
+  readonly modelPublication?: import('../../session/model/state.js').SessionModelPublication
   /** Catalogue-only refresh retains ordinary accepted settings and rechecks model constraints. */
   readonly refreshRuntimeConfig?: (scope?: 'catalog') => import('../../config/application.js').ConfigReloadResult
   /** Apply a display-only setting after its owning writer has persisted it. */

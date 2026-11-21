@@ -7,8 +7,11 @@ import type {ShellSessionRuntime} from '../../../core/shell/sessionRuntime.js';
 import {configurationAdmission, initialConfiguration} from '../../../core/shell/configuration.js';
 import {ShellCommandRuntime} from '../../../core/shell/command.js';
 import {HookDispatcher} from '../../../core/hooks/hookDispatcher.js';
+import * as configurationCommands from '../../../core/commands/configuration.js';
+import {writeCatalogCache} from '../../../core/models/catalogStore.js';
 import {getRuntimeConfig} from '../../../config/runtimeConfig.js';
 import {SessionManager} from '../../../session/SessionManager.js';
+import {readSessionModel} from '../../../session/model/state.js';
 import {catalogContributions, registerCatalogContribution} from '../../../core/catalog/contributions.js';
 import {ExtensionService} from '../../../extensions/service.js';
 import { SubmissionQueue } from '../../interactive/inputQueue.js';
@@ -192,6 +195,52 @@ it('applies the successor tool selection during startup inside the reload comman
   const result = await reload();
   expect(result.output).toContain('reloaded');
   expect(sessionToolConfig(context, context.runtimeConfig).config.allowedTools).toEqual(['write']);
+});
+
+it('persists the successor model and thinking preference during reload startup', async () => {
+  const file = path.join(root, 'model.ts');
+  context.cliExtensionPaths = [file];
+  fs.writeFileSync(file, `export default api => {
+    api.registerVirtualModel({ provider: 'adaptive', id: 'next', name: 'Next', thinkingLevels: ['high'],
+      route: () => ({ provider: 'openai', modelId: 'physical' }) });
+    api.on('session_start', async event => {
+      if (event.reason !== 'reload') return;
+      await api.setModel('adaptive/next');
+      await api.setThinkingLevel('high');
+    });
+  };`);
+  install();
+  await startExtensionsFor(context);
+  const prior = context.configuration.current;
+  expect((await reload()).output).toContain('reloaded');
+  expect(context.configuration.current.revision).toBe(prior.revision + 2);
+  expect(readSessionModel(context.session.id)?.virtualModel).toEqual({ provider: 'adaptive', model: 'next', thinkingEffort: 'high' });
+});
+
+it('reports a saved startup preference without claiming configuration application after catalog drift', async () => {
+  const file = path.join(root, 'model.ts'); context.cliExtensionPaths = [file];
+  fs.writeFileSync(file, `export default api => {
+    api.registerVirtualModel({ provider: 'adaptive', id: 'next', name: 'Next',
+      route: () => ({ provider: 'openai', modelId: 'physical' }) });
+    let outcome;
+    api.on('session_start', async event => {
+      if (event.reason === 'reload') outcome = await api.setModel('adaptive/next');
+    });
+    api.registerCommand({ name: 'preference-outcome', kind: 'local', execute: () => ({ kind: 'local', output: outcome?.status }) });
+  };`);
+  install(); await startExtensionsFor(context);
+  const prior = context.configuration.current;
+  const notice = configurationCommands.configurationApplicationNotice;
+  vi.spyOn(configurationCommands, 'configurationApplicationNotice').mockImplementationOnce((...args) => {
+    expect(readSessionModel(context.session.id)?.virtualModel).toEqual({ provider: 'adaptive', model: 'next' });
+    writeCatalogCache([{ id: 'openai', models: [{ id: 'fixture-drift' }] }]);
+    return notice(...args);
+  });
+  expect((await reload()).output).toContain('An extension model preference was saved. Configuration application remains unverified.');
+  expect(context.configuration.current).toBe(prior);
+  expect(readSessionModel(context.session.id)?.virtualModel).toEqual({ provider: 'adaptive', model: 'next' });
+  expect(await routeSlashCommand('/preference-outcome', { cwd: root, projectRoot: root, sessionId: context.session.id,
+    extensionCommand: extensionCommandFor(context) })).toMatchObject({ kind: 'local', output: 'saved' });
 });
 
 it('retains explicit input but removes startup entries when reload is cancelled during new startup', async () => {

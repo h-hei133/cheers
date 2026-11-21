@@ -219,7 +219,8 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     && (sessionEdit.projectRoot === undefined || path.resolve(sessionEdit.projectRoot) !== path.resolve(context.projectRoot))) {
     return 'Model switch blocked: the saved session workspace differs from the current workspace.';
   }
-  const preDecision = await defaultHookDispatcher.dispatch({
+  const hooks = context.modelHooks ?? defaultHookDispatcher;
+  const preDecision = await hooks.dispatch({
     eventName: "PreModelSwitch", sessionId: context.sessionId || 'model-switch',
     workspaceRoot: context.projectRoot ?? context.cwd, timestamp: new Date().toISOString(), fromModel, toModel: model,
   });
@@ -301,7 +302,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
         ...(saved?.skillful !== undefined ? { skillful: saved.skillful } : {}),
         // Request controls belong to the same model and credential binding.
         ...(sameTarget ? { serviceTier: saved.serviceTier, contextWindow: saved.contextWindow } : {}),
-      }, sessionEdit!, beforeCommit);
+      }, sessionEdit!, beforeCommit, context.modelPublication);
     } catch (error) {
       return sessionFailure(error);
     }
@@ -322,7 +323,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   if (applicationNotice) return [`Model preference saved for ${model}; reasoning effort: ${thinkingEffort ?? "auto (provider decides)"}.`, capabilityNotice, applicationNotice].filter(Boolean).join("\n");
 
   // Dispatch PostModelSwitch Hook
-  await defaultHookDispatcher.dispatch({
+  await hooks.dispatch({
     eventName: "PostModelSwitch",
     sessionId: context?.sessionId || "model-switch",
     workspaceRoot: context?.cwd || process.cwd(),

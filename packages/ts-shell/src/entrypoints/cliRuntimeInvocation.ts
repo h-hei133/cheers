@@ -25,7 +25,7 @@ import { browserTools } from '../tools/registry.js';
 import { requestIdentity } from '../context/request/identity.js';
 export { requestIdentity } from '../context/request/identity.js';
 import { pendingTurnInput } from "../turn/pendingInput.js";
-import { CoreMcpGateway } from "../core/mcp/gateway.js";
+import { CoreMcpGateway, type McpGateway } from "../core/mcp/gateway.js";
 import { runTurn, type CompactionSetup, type TurnRun, type TurnOptions } from "../turn/session.js";
 import { createStepFunction, type StepFunction } from "../turn/step.js";
 import {
@@ -108,7 +108,7 @@ export interface CliRuntimeInvocationInput {
   /** Images that travelled with the prompt; see `PromptAttachments`. */
   readonly attachments?: PromptAttachments;
   readonly workspaceRoot: string;
-  readonly mcpGateway?: CoreMcpGateway;
+  readonly mcpGateway?: McpGateway;
   readonly signal: AbortSignal;
   readonly maxTurns: number;
   readonly escalationPromptHandler: (prompt: EscalationPrompt) => Promise<EscalationResponse>;

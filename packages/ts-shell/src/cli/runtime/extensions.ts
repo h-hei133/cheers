@@ -122,7 +122,7 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
       }
       identity = key; const session = context.session.id; const root = context.cwd;
       let argumentsAdmitted = !cliArguments;
-      const extensionHost = installExtensionHost(context, runtime, store, gateway, () => argumentsAdmitted);
+      const extensionHost = installExtensionHost(context, runtime, store, gateway, () => argumentsAdmitted, () => gate().escalationPromptHandler);
       ownedHost = extensionHost;
       lifecycle = new ExtensionSessionLifecycle(context);
       const check = () => { const refused = configurationAdmission(context)() ?? (context.session.id !== session || context.cwd !== root ? 'Extension session or workspace changed.' : undefined); if (refused) throw new Error(refused); };
@@ -160,6 +160,7 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
     shutdown: signal => { closing = true; shortcuts?.retire(); return lifecycle!.shutdown(async () => {}, 'reload', signal); },
     retire, replace: async signal => ({ host: await rebind(signal) }),
     start: signal => lifecycle!.start(() => ready, 'reload', signal),
+    preferenceDiagnostic: message => message,
     diagnostics: () => service?.errors ?? [],
   }) };
   runtimes.set(context, bound);

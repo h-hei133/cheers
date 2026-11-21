@@ -10,6 +10,7 @@ import { resolveUiHost, type ExtensionUiHost } from '../../../extensions/runtime
 import type { SessionManager } from '../../../session/SessionManager.js';
 import type { CoreMcpGateway } from '../../../core/mcp/gateway.js';
 import type { RuntimeConfig } from '../../../config/runtimeConfig.js';
+import type { ToolGateOptions } from '../../../turn/tools.js';
 import { queueExtensionMessage } from '../inputQueue.js';
 import { sessionModelSetters } from './model.js';
 
@@ -32,7 +33,8 @@ const surfaces = new WeakMap<ShellRuntimeContext, UiBinding>();
 
 /** Share one session host between file, installed and embedded extensions. */
 export function installExtensionHost(context: ShellRuntimeContext, runtime: ShellSessionRuntime, store?: SessionManager,
-  gateway?: Pick<CoreMcpGateway, 'peekSnapshot'>, validateStartup?: () => boolean): ExtensionHostBridge {
+  gateway?: Pick<CoreMcpGateway, 'peekSnapshot'>, validateStartup?: () => boolean,
+  hookApproval?: () => ToolGateOptions['escalationPromptHandler']): ExtensionHostBridge {
   hosts.get(context)?.close();
   const sessionId = context.session.id;
   const createdAt = context.session.createdAt;
@@ -82,7 +84,7 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
     getAllTools: allTools,
     getCommands: () => { check(); return [...new Set([...createCommandRegistry(root, context.runtimeConfig).keys(),
       ...catalogContributions(root, sessionId).flatMap(entry => entry.commands.map(command => command.name))])]; },
-    ...sessionModelSetters(context, runtime, operations),
+    ...sessionModelSetters(context, runtime, operations, () => host, hookApproval),
     sendMessage: async message => {
       operations();
       if (typeof message !== 'string' || !message.trim()) throw new Error('Extension message must be nonempty text.');

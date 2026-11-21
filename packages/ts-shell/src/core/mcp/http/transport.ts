@@ -39,7 +39,10 @@ export class McpHttpTransport extends StreamableHTTPClientTransport {
     const [message] = args;
     if (Array.isArray(message)) throw safeHttpFailure(new Error('MCP HTTP batches are unsupported.'));
     this.requests.open(message);
-    if ('method' in message && message.method === 'notifications/cancelled') this.requests.cancel(message.params?.requestId as RequestId);
+    if ('method' in message && message.method === 'notifications/cancelled') {
+      this.requests.cancel(message.params?.requestId as RequestId);
+      return this.admissions.run(undefined, () => super.send(...args));
+    }
     try { await super.send(...args); } catch (error) { throw this.failure = safeHttpFailure(error, this.externalBearer); }
   }
   override async close(): Promise<void> { this.requests.close(); await super.close(); }

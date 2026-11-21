@@ -1,4 +1,4 @@
-import type { CoreMcpGateway } from "../../core/mcp/gateway.js";
+import type { McpGateway } from "../../core/mcp/gateway.js";
 import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type { ProviderCredentialResolution } from "../../core/shell/providerCredentials.js";
@@ -41,7 +41,7 @@ export function streamCliRuntimePrompt(input: {
   readonly readPromptIdentity?: CliRuntimeInvocationInput['readPromptIdentity'];
   readonly continuityContext?: string;
   readonly onPromptAccepted?: () => void;
-  readonly mcpGateway?: CoreMcpGateway;
+  readonly mcpGateway?: McpGateway;
   /** Images that travelled with the prompt; see `PromptAttachments`. */
   readonly attachments?: PromptAttachments;
   readonly sessionId: string;
