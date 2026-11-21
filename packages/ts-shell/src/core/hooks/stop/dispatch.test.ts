@@ -1,10 +1,11 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HookDispatcher } from '../hookDispatcher.js';
 import { loadHookDeclarations } from '../config.js';
 import { registerDeclaredHooks } from '../registration.js';
-import { HookTrustStore } from '../trust.js';
+import { hookFingerprint, HookTrustStore } from '../trust.js';
 import type { StopPayload } from '../types.js';
 import { commandIdentity, normalizeStopResult, progressFingerprint, stopCheck } from './result.js';
 import { stopDeadline } from './deadline.js';
@@ -139,5 +140,51 @@ describe('Stop command boundary', () => {
       { proofVerdict: 'partial' as const }, { evidenceIdentity: ['c'] }]) {
       expect(progressFingerprint([a])).not.toEqual(progressFingerprint([{ ...a, ...patch }]));
     }
+  });
+
+  it('runs a pinned offline completionGate artifact and fails closed when its digest mismatches', async () => {
+    const script = path.join(root, 'completion.mjs');
+    const source = `process.stdout.write(JSON.stringify({ contract: { name: 'normproof.completion-gate.stop', version: '0.1.0' }, decision: 'allow', reasonCode: 'proven', proofVerdict: 'proven', evidenceIdentity: ['gate:local'] }));\n`;
+    fs.writeFileSync(script, source);
+    const completionGate = {
+      version: 1,
+      path: 'completion.mjs',
+      sha256: createHash('sha256').update(source).digest('hex'),
+      nodeFloor: '20.3.0',
+    };
+    configure({ completionGate, timeoutMs: 5000 });
+    const loaded = loadHookDeclarations(root, { includeUser: false });
+    expect(loaded.problems).toEqual([]);
+    expect(loaded.hooks[0]?.completionGate).toEqual(completionGate);
+    expect(hookFingerprint(loaded.hooks[0]!)).not.toBe(
+      hookFingerprint({ ...loaded.hooks[0]!, completionGate: { ...completionGate, sha256: '0'.repeat(64) } }),
+    );
+    const homeDir = path.join(root, 'home');
+    fs.mkdirSync(homeDir);
+    const hooks = new HookDispatcher();
+    registerDeclaredHooks(hooks, root, {
+      homeDir,
+      trustStore: new HookTrustStore(path.join(homeDir, 'trust.json')),
+      requestApproval: async () => 'allow-once',
+    });
+    expect(await hooks.dispatch(payload())).toMatchObject({
+      decision: 'allow',
+      reasonCode: 'explicit_allow',
+      stopChecks: [expect.objectContaining({
+        decision: 'allow',
+        reasonCode: 'proven',
+        proofVerdict: 'proven',
+        evidenceIdentity: ['gate:local'],
+      })],
+    });
+
+    // Tampering with the script after pinning must fail closed without executing it.
+    fs.writeFileSync(script, `require('node:fs').writeFileSync('tampered.txt', 'bad');\n`);
+    expect(await hooks.dispatch(payload())).toMatchObject({
+      decision: 'unknown',
+      reasonCode: 'version_mismatch',
+      proofVerdict: 'unknown',
+    });
+    expect(fs.existsSync(path.join(root, 'tampered.txt'))).toBe(false);
   });
 });

@@ -4,7 +4,7 @@ import { assertSourceAccess } from '../../query/sourcePolicy.js';
 import { evaluateToolPermissionScope } from '../../query/toolPolicy.js';
 import { assertProfileStorage } from '../../paths/profile/context.js';
 import { verifyPathContainment } from '../../security/pathJail.js';
-import type { PermissionScope } from '../../../cli/approval/permissionScope.js';
+import type { PermissionScope } from '../../shell/approval/scope.js';
 import type { WorkspaceRoot } from '../../workspace/model.js';
 import type { DenyRule } from '../../shell/approval/deny.js';
 

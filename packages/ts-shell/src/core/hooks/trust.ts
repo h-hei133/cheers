@@ -34,6 +34,7 @@ import { HookTrustUpdateError, readHookTrust, updateHookTrust } from './trust/st
 /** The parts of a hook that decide what it does, and where it came from. */
 export interface HookIdentity {
   readonly writeGate?: unknown;
+  readonly completionGate?: unknown;
   readonly timeoutMs?: number;
   readonly event: string;
   readonly matcher?: string;
@@ -62,7 +63,8 @@ export interface HookIdentity {
  */
 export function hookFingerprint(hook: HookIdentity): string {
   const canonical = JSON.stringify([hook.event, hook.matcher ?? "", hook.command, path.resolve(hook.sourcePath),
-    ...(hook.writeGate === undefined ? [] : [hook.writeGate, hook.timeoutMs ?? 15_000])]);
+    ...(hook.writeGate === undefined ? [] : [hook.writeGate, hook.timeoutMs ?? 15_000]),
+    ...(hook.completionGate === undefined ? [] : ['completionGate', hook.completionGate, hook.timeoutMs ?? 3_000])]);
   return createHash("sha256").update(canonical).digest("hex");
 }
 

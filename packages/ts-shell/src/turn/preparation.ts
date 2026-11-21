@@ -1,6 +1,6 @@
 import { evaluateToolPermissionScope } from '../core/query/toolPolicy.js';
 import { selectWorkspaceRoot } from '../core/workspace/roots.js';
-import type { PermissionScope } from '../cli/approval/permissionScope.js';
+import type { PermissionScope } from '../core/shell/approval/scope.js';
 import type { DenyRule } from '../core/shell/approval/deny.js';
 import type { ToolExecutionContext, ToolPreparation } from '../tools/types.js';
 import { assertSourceAccess } from '../core/query/sourcePolicy.js';

@@ -196,6 +196,8 @@ export interface InProcessHookConfig {
 export interface CommandHookConfig {
   /** Opt-in canonical write translation. Invalid declarations fail closed at dispatch. */
   readonly writeGate?: unknown;
+  /** Pinned offline completion gate artifact. Invalid declarations fail closed at dispatch. */
+  readonly completionGate?: unknown;
   readonly name?: string;
   readonly description?: string;
   readonly event: HookEventName;

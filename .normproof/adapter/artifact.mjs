@@ -142,5 +142,16 @@ export function extractPinned(destination) {
     throw new Error('stale_artifact: write provenance');
   }
   requireDigest(fs.readFileSync(path.join(repository, artifact.path)), contract.writeArtifactSha256, 'write CLI');
-  return { ...identity, writeArtifactSha256: artifact.sha256, writeProvenance: artifact.provenance };
+  const completion = JSON.parse(fs.readFileSync(path.join(repository, '.normproof/completion-gate/artifact.json')));
+  if (completion.sha256 !== contract.completionArtifactSha256 || completion.nodeFloor !== contract.nodeFloor) {
+    throw new Error('stale_artifact: completion provenance');
+  }
+  requireDigest(fs.readFileSync(path.join(repository, completion.path)), contract.completionArtifactSha256, 'completion CLI');
+  return {
+    ...identity,
+    writeArtifactSha256: artifact.sha256,
+    writeProvenance: artifact.provenance,
+    completionArtifactSha256: completion.sha256,
+    completionProvenance: completion.provenance,
+  };
 }

@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { PermissionScope } from "../cli/approval/permissionScope.js";
+import type { PermissionScope } from "../core/shell/approval/scope.js";
 import { boundText, TOOL_OUTPUT_LIMIT, type AgentTool, type AgentToolResult, type ToolHooks } from "../core/agent/tools.js";
 import { OutputAccumulator } from "../core/tools/outputAccumulator.js";
 import { DEFAULT_MAX_LINES } from "../core/tools/truncation.js";

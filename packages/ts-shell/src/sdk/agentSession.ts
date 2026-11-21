@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { PermissionScope } from "../cli/approval/permissionScope.js";
+import type { PermissionScope } from "../core/shell/approval/scope.js";
 import type { CliOptions } from "../cli/options/cliOptions.js";
 import { resolveCliCredential } from "../cli/provider/cliProviderRuntimeBridge.js";
 import { closeCollaborationFor } from "../cli/runtime/collaboration.js";

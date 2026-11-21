@@ -1,5 +1,5 @@
 import type { ProviderMessage, ProviderToolCall } from '../model-adapters/message.js';
-import type { PermissionScope } from "../cli/approval/permissionScope.js";
+import type { PermissionScope } from "../core/shell/approval/scope.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import { textSize } from '../context/request/measure.js';
 import type { PromptSource } from '../context/request/model.js';

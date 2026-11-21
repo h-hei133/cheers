@@ -204,7 +204,7 @@ test('hooks: the native Stop emits a versioned decision for both clean and block
   }
 });
 
-test('hooks: Stop blocks unresolved exports for three improving repair rounds', nativeRuntime, () => {
+test('hooks: Stop blocks unresolved exports for three improving repair rounds via the offline pinned bundle', () => {
   const root = workspace('repair', 'export const a = 1, b = 2, c = 3;', 'packages/example/src/entry.ts');
   const entry = path.join(root, 'packages/example/src/entry.ts');
   fs.writeFileSync(path.join(root, 'packages/example/src/use.ts'), "import { a, b, c } from './entry.js'; export const total = a + b + c;");
@@ -214,10 +214,12 @@ test('hooks: Stop blocks unresolved exports for three improving repair rounds', 
   });
   assert.equal(write.status, 0, write.stderr);
   assert.equal(JSON.parse(write.stdout).decision, 'allow_with_advisory');
+  const completionArtifact = JSON.parse(fs.readFileSync(path.join(repository, '.normproof/completion-gate/artifact.json'), 'utf8'));
+  const { provenance, ...completionDescriptor } = completionArtifact;
   const projectHooks = JSON.parse(fs.readFileSync(path.join(repository, '.agents/hooks.json'), 'utf8'));
-  assert.equal(projectHooks.hooks.Stop[0].hooks[0].command,
-    'npx --yes --package .normproof/normproof-0.1.0.tgz normproof gate stop --emit-result');
-  const cli = path.join(scratch, 'package/dist/adapters/cli/normproof.js');
+  assert.deepEqual(projectHooks.hooks.Stop[0].hooks[0].completionGate, completionDescriptor);
+  assert.equal(provenance.commit, readBundleMetadata().baseCommit);
+  const cli = path.join(repository, completionDescriptor.path);
   const stop = active => {
     const run = command([cli, 'gate', 'stop', '--emit-result'], { cwd: root, input: JSON.stringify({
       cwd: root, hook_event_name: 'Stop', session_id: 'repair-exports', stop_hook_active: active, stop_repair_protocol: 1

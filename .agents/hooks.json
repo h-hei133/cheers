@@ -22,8 +22,12 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "command": "npx --yes --package .normproof/normproof-0.1.0.tgz normproof gate stop --emit-result",
+            "completionGate": {
+              "version": 1,
+              "path": ".normproof/completion-gate/cli.mjs",
+              "sha256": "b99d6fe8ed6f0840df711e08a7e8716d750f853a83857061df3692325e30b76d",
+              "nodeFloor": "20.3.0"
+            },
             "timeoutMs": 20000
           }
         ]

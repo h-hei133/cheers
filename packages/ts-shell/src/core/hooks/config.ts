@@ -17,7 +17,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { HookEventName } from "./types.js";
-import { writeHookCommand } from './artifact.js';
+import { completionHookCommand, writeHookCommand } from './artifact.js';
 import { resolveUserDataFile, userDataDir, userHomeDir } from "../../core/paths/userHome.js"
 
 /**
@@ -51,6 +51,7 @@ const HOOK_EVENTS: readonly HookEventName[] = [
 /** One hook a configuration declared, resolved to the fields that matter. */
 export interface HookDeclaration {
   readonly writeGate?: unknown;
+  readonly completionGate?: unknown;
   readonly timeoutMs?: number;
   readonly event: HookEventName;
   readonly matcher?: string;
@@ -170,12 +171,12 @@ function readOne(configPath: string): HookConfigLoadResult {
  * established configuration files use, and a shape people already have is worth
  * matching even when a flatter one would do.
  */
-function readCommands(group: unknown, problems: string[], configPath: string): Pick<HookDeclaration, 'command' | 'writeGate' | 'timeoutMs'>[] {
+function readCommands(group: unknown, problems: string[], configPath: string): Pick<HookDeclaration, 'command' | 'writeGate' | 'completionGate' | 'timeoutMs'>[] {
   if (typeof group !== "object" || group === null || !("hooks" in group)) return [];
   const handlers = group.hooks;
   if (!Array.isArray(handlers)) return [];
 
-  const commands: Pick<HookDeclaration, 'command' | 'writeGate' | 'timeoutMs'>[] = [];
+  const commands: Pick<HookDeclaration, 'command' | 'writeGate' | 'completionGate' | 'timeoutMs'>[] = [];
   for (const handler of handlers) {
     if (typeof handler !== "object" || handler === null) continue;
     const timeoutMs = 'timeoutMs' in handler && typeof handler.timeoutMs === 'number' && Number.isSafeInteger(handler.timeoutMs) && handler.timeoutMs > 0
@@ -183,6 +184,11 @@ function readCommands(group: unknown, problems: string[], configPath: string): P
     if ('timeoutMs' in handler && timeoutMs === undefined) problems.push(`${configPath}: timeoutMs must be a positive integer in milliseconds; using the default timeout`);
     if ('writeGate' in handler) {
       commands.push({ command: writeHookCommand(handler.writeGate), writeGate: handler.writeGate,
+        ...(timeoutMs === undefined ? {} : { timeoutMs }) });
+      continue;
+    }
+    if ('completionGate' in handler) {
+      commands.push({ command: completionHookCommand(handler.completionGate), completionGate: handler.completionGate,
         ...(timeoutMs === undefined ? {} : { timeoutMs }) });
       continue;
     }

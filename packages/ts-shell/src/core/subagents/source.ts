@@ -3,7 +3,7 @@ import { resolveUserDataFile } from '../paths/userHome.js';
 import { profileWorkspaceDir } from '../paths/profile/workspace.js';
 import { assertSourceAccess } from '../query/sourcePolicy.js';
 import { evaluateToolPermissionScope } from '../query/toolPolicy.js';
-import type { PermissionScope } from '../../cli/approval/permissionScope.js';
+import type { PermissionScope } from '../shell/approval/scope.js';
 import type { WorkspaceRoot } from '../workspace/model.js';
 import type { DenyRule } from '../shell/approval/deny.js';
 

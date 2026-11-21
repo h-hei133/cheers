@@ -1,4 +1,5 @@
 import type { CommandHookConfig, HookDecision, InProcessHookConfig, StopPayload } from '../types.js';
+import { checkCompletionHookArtifact, completionHookCommand } from '../artifact.js';
 import { STOP_TIMEOUT_MS, type StopCheck, type StopDispatchOptions } from './model.js';
 import { normalizeStopResult, stopCheck, stopUnknown } from './result.js';
 import { boundedStopOperation, runStopCommand } from './run.js';
@@ -37,9 +38,19 @@ export async function dispatchStop(input: {
     const admission = await boundedStopOperation(async () => input.current() && await input.allowed(hook, () => active && !options.signal?.aborted)
       && input.current() ? { decision: 'allow' } : stopUnknown('not_authorized'), timeoutMs, options.signal);
     active = false;
-    const result = admission.decision === 'allow'
-      ? await runStopCommand(hook.command, payload, timeoutMs, options.signal).catch(() => stopUnknown('process_failed')) : admission;
-    const decision = accept(hook.command, input.current() ? result : stopUnknown('registration_changed'), started);
+    let result: HookDecision;
+    let command = hook.command;
+    if (admission.decision !== 'allow') {
+      result = admission;
+    } else if (hook.completionGate !== undefined) {
+      command = completionHookCommand(hook.completionGate);
+      const invalidArtifact = checkCompletionHookArtifact(hook.completionGate, payload.workspaceRoot);
+      result = invalidArtifact
+        ?? await runStopCommand(command, payload, timeoutMs, options.signal).catch(() => stopUnknown('process_failed'));
+    } else {
+      result = await runStopCommand(command, payload, timeoutMs, options.signal).catch(() => stopUnknown('process_failed'));
+    }
+    const decision = accept(command, input.current() ? result : stopUnknown('registration_changed'), started);
     if (decision.decision !== 'allow') return decision;
   }
   return { ...(unproven ?? { decision: 'allow', reasonCode: checks.length ? 'explicit_allow' : 'not_configured' }), stopChecks: checks };

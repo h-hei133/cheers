@@ -95,6 +95,7 @@ export function registerDeclaredHooks(
     matcher: hook.matcher,
     command: hook.command,
     ...(hook.writeGate === undefined ? {} : { writeGate: hook.writeGate }),
+    ...(hook.completionGate === undefined ? {} : { completionGate: hook.completionGate }),
     ...(hook.timeoutMs === undefined ? {} : { timeoutMs: hook.timeoutMs }),
     // Carried so the dispatcher can name what it is asking about, and so an
     // approval attaches to this command in this file rather than to a name.

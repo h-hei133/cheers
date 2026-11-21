@@ -5,6 +5,7 @@
   "bundleMetadataSha256": "c9ace05689b02b9c7a39dd785d2a64131eccd94b4f07ba9f736c79df799cf5cb",
   "archiveSha256": "92536c4d76345ac6e2991998095b60f67345173544c3648c7f2279479c7069ad",
   "writeArtifactSha256": "e76dac23e7a890aa2075a342d8f1009ae1b25c7079e7003804a70935cc952e16",
+  "completionArtifactSha256": "b99d6fe8ed6f0840df711e08a7e8716d750f853a83857061df3692325e30b76d",
   "parserVersion": "5.9.3",
   "nodeFloor": "20.3.0",
   "packageNodeEngine": ">=24",
@@ -16,7 +17,7 @@
   "surfaces": {
     "judge": "pinned upstream archive; native CI gate and opt-in shadow observation",
     "write": "separate pinned artifact; JSON decision is independent of the process exit code",
-    "stop": "versioned Stop result",
+    "stop": "separate pinned artifact; offline versioned Stop result at the Node 20.3 floor",
     "mcpInitialize": "explicit revision negotiation",
     "report": "raw report retains blocking and advisory findings"
   }

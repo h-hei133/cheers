@@ -10,7 +10,7 @@ import {
   scopeLabel,
   scopeMeaning,
   type PermissionScope,
-} from "../cli/approval/permissionScope.js";
+} from "../core/shell/approval/scope.js";
 import {
   createApprovalResponse,
   formatAllowOnceAppliedLine,

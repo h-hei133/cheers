@@ -4,7 +4,13 @@ import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { checkWriteHookArtifact, writeHookCommand, writeHookProtocol } from './artifact.js';
+import {
+  checkCompletionHookArtifact,
+  checkWriteHookArtifact,
+  completionHookCommand,
+  writeHookCommand,
+  writeHookProtocol,
+} from './artifact.js';
 
 let root: string;
 beforeEach(() => {
@@ -28,6 +34,7 @@ describe('pinned write hook artifact', () => {
       const pinned = { ...artifact(128), protocolVersion: 2, workerProtocol: 1 };
       expect(writeHookCommand(pinned)).toMatch(/^BUN_BE_BUN=1 exec .+ gate write --emit-result$/);
       expect(writeHookCommand(pinned, 'stdio')).toMatch(/^BUN_BE_BUN=1 exec .+ gate write --stdio$/);
+      expect(completionHookCommand(artifact(128))).toMatch(/^BUN_BE_BUN=1 exec .+ gate stop --emit-result$/);
     } finally {
       if (previous) Object.defineProperty(process.versions, 'bun', previous);
       else Reflect.deleteProperty(process.versions, 'bun');
@@ -73,5 +80,16 @@ describe('pinned write hook artifact', () => {
     expect(checkWriteHookArtifact(declaration, root))
       .toMatchObject({ decision: 'block', hookVerdict: { status: 'unknown', reasonCode: 'artifact_invalid' } });
     expect(requestedBytes).toBe(8 * 1024 * 1024 + 1);
+  });
+
+  it('verifies pinned completion hook artifacts and fails closed on mismatch or extra fields', () => {
+    const declaration = artifact(Math.ceil(3.8 * 1024 * 1024));
+    expect(checkCompletionHookArtifact(declaration, root)).toBeUndefined();
+    expect(checkCompletionHookArtifact({ ...declaration, sha256: '0'.repeat(64) }, root))
+      .toEqual({ decision: 'unknown', reasonCode: 'version_mismatch', proofVerdict: 'unknown' });
+    expect(checkCompletionHookArtifact({ ...declaration, protocolVersion: 2 }, root))
+      .toEqual({ decision: 'unknown', reasonCode: 'version_mismatch', proofVerdict: 'unknown' });
+    expect(checkCompletionHookArtifact({ ...declaration, path: path.join(root, 'missing.mjs') }, root))
+      .toEqual({ decision: 'unknown', reasonCode: 'artifact_unreadable', proofVerdict: 'unknown' });
   });
 });

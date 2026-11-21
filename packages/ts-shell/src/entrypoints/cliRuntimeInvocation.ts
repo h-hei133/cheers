@@ -6,7 +6,7 @@ import { checkRealProviderReadiness } from "../core/shell/providerReadiness.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
 import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliSurface.js";
-import type { PermissionScope } from "../cli/approval/permissionScope.js";
+import type { PermissionScope } from "../core/shell/approval/scope.js";
 import type { InteractiveAsk } from "../core/tools/ask/contract.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";

@@ -1,6 +1,6 @@
 import type { AgentMessage } from '../core/agent/state.js';
 import type { ImageContent } from '../model-adapters/multimodal.js';
-import type { PermissionScope } from '../cli/approval/permissionScope.js';
+import type { PermissionScope } from '../core/shell/approval/scope.js';
 import type { WorkspaceRoot } from '../core/workspace/model.js';
 import { environmentLine } from './prompt.js';
 

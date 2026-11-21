@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { PermissionScope } from "../../cli/approval/permissionScope.js";
+import type { PermissionScope } from "../shell/approval/scope.js";
 import type { EscalationPrompt } from "../shell/approval/contract.js";
 import { isReadOnlyBashCommand } from "../shell/approval/evaluator.js";
 import { matchDenyRule, type DenyRule } from "../shell/approval/deny.js";

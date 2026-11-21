@@ -17,7 +17,7 @@ import { gitGateFor } from '../cli/runtime/gitGate.js';
 import { buildToolEscalationPrompt } from '../core/query/toolPolicy.js';
 import type { EscalationPrompt } from '../core/shell/approval/contract.js';
 import type { ApprovalAuditRecord } from '../core/shell/approvalPromptRenderer.js';
-import type { PermissionScope } from '../cli/approval/permissionScope.js';
+import type { PermissionScope } from '../core/shell/approval/scope.js';
 import { createCliEscalationPromptHandler } from './cliApprovalModule.js';
 import { runCliRuntimeInvocation } from './cliRuntimeInvocation.js';
 

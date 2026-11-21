@@ -34,7 +34,7 @@ import {
 } from "./sessionTerminalState.js";
 import { ShellStateMachine } from "./stateMachine.js";
 import { ShellCommandRuntime } from "./command.js";
-import type { PermissionScope } from "../../cli/approval/permissionScope.js";
+import type { PermissionScope } from "./approval/scope.js";
 import type { CompactionOutcome } from "./compaction.js";
 import type { TurnInput } from "../../turn/session.js";
 import { hasUnfinishedSessionWork } from "../../session/recovery/work.js";
