@@ -86,6 +86,7 @@ This file is the curated, compact index of reusable engineering pitfalls, enviro
 - **Root Cause**: Non-exclusive existence checks race across processes, and registry writes without source/destination CAS clobber competing selections.
 - **Rule**: Use non-recursive exclusive `mkdir` + `wx` creation and lock-guarded CAS (`activationId` + `expectedVersion`) on session activation; retain `unknown` outcomes on write/fsync/readback uncertainty instead of faking rollback.
 - **Read boundary**: Carry the observed activation into implicit startup admission. Preserve the selection after a snapshot version conflict so startup can retry. Compare export file versions before attaching accounting since a completed transaction may already have removed its marker.
+- **Recovery receipt**: Write the activation and transaction receipt in the same registry replacement. Recover against that receipt even after a later selection supersedes the pointer. Verify the saved session version before applying the metadata update.
 
 ### Async Admission Must Recheck Generation, Grants, And Cancellation After Every `await`
 - **Symptom**: A dismissed picker saves stale state, a revoked grant reads attachment content, or a late reload resurrects a closed host/extension.
@@ -109,6 +110,7 @@ This file is the curated, compact index of reusable engineering pitfalls, enviro
 ### SDK Reload Validates Saved Presentation Fields
 - **Symptom**: SDK resource reload rejects a session after its first saved prompt.
 - **Rule**: Use the saved title and activity time when verifying reload metadata. Keep the live session binding and pin saved file versions through replacement.
+- **Startup setters**: Check the replacement command and successor host together. Bind hooks to that operation's approval and preserve the successor's config binding. A saved preference with unconfirmed runtime application makes the reload partial.
 
 ### Script Model Helpers Require The Host's Media Tool
 - **Symptom**: A script calling a model helper invokes an unrelated tool that has the same name as a media tool.

@@ -25,7 +25,7 @@
 **Current phase** 55/62 项通过 Linux 本地功能验收，7 项开放。
 **Completed batch** 本轮关闭 E.9、F1.5、F2.6、T6.3。此前 E.4 和 T5.2 已计入轮前 51 项。按实际证据更新 [任务清单](tasks.md)。
 **Open work** C.6、E.3、E.7、F1.2、F1.4、F2.1、T5.1。T5.1 单文件迁移需要保留旧转录、字节预算和前缀身份。会话和注册表需要共同的持久提交点以及进程终止恢复证据。外部资格缺口见 [进展摘要](summary.md)。
-**Repository gate** `441786e6` 固定快照通过六项静态检查、26 个文件 713 项和 Linux 构建 `b78d1e67b4a5`。当前结构判定为 `partial`，0 阻断，`core/shell/bootstrap.ts` 超出函数上限 1 个。续接顺序见 [进展摘要](summary.md#后续工作)。
+**Repository gate** `e5f9a28` 源码通过六项静态检查、23 个文件 331 项和 Linux 构建 `bd359e1bca57`。固定归档结构判定为 `proven`，开放义务为 0。续接顺序见 [进展摘要](summary.md#后续工作)。
 **Evidence boundary** Linux 上已通过聚焦回归、独立安装、编译入口、PTY、单文件发行和配置模型一次自行修复。提交保留在本地。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -85,6 +85,7 @@ E.5本批实际L／额外依赖3（blocked publication独立撤权、原共享ho
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-21 | `e72fad7` 提交受保护恢复的注册表回执与读取快照。`e5f9a28` 提交 SDK 扩展 MCP 隔离、受控重载持久设置及网关快照归位。联合六项静态检查、23 文件 331 项、Linux 构建 `bd359e1bca57`、固定归档结构判定 `proven`。两项继续开放，55/62 已验收。 |
 | 2026-11-21 | Batch 4 完成 E.4 Codemode 确定性重放（环境/源码/输入绑定、固定时钟与种子 PRNG、有序只读目录 RPC 追踪与副作用零重派发），并修复全量同步模型目录元数据上限与 worker `execArgv` 隔离缺陷。六门、7 套件 126 项、build `d853f94c600c`、三进程编译产物重放/漂移测试、配置模型真实 `record`→`replay_id` 逐字节一致实测与 `normproof judge` `proven` 通过；51/62 完成，11 项开放。 |
 | 2026-11-21 | Batch 3 完成 T5.1 其余多文件记录事务（v3：`addTurn`/`markRunStarted`/`markTurnActive`/`markRecoveryReentry`/`saveTerminated`/`updateSessionWorkspaceBinding` 统一复用 `prompt-transaction.json`）与 T5.2 旧格式转录迁移及回退（`SessionManager.migrateTranscript`）。六门、11 套件 231 项、build `8a49bf947565`、Linux 编译产物多进程恢复/迁移验收与 `normproof judge` `proven` 通过；50/62 完成，12 项开放。 |
 | 2026-11-21 | Batch 1 (`d49c2ab0`) 落地离线 Node 20.3 `completion-gate` 固定产物并下沉 `PermissionScope` 至 `core/shell/approval/scope.ts`，默认 `normproof judge` 转绿为 `proven`（0 open obligations）；Batch 2 合并 OpenRouter 浏览器授权密钥（F1.4 部分），六门、8 套件 274 项、build `924191a436aa` 与 `normproof judge` `proven` 通过；真实人类同意仍缺，F1.4 保持开项。 |
