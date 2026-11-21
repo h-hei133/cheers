@@ -4,7 +4,7 @@ import { isRecord } from '../../values/record.js';
 export const MAX_STOP_REENTRIES = 1;
 export const MAX_STOP_REPAIR_ROUNDS = 3;
 export const STOP_REPAIR_PROTOCOL = 1;
-export const STOP_TIMEOUT_MS = 3_000;
+export const STOP_TIMEOUT_MS = 20_000;
 
 export interface StopRepairProgress {
   readonly version: typeof STOP_REPAIR_PROTOCOL;

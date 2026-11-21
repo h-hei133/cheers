@@ -2,7 +2,7 @@
 title: "Cheers Topic Guide"
 schema_state: advisory
 created: 2026-08-28
-updated: 2026-08-28
+updated: 2026-11-21
 summary: "Human-owned topic guide for cheers vocabulary, domain boundaries, and reference mappings."
 ---
 
@@ -32,5 +32,5 @@ summary: "Human-owned topic guide for cheers vocabulary, domain boundaries, and 
 
 ## Source Conventions
 
-- Code facts must be grounded in `packages/ts-shell`, `packages/rust-core`, or reference repositories under `~/projects/`.
+- Code facts must be grounded in the workspace packages (`packages/ts-shell` and the eight extracted domain packages under `packages/`) or read-only reference repositories under `~/projects/`.
 - No unsubstantiated success claims; follow strict evidence and truthfulness invariants.

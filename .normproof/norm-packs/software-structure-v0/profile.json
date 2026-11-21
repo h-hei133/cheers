@@ -7,7 +7,7 @@
     {
       "id": "source_graph_is_acyclic",
       "title": "No runtime dependency cycle among source modules",
-      "severity": "advisory",
+      "severity": "blocking",
       "requiredWhen": {
         "kind": "always"
       },
@@ -43,8 +43,12 @@
       "id": "execution_does_not_reach_cli",
       "title": "Execution does not depend on the CLI",
       "severity": "advisory",
-      "requiredWhen": { "kind": "always" },
-      "requiredEvidence": ["source_module_graph"],
+      "requiredWhen": {
+        "kind": "always"
+      },
+      "requiredEvidence": [
+        "source_module_graph"
+      ],
       "requiredAuthority": "A0",
       "expression": {
         "kind": "noDependency",
@@ -56,8 +60,8 @@
       "repair": "Inject the runtime implementation from the composition entry."
     },
     {
-      "id": "advisor_does_not_reach_shell",
-      "title": "Advisor does not depend on the shell",
+      "id": "domains_do_not_reach_shell",
+      "title": "Domain packages do not depend on the shell",
       "severity": "blocking",
       "requiredWhen": {
         "kind": "always"
@@ -69,147 +73,10 @@
       "expression": {
         "kind": "noDependency",
         "evidenceId": "source_module_graph",
-        "from": "packages/advisor/**",
-        "to": "packages/ts-shell/**",
-        "reachable": true
-      },
-      "repair": "Accept the required behavior through the domain interface and supply it from the shell."
-    },
-    {
-      "id": "browser_does_not_reach_shell",
-      "title": "Browser does not depend on the shell",
-      "severity": "blocking",
-      "requiredWhen": {
-        "kind": "always"
-      },
-      "requiredEvidence": [
-        "source_module_graph"
-      ],
-      "requiredAuthority": "A0",
-      "expression": {
-        "kind": "noDependency",
-        "evidenceId": "source_module_graph",
-        "from": "packages/browser/**",
-        "to": "packages/ts-shell/**",
-        "reachable": true
-      },
-      "repair": "Accept the required behavior through the domain interface and supply it from the shell."
-    },
-    {
-      "id": "collaboration_does_not_reach_shell",
-      "title": "Collaboration does not depend on the shell",
-      "severity": "blocking",
-      "requiredWhen": {
-        "kind": "always"
-      },
-      "requiredEvidence": [
-        "source_module_graph"
-      ],
-      "requiredAuthority": "A0",
-      "expression": {
-        "kind": "noDependency",
-        "evidenceId": "source_module_graph",
-        "from": "packages/collaboration/**",
-        "to": "packages/ts-shell/**",
-        "reachable": true
-      },
-      "repair": "Accept the required behavior through the domain interface and supply it from the shell."
-    },
-    {
-      "id": "desktop_does_not_reach_shell",
-      "title": "Desktop does not depend on the shell",
-      "severity": "blocking",
-      "requiredWhen": {
-        "kind": "always"
-      },
-      "requiredEvidence": [
-        "source_module_graph"
-      ],
-      "requiredAuthority": "A0",
-      "expression": {
-        "kind": "noDependency",
-        "evidenceId": "source_module_graph",
-        "from": "packages/desktop/**",
-        "to": "packages/ts-shell/**",
-        "reachable": true
-      },
-      "repair": "Accept the required behavior through the domain interface and supply it from the shell."
-    },
-    {
-      "id": "media_does_not_reach_shell",
-      "title": "Media does not depend on the shell",
-      "severity": "blocking",
-      "requiredWhen": {
-        "kind": "always"
-      },
-      "requiredEvidence": [
-        "source_module_graph"
-      ],
-      "requiredAuthority": "A0",
-      "expression": {
-        "kind": "noDependency",
-        "evidenceId": "source_module_graph",
-        "from": "packages/media/**",
-        "to": "packages/ts-shell/**",
-        "reachable": true
-      },
-      "repair": "Accept the required behavior through the domain interface and supply it from the shell."
-    },
-    {
-      "id": "planning_does_not_reach_shell",
-      "title": "Planning does not depend on the shell",
-      "severity": "blocking",
-      "requiredWhen": {
-        "kind": "always"
-      },
-      "requiredEvidence": [
-        "source_module_graph"
-      ],
-      "requiredAuthority": "A0",
-      "expression": {
-        "kind": "noDependency",
-        "evidenceId": "source_module_graph",
-        "from": "packages/planning/**",
-        "to": "packages/ts-shell/**",
-        "reachable": true
-      },
-      "repair": "Accept the required behavior through the domain interface and supply it from the shell."
-    },
-    {
-      "id": "research_does_not_reach_shell",
-      "title": "Research does not depend on the shell",
-      "severity": "blocking",
-      "requiredWhen": {
-        "kind": "always"
-      },
-      "requiredEvidence": [
-        "source_module_graph"
-      ],
-      "requiredAuthority": "A0",
-      "expression": {
-        "kind": "noDependency",
-        "evidenceId": "source_module_graph",
-        "from": "packages/research/**",
-        "to": "packages/ts-shell/**",
-        "reachable": true
-      },
-      "repair": "Accept the required behavior through the domain interface and supply it from the shell."
-    },
-    {
-      "id": "workflow_does_not_reach_shell",
-      "title": "Workflow does not depend on the shell",
-      "severity": "blocking",
-      "requiredWhen": {
-        "kind": "always"
-      },
-      "requiredEvidence": [
-        "source_module_graph"
-      ],
-      "requiredAuthority": "A0",
-      "expression": {
-        "kind": "noDependency",
-        "evidenceId": "source_module_graph",
-        "from": "packages/workflow/**",
+        "from": "packages/**",
+        "excludeFrom": [
+          "packages/ts-shell/**"
+        ],
         "to": "packages/ts-shell/**",
         "reachable": true
       },
@@ -230,7 +97,10 @@
       "expression": {
         "kind": "groupSizeUnder",
         "evidenceId": "source_module_functions",
-        "ceiling": { "kind": "baseline", "evidenceId": "structure_baseline" },
+        "ceiling": {
+          "kind": "baseline",
+          "evidenceId": "structure_baseline"
+        },
         "onEmpty": "unsatisfied"
       },
       "repair": "Extract one responsibility from the module to satisfy its accepted ceiling."

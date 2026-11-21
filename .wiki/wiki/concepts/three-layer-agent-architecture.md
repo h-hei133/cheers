@@ -11,7 +11,10 @@ confidence: high
 
 # Three-Layer Agent Architecture
 
-The `cheers` system is structured into three distinct runtime layers to maximize flexibility, safety, and performance.
+> [!WARNING]
+> **Historical / Superseded (2026-11-21):** The earlier three-layer TypeScript + Rust (`packages/rust-core`) + Python (`packages/python-eval`) proposal described below has been retired. Cheers is now a 9-package TypeScript monorepo (`packages/ts-shell` plus eight independent domain packages) using OS-level `bwrap`/`sandbox-exec` isolation and Bun single-file executable builds. Retain this article for historical design context only; see [AGENTS.md](../../../AGENTS.md) and [architecture-boundaries.md](../../../agent-rules/architecture-boundaries.md) for current architecture authority.
+
+The `cheers` system was originally structured into three distinct runtime layers to maximize flexibility, safety, and performance.
 
 ```mermaid
 graph TD

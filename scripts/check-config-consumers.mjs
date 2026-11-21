@@ -28,13 +28,13 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { workspaceSourceRoots } from './build/workspaces.mjs'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // The tree to check. Defaults to this repository; a test passes a fixture root so
 // the gate can be exercised against a known shape instead of only the live tree.
 const targetRoot = resolve(process.argv[2] ?? repoRoot)
 const CONFIG_MODULE = 'packages/ts-shell/src/config/runtimeConfig.ts'
-const SOURCE_ROOT = 'packages/ts-shell/src'
 
 // Fields that are deliberately declared with no production reader.
 //
@@ -111,8 +111,12 @@ if (declared.length < MIN_DECLARED_FIELDS) {
 function walk(dir, files = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name)
-    if (entry.isDirectory()) walk(full, files)
-    else if (entry.name.endsWith('.ts')) files.push(full)
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name.startsWith('.')) continue
+      walk(full, files)
+    } else if (/\.tsx?$/.test(entry.name)) {
+      files.push(full)
+    }
   }
   return files
 }
@@ -130,12 +134,12 @@ function walk(dir, files = []) {
 const consumers = new Map(declared.map((field) => [field, { production: [], test: [] }]))
 const matcher = new RegExp(`(?<!this)\\.(${declared.join('|')})\\b`, 'g')
 
-for (const file of walk(resolve(targetRoot, SOURCE_ROOT))) {
+for (const file of workspaceSourceRoots(targetRoot).flatMap((dir) => walk(dir))) {
   const path = relative(targetRoot, file)
   if (path === CONFIG_MODULE) continue
   const text = readFileSync(file, 'utf8')
   for (const match of text.matchAll(matcher)) {
-    const bucket = path.endsWith('.test.ts') ? 'test' : 'production'
+    const bucket = /\.test\.tsx?$/.test(path) ? 'test' : 'production'
     const entry = consumers.get(match[1])
     if (!entry[bucket].includes(path)) entry[bucket].push(path)
   }

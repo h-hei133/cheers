@@ -57,11 +57,19 @@ Contract changes must keep producer and consumer semantics aligned.
 
 `contracts` must not contain business orchestration, model/provider calls, shell helpers, file-system helpers, UI helpers, test mock convenience, or runtime side-effect code.
 
-## Single Runtime
+## Single Runtime Control Plane
 
-The product is TypeScript only. There is no Python evaluation layer and no Rust execution daemon; both were removed after measurement showed they provided nothing the TypeScript path did not already do better (see `.wiki/features/08-gap-and-debt-research.md` section 2).
+The core product control plane, CLI, and workspace packages are TypeScript. The earlier Python offline evaluation layer and Rust daemon prototype were removed after measurement showed they added maintenance cost without beating the TypeScript runtime (see `.wiki/features/08-gap-and-debt-research.md` section 2).
 
-Do not reintroduce a second language for performance. Execution latency is dominated by the child process a command spawns, not by the orchestrator that spawns it. If a future need is genuinely native — system-level isolation such as `seccomp`/namespaces/Seatbelt — bring a benchmark that proves the existing `sandbox/` implementation is insufficient, and add it as an in-process binding rather than a separate process.
+Keep shell, session, orchestration, replay, recovery, permission, and result semantics in TypeScript. Do not reintroduce a second runtime daemon merely for assumed throughput — command latency is dominated by spawned child processes. A focused native binding or external tool may still be introduced when a platform capability requires it (for example kernel isolation or a mature native CLI) and concrete evidence justifies the maintenance boundary.
+
+## Workspace Package Boundaries
+
+Cheers ships nine workspace packages (`packages/ts-shell` plus eight domain packages: `packages/advisor`, `packages/browser`, `packages/collaboration`, `packages/desktop`, `packages/media`, `packages/planning`, `packages/research`, `packages/workflow`):
+
+- Dependencies between packages must be acyclic and declared in each package's `package.json`.
+- Cross-package imports must target declared public package exports — never relative paths across package roots.
+- Domain packages must not import or transitively reach `packages/ts-shell`; shell composition supplies host services through domain interfaces.
 
 ## Domain Ownership
 

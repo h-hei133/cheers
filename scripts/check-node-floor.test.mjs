@@ -135,3 +135,16 @@ test('ignores test files, which may name an API while asserting about it', (t) =
   const result = run(fixture(t, files))
   assert.equal(result.status, 0, result.stdout)
 })
+
+test('scans every declared workspace package outside packages/ts-shell', (t) => {
+  const files = {
+    'package.json': `${JSON.stringify({ name: 'fixture', version: '0.0.0', engines: { node: '>=20.3.0' }, workspaces: ['packages/ts-shell', 'packages/domain'] }, null, 2)}\n`,
+    'packages/ts-shell/package.json': `${JSON.stringify({ name: '@cheers/ts-shell' })}\n`,
+    'packages/domain/package.json': `${JSON.stringify({ name: '@cheers/domain' })}\n`,
+    [`${SRC}/ok.ts`]: 'export const value = 1\n',
+    'packages/domain/src/leak.ts': 'export const grouped = Object.groupBy([], () => "a")\n',
+  }
+  const result = run(fixture(t, files))
+  assert.equal(result.status, 1, result.stdout)
+  assert.match(result.stdout, /packages\/domain\/src\/leak\.ts:1 - Object\.groupBy/)
+})

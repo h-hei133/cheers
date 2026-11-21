@@ -19,7 +19,7 @@ const { evaluateObligationExpression } = await import(pathToFileURL(path.join(bu
 const { collectEvidence } = await import(pathToFileURL(path.join(bundle, 'dist/adapters/sidecar-file/evidence-collector.js')).href);
 const { GRAPH_SAFETY } = await import(pathToFileURL(path.join(bundle, 'dist/contracts/sidecar/graph-budget.js')).href);
 const metadata = readBundleMetadata();
-const nativeRuntime = { skip: Number(process.versions.node.split('.')[0]) < 24 && 'The native package requires Node 24' };
+const nativeRuntime = { skip: false };
 
 function wideGraph(count = 4096) {
   return new Map(Array.from({ length: count }, (_, index) => [`packages/m${index}.ts`,
@@ -147,7 +147,7 @@ test('ASI declarations cannot hide a missing side-effect import from the native 
   assert.match(JSON.stringify(obligation), /missing\.js/);
 });
 
-test('a native self import remains a cycle under the unchanged advisory obligation', nativeRuntime, () => {
+test('a native self import fails the blocking cycle obligation', nativeRuntime, () => {
   const source = "import './entry.js';\nexport function value() { return 1; }\n";
   const collected = graph.buildModuleGraph(new Map([['packages/entry.ts', source]]));
   assert.deepEqual(collected.edges, [{ from: 'packages/entry.ts', to: 'packages/entry.ts', kind: 'value' }]);
@@ -159,9 +159,9 @@ test('a native self import remains a cycle under the unchanged advisory obligati
   writeJudgeConfig(workspace);
   const run = spawnSync(process.execPath, [path.join(bundle, 'dist/adapters/cli/normproof.js'), 'judge'],
     { cwd: workspace, encoding: 'utf8', env: { ...process.env, CHEERS_REAL_HOME: '' } });
-  assert.equal(run.status, 0, run.stdout + run.stderr);
+  assert.equal(run.status, 2, run.stdout + run.stderr);
   const verdict = JSON.parse(fs.readFileSync(path.join(workspace, '.normproof/out/verdict.json'), 'utf8'));
-  assert.equal(verdict.status, 'partial');
+  assert.equal(verdict.status, 'failed');
   const ledger = JSON.parse(fs.readFileSync(path.join(workspace, '.normproof/out/ledger.json'), 'utf8'));
   assert.equal(ledger.obligations.find(entry => entry.id === 'source_graph_is_acyclic').status, 'failed');
   assert.equal(ledger.obligations.find(entry => entry.id === 'source_graph_has_no_unresolved_specifiers').status, 'satisfied');

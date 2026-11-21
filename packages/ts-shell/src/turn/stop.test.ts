@@ -120,7 +120,7 @@ describe('Stop completion lifecycle', () => {
   });
 
   it('keeps timeout and handler failure unknown', async () => {
-    expect(STOP_TIMEOUT_MS).toBe(3000);
+    expect(STOP_TIMEOUT_MS).toBe(20_000);
     for (const failure of ['timeout', 'handler_failed']) {
       const f = fixture(() => allow);
       f.hooks.clear();

@@ -46,7 +46,7 @@ export async function dispatchStop(input: {
       command = completionHookCommand(hook.completionGate);
       const invalidArtifact = checkCompletionHookArtifact(hook.completionGate, payload.workspaceRoot);
       result = invalidArtifact
-        ?? await runStopCommand(command, payload, timeoutMs, options.signal).catch(() => stopUnknown('process_failed'));
+        ?? await runStopCommand(command, payload, timeoutMs, options.signal, [process.execPath]).catch(() => stopUnknown('process_failed'));
     } else {
       result = await runStopCommand(command, payload, timeoutMs, options.signal).catch(() => stopUnknown('process_failed'));
     }

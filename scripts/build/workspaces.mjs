@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 export function workspacePackages(root, verifyPath = () => {}) {
@@ -20,6 +20,28 @@ export function workspacePackages(root, verifyPath = () => {}) {
     names.add(pkg.name);
     return { directory, file, pkg };
   });
+}
+
+/**
+ * Returns `src/` directories for every declared workspace package, falling back to
+ * `packages/ts-shell/src` for standalone test fixtures that do not declare a root `workspaces` array.
+ */
+export function workspaceSourceRoots(root) {
+  const manifestPath = path.join(root, "package.json");
+  if (existsSync(manifestPath)) {
+    try {
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+      if (Array.isArray(manifest?.workspaces) && manifest.workspaces.length > 0) {
+        return workspacePackages(root)
+          .map(entry => path.join(root, entry.directory, "src"))
+          .filter(dir => existsSync(dir));
+      }
+    } catch {
+      // Fixtures with malformed or partial root manifests fall through to the caller's own checks.
+    }
+  }
+  const fallback = path.join(root, "packages", "ts-shell", "src");
+  return existsSync(fallback) ? [fallback] : [];
 }
 
 export function domainPackages(root, verifyPath) {

@@ -22,9 +22,20 @@ export async function boundedStopOperation(
 }
 
 /** Stop owns a hard deadline, including descendants holding inherited output pipes. */
-export async function runStopCommand(command: string, payload: StopPayload, timeoutMs: number, signal?: AbortSignal): Promise<HookDecision> {
+export async function runStopCommand(
+  command: string,
+  payload: StopPayload,
+  timeoutMs: number,
+  signal?: AbortSignal,
+  readOnlyRoots: readonly string[] = [],
+): Promise<HookDecision> {
   if (signal?.aborted) return stopUnknown('cancelled');
-  const sandbox = planSandboxedCommand({ shell: '/bin/sh', shellArgs: ['-c', command], workspaceRoot: payload.workspaceRoot });
+  const sandbox = planSandboxedCommand({
+    shell: '/bin/sh',
+    shellArgs: ['-c', command],
+    workspaceRoot: payload.workspaceRoot,
+    readOnlyRoots,
+  });
   if (sandbox.state === 'refused') return stopUnknown('sandbox_refused');
   return new Promise(resolve => {
     let settled = false;

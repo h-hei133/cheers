@@ -338,10 +338,12 @@ export class HookDispatcher {
         // so the sandbox wrapper's arguments are never re-parsed by a shell. A
         // hook command containing `$(...)` would otherwise be substituted by the
         // wrapper's own shell before it ever reached the sandbox.
+        const execRoots = translated ? [process.execPath] : [];
         const sandbox = planSandboxedCommand({
           shell: SHELL_BIN,
           shellArgs: ["-c", command],
           workspaceRoot: payload.workspaceRoot,
+          readOnlyRoots: execRoots,
         });
         if (sandbox.state === "refused") {
           // A hook command is still a command, and a hook that does not run must
@@ -361,7 +363,12 @@ export class HookDispatcher {
         const workerIdentity = translated ? writeWorkerIdentity(hook.writeGate) : undefined;
         if (workerIdentity !== undefined && jsonPayloads.length === 1) {
           const workerCommand = writeHookCommand(hook.writeGate, 'stdio');
-          const workerSandbox = planSandboxedCommand({ shell: SHELL_BIN, shellArgs: ['-c', workerCommand], workspaceRoot: payload.workspaceRoot });
+          const workerSandbox = planSandboxedCommand({
+            shell: SHELL_BIN,
+            shellArgs: ['-c', workerCommand],
+            workspaceRoot: payload.workspaceRoot,
+            readOnlyRoots: execRoots,
+          });
           if (workerSandbox.state !== 'refused') {
             const workerProgram = workerSandbox.command ?? SHELL_BIN;
             const workerArgs = workerSandbox.args ?? ['-c', workerCommand];
@@ -380,6 +387,9 @@ export class HookDispatcher {
               accumulatedDecision = mergeWriteHookResult(accumulatedDecision, result);
               continue;
             }
+            logger.warn('Write hook stdio worker unavailable; falling back to one-shot execution', {
+              event: relevantEvent,
+            });
           }
         }
         for (const jsonPayload of jsonPayloads) {

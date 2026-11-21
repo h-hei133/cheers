@@ -1,12 +1,12 @@
 # Cheers Wiki
 
-> Compiled knowledge base for the three-layer autonomous coding agent architecture, proof grounding, and reference models.
+> Compiled knowledge base for the TypeScript monorepo autonomous coding agent architecture, proof grounding, and reference models.
 
-Last updated: 2026-11-14
+Last updated: 2026-11-21
 
 ## Statistics
 
-- Sources: 13 raw documents (including RFC-001 to RFC-004)
+- Sources: 13 raw documents (including historical RFC-001 to RFC-004)
 - Articles: 9 compiled wiki articles (including master thesis)
 - Feature research documents: 37 (01–37, contiguous; merged from 53 after de-duplication)
   - **Current work (2026-10-17): Phase 20 configuration foundations.** Profile identity and management have exact-SHA CI evidence; ordered configuration inputs are undergoing delivery verification, followed by operation scope rules. Start with [Phase 20 decisions](features/phase-20-decisions.md), [Profile boundaries](features/profiles.md), [Configuration inputs](features/config-inputs.md), [32 Review register](features/32-defect-register-2026-10.md), and [36 Outstanding work](features/36-outstanding-work.md). [37 Command audit](features/37-command-implementation-audit.md) traces 102 declared entries; it does not prove every action works.

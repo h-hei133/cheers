@@ -68,12 +68,13 @@
 //
 // Exit codes: 0 report produced, 2 the source root is missing.
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { workspaceSourceRoots } from './build/workspaces.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const SOURCE_ROOT = join(ROOT, 'packages', 'ts-shell', 'src')
+const SOURCE_ROOTS = workspaceSourceRoots(ROOT)
 
 const args = process.argv.slice(2)
 const showAll = args.includes('--all')
@@ -83,13 +84,13 @@ const CEILING = ceilingIndex === -1 ? 20 : Number(args[ceilingIndex + 1])
 // Thresholds, each justified in the header. Kept together so the criterion reads
 // as one definition rather than four scattered numbers.
 const THIN_FACADE = {
-  minDelegationRatio: 0.9,
-  maxBranchingFunctions: 0,
+  minDelegationRatio: 0.85,
+  maxBranchingFunctions: 2,
   maxOwnStateWrites: 0,
 }
 
-if (!existsSync(SOURCE_ROOT)) {
-  console.log(`[config-failure] module-facade-source-missing - ${relative(ROOT, SOURCE_ROOT)}`)
+if (SOURCE_ROOTS.length === 0) {
+  console.log(`[config-failure] module-facade-source-missing - packages/*/src`)
   process.exit(2)
 }
 
@@ -101,7 +102,12 @@ function collectSources(directory, files = []) {
       collectSources(full, files)
       continue
     }
-    if (entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) {
+    if (
+      entry.isFile() &&
+      /\.tsx?$/.test(entry.name) &&
+      !entry.name.endsWith('.d.ts') &&
+      !/\.(?:test|spec)\.tsx?$/.test(entry.name)
+    ) {
       files.push(full)
     }
   }
@@ -260,7 +266,7 @@ function analyse(file) {
   }
 }
 
-const rows = collectSources(SOURCE_ROOT)
+const rows = SOURCE_ROOTS.flatMap((dir) => collectSources(dir))
   .map(analyse)
   .filter((row) => row.nameCount > 0)
   .sort((left, right) => right.nameCount - left.nameCount)

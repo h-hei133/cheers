@@ -37,9 +37,11 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { workspaceSourceRoots } from './build/workspaces.mjs'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const strict = process.argv.includes('--strict')
+const sourceRoots = workspaceSourceRoots(repoRoot)
 
 const RULES = ['AGENTS.md', 'agent-rules', '.wiki/_index.md']
 // The documents whose own status entry claims they describe the current tree.
@@ -68,13 +70,14 @@ const CANDIDATE = /`((?:packages|apps|scripts|docs|agent-rules|contracts)\/[^`\s
 const SOURCE_PATH = /`([a-z][a-z0-9-]*(?:\/[A-Za-z0-9_.@-]+)+\.(?:ts|tsx|mjs|js))`/g
 
 function sourceDomains() {
-  const root = resolve(repoRoot, 'packages/ts-shell/src')
-  if (!existsSync(root)) return new Set()
-  return new Set(
-    readdirSync(root, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name),
-  )
+  const domains = new Set()
+  for (const root of sourceRoots) {
+    if (!existsSync(root)) continue
+    for (const entry of readdirSync(root, { withFileTypes: true })) {
+      if (entry.isDirectory()) domains.add(entry.name)
+    }
+  }
+  return domains
 }
 
 function sourcePaths(text, domains) {
@@ -123,7 +126,7 @@ function resolves(referenced) {
     referenced.replace(/\.js$/, '.tsx'),
     referenced.replace(/^(.*)\/$/, '$1/index.md'),
   ]
-  const bases = ['', 'packages/ts-shell/src']
+  const bases = ['', ...sourceRoots.map((root) => relative(repoRoot, root))]
   return shapes.some((shape) => bases.some((base) => existsSync(resolve(repoRoot, base, shape))))
 }
 

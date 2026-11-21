@@ -13,9 +13,9 @@ Keep work tied to the requested user-facing path and the current owner module.
 
 ## Pitfall Memory (`HANDOFF.md`)
 
-- **Read Before Starting**: Before starting a new task or touching an unfamiliar subsystem, read `HANDOFF.md` at the repository root to check recorded pitfalls and operational guardrails.
-- **Record After Solving**: Whenever you encounter and resolve a non-obvious trap (runtime edge case, build/test hazard, state race, environment quirk), append a concise, factual entry (`Symptom` / `Root Cause` / `Rule`) to `HANDOFF.md` before finishing the task.
-- Keep `HANDOFF.md` strictly for reusable engineering lessons and traps — never use it as a task status log or commit history.
+- **Targeted Lookup Before Starting**: Before touching an unfamiliar subsystem, search `HANDOFF.md` at the repository root by domain keyword (`rg -i "<topic>" HANDOFF.md`) to check recorded pitfalls and operational guardrails.
+- **Record After Solving**: Whenever you encounter and resolve a non-obvious trap (runtime edge case, build/test hazard, state race, environment quirk), add a concise, factual entry (`Symptom` / `Root Cause` / `Rule`) under the owning section in `HANDOFF.md` before finishing.
+- **Compaction Discipline**: Keep `HANDOFF.md` compact (`<15 KB`) and strictly for reusable engineering guardrails — never use it as a task status log or commit history. Archive historical per-batch entries to `.wiki/refactor/handoff-archive-2026.md` (or a dated archive file) rather than growing `HANDOFF.md` unboundedly.
 
 ## Before Editing
 

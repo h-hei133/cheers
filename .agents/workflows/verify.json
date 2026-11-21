@@ -1,17 +1,18 @@
 {
   "name": "verify",
-  "description": "types first, then the shell test suite",
-  "maxConcurrency": 2,
+  "description": "serial Tier-1 static gates, typecheck, and shell test suite",
+  "maxConcurrency": 1,
   "steps": [
+    {
+      "id": "static-gates",
+      "run": "npm run verify:import-cycles && npm run check:config-consumers && npm run check:declarations && npm run check:node-floor && npm run check:lint && npm run verify:docs-drift:strict",
+      "timeoutSeconds": 180
+    },
     {
       "id": "types",
       "run": "npx tsc --noEmit -p packages/ts-shell/tsconfig.build.json",
+      "needs": ["static-gates"],
       "timeoutSeconds": 600
-    },
-    {
-      "id": "cycles",
-      "run": "node scripts/validate-structure.mjs",
-      "timeoutSeconds": 300
     },
     {
       "id": "shell-tests",

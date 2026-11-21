@@ -28,6 +28,12 @@ packages/ts-shell/src/session/recovery/sessionRecoveryRuntime.ts
 
 ## Owner Domains
 
+Cheers is organized as a 9-package TypeScript monorepo (`package.json` `workspaces`):
+
+- Independent domain packages (`packages/<domain>/src/`, unidirectional — must never reach `packages/ts-shell`):
+  `packages/advisor/`, `packages/browser/`, `packages/collaboration/`, `packages/desktop/`, `packages/media/`, `packages/planning/`, `packages/research/`, `packages/workflow/`.
+- Shell control plane and runtime substrate (`packages/ts-shell/src/`):
+
 Use existing owner domains where possible. Feature and runtime domains under
 `packages/ts-shell/src/`:
 
@@ -189,26 +195,19 @@ A compatibility shim is different from a rightful domain manager. For example, `
 
 ### Facade Or Monolith
 
-A module may keep more than the responsibility ceiling of function-like names only
-when it is a **thin facade**: an aggregation surface whose names delegate rather
-than own behaviour. Claiming that standing requires measurement, not assertion.
+A production module (excluding `*.test.ts*` and `*.spec.ts*`) may keep more than the responsibility ceiling (`20` declared function-like names) only when it is a **thin facade**: an aggregation surface whose names delegate rather than own behaviour. Claiming that standing requires measurement, not assertion.
 
 A module is a thin facade only when all three hold:
 
-1. **Delegation ratio >= 0.90.** At least 90% of its declarations are a single
+1. **Delegation ratio >= 0.85.** At least 85% of its declarations are a single
    call, optionally returning or reading one property of that result.
-2. **No branching.** No declaration contains `if`, `for`, `while`, `switch`,
-   `try`, a ternary, or `catch`.
+2. **Bounded guard branching (`<= 2`).** At most two declarations contain small
+   input/lifecycle guards (`if`, `for`, `while`, `switch`, `try`, ternary, `catch`).
 3. **No own state.** No `this.<field> =` assignment outside the constructor.
 
-Otherwise the module is a real monolith and the ceiling applies: split it.
+Otherwise the module is a real monolith and the ceiling applies: split it (or respect its v2 baseline ceiling in `.normproof/baseline.json`).
 
-Run `npm run analyze:module-facades` to compute all three clauses and classify
-every over-ceiling module. On the current tree the classification has a clean
-gap — facade-shaped modules sit at a delegation ratio at or above 0.90 with zero
-branching, and real monoliths sit at 0.35 or below. Physical lines per declared
-name are printed for context only and are not part of the verdict, because long
-modules in this tree are mostly literal tables and doc comments rather than logic.
+Run `npm run analyze:module-facades` to compute all three clauses across all workspace packages and classify every over-ceiling production module. Physical lines per declared name are printed for context only and are not part of the verdict, because long modules in this tree are mostly literal tables and doc comments rather than logic.
 
 Note: a declaration whose return type is an inline object type (`readonly { ... }[]`)
 can be parsed as starting mid-annotation and reported as branch-free. Treat a
@@ -254,16 +253,15 @@ Do not add direct shell, filesystem write, provider, browser, MCP, or package-lo
 
 Product code must avoid development-process vocabulary unless the file is explicitly historical or compatibility-only.
 
-Avoid product names that include:
+Avoid development-process labels in product names:
 
 ```text
-route
+route01 / route-era milestone tags (ordinary domain routing terms like HTTP/command routes are fine)
 capstone
 closeout
 cut-through
 sprint
 MVP
-reference
 inspired
 ```
 

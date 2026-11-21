@@ -19,7 +19,7 @@ RTK command discipline is configured outside this repository. Follow the global 
 ## Engineering Principles & Handoff Memory
 
 - **First-Principles Thinking**: Start from the fundamental problem. Confirm the real goal, hard constraints, and verifiable success criteria before acting. Do not blindly follow convention or copy legacy patterns when a simpler, direct path solves the root problem.
-- **Pitfall Memory (`HANDOFF.md`)**: Before starting a new task, read `HANDOFF.md` at the repository root to avoid repeating known pitfalls. When you encounter and solve a non-obvious trap during work, append the root cause and guardrail to `HANDOFF.md` before finishing.
+- **Pitfall Memory (`HANDOFF.md`)**: Before touching an unfamiliar subsystem, search `HANDOFF.md` by domain keyword (`rg -i "<topic>" HANDOFF.md`) to avoid known pitfalls. Keep `HANDOFF.md` compact (`<15 KB`) for reusable traps only; historical batch entries live in `.wiki/refactor/handoff-archive-2026.md`. When you solve a non-obvious trap, add a concise entry under the owning section before finishing.
 - **MUI (Minimal UI)**: Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining.
 
 ## Non-Negotiable Safety
@@ -38,51 +38,48 @@ Detailed rules: [provider and secret boundary](agent-rules/provider-and-secret-b
 
 ## Architecture Summary
 
-- TypeScript is the primary product runtime and control plane: shell, session, orchestration, query loop, slash commands, permission UX, recovery, replay, runtime durability, result mapping, terminal/session surface, high-level capability routing, and every current execution adapter.
-- Execution is an explicit runtime boundary/interface implemented in `packages/ts-shell/src/` (see `core/tools/`, `tools/`, `sandbox/`, and the `browser/*Executor.ts` adapters). Commands run through `runtime/execution/`, which is the single execution path: `runtime/execution/service.ts` projects a result, `runtime/execution/local.ts` spawns the process and streams its output.
-- Isolation is owned by `sandbox/` (`bwrap` on Linux, `sandbox-exec` on macOS), not by a separate runtime. There is no second execution plane.
-- Where a mature native tool already exists, call it instead of reimplementing it in-process. `grep` runs `rg` when it is installed and falls back to the in-process walk when it is not; the fallback is what keeps a machine without `rg` working. Do not add a second language to reach the same speed — the compared implementations all reach it by running ripgrep, one of them by linking its crates.
-- Distribution: `npm run build:exe` compiles a single-file executable (no Node required, ~7× faster startup). The build bakes in the version and name, because a compiled binary has no manifest to read.
-- `contracts` carries schemas, events, lifecycle states, permission semantics, and serialization rules only when there is a real cross-runtime consumer.
-- The product is single-language: TypeScript. There is no Rust or Python workspace member. A native sandbox module may be reconsidered if a benchmark shows `bwrap` is insufficient; until such evidence exists, adding a second language is a cost with no measured benefit.
-- Project master knowledge base, technical RFCs (RFC-001 through RFC-004), and architecture specifications live in `.wiki/` (`.wiki/_index.md`).
+- **TypeScript Monorepo Control Plane**: Cheers is a 9-package TypeScript workspace (`package.json` `workspaces`):
+  - `packages/ts-shell`: primary shell, CLI, session, orchestration, query loop, slash commands, permission UX, recovery, replay, runtime durability, result mapping, hooks, sandbox, and composition root.
+  - Eight independent domain packages (`packages/advisor`, `packages/browser`, `packages/collaboration`, `packages/desktop`, `packages/media`, `packages/planning`, `packages/research`, `packages/workflow`): unidirectional dependencies only — no domain package may import or transitively reach `packages/ts-shell`, and cross-package imports must use declared public package entries (`exports`).
+- **Execution Boundary**: Commands and workspace side effects run through `packages/ts-shell/src/runtime/execution/` (`service.ts` projects results, `local.ts` spawns and streams processes) and sanctioned tool/edit/sandbox owners.
+- **Isolation**: OS isolation is owned by `packages/ts-shell/src/sandbox/` (`bwrap` on Linux, `sandbox-exec` on macOS). There is no second execution daemon.
+- **Reuse Mature Native Tools**: Call installed native tools (e.g., `rg` with in-process fallback) rather than reimplementing them. Keep the core control plane and CLI in TypeScript; introducing a native binding or auxiliary tool requires concrete benchmark or platform evidence and explicit scope.
+- **Distribution**: `npm run build:exe` compiles a single-file executable (no Node required) with baked-in package metadata.
+- **Knowledge Base**: Active architecture notes, guides, and upgrade records live under `.wiki/` (`.wiki/_index.md`). Historical RFCs and older refactor plans are archival context only.
+
 Detailed rules: [architecture boundaries](agent-rules/architecture-boundaries.md).
 
 ## Ownership And Naming Summary
 
-- Put behavior in the owning module or domain instead of central orchestration, entrypoint files, compatibility shims, or vague helper buckets.
-- Prefer multi-level owner-domain structure where folders carry context and files use short local role names.
-- Use short, responsibility-based file names such as `model`, `contract`, `policy`, `projection`, `renderer`, `adapter`, `state`, `events`, `stream`, or `index` only inside clear domain folders.
-- Do not encode an entire feature, roadmap title, implementation phase, or historical route name into a product file name.
-- Compatibility wrappers must remain thin and delegate or re-export only; they must not become the place where new behavior grows.
+- Put behavior in the owning workspace package and domain module instead of central orchestration, entrypoint files, compatibility shims, or vague helper buckets.
+- Prefer multi-level owner-domain structure where folders carry context and files use short local role names (`model`, `contract`, `policy`, `projection`, `renderer`, `adapter`, `state`, `events`, `stream`, `index`).
+- Do not encode roadmap titles, implementation phases, or development-process milestone labels into product filenames.
+- Compatibility wrappers must remain thin and delegate or re-export only; they must not accumulate new behavior.
 - Keep TypeScript imports ending in `.js` when importing local TypeScript modules that compile to JavaScript.
-- Avoid external-project names, route-era terms, and process vocabulary in product code, filenames, public runtime fields, and user-visible output unless the surface is explicitly historical or compatibility-only.
+- Avoid external-project names and development-process vocabulary in product code, filenames, public runtime fields, and user-visible output unless explicitly historical or compatibility-only.
 
 Detailed rules: [file placement and naming](agent-rules/file-placement-and-naming.md), [compatibility and history](agent-rules/compatibility-and-history.md).
 
 ## Validation Summary
 
 - **No Concurrent Heavy Execution (OOM Prevention)**: NEVER run compilation, test, or verification commands (`tsc`, `vitest`, `npm run build*`, `npm run test*`, `npm run verify:*`, `normproof`) concurrently across parallel tool calls, background jobs, or subagents. Concurrent heavy processes trigger the WSL2 Linux OOM-Killer and crash the session.
-- **Batch & Fast-Fail Serial Chaining**: Chain sequential checks with `&&`. Run sub-second static gates (`verify:import-cycles`, `check:*`, `verify:docs-drift:strict`) before heavy builds or `vitest` so failures short-circuit immediately. When testing multiple files, pass all target test files into a single `vitest run <fileA> <fileB>` invocation rather than spawning separate `vitest` processes.
-- **Subagent Execution Ban**: Delegated subagents (`task`) must NEVER run `build`, `vitest`, or `normproof` mid-flight. Subagents only research or edit their slice; the main agent runs verification serially once after integration.
-- Run focused validation tied to the files and behavior changed.
-- Do not default to full-repository validation when a focused gate covers the risk.
-- If only markdown files change, do not run build/tests (except `npm run verify:docs-drift:strict` when editing rule/index docs).
-- Classify failing tests before changing implementation or tests.
-- Do not claim validation passed unless the command actually ran and passed.
-- Restore audit/history residue before finalizing.
-CI enforces these gates, and they exit non-zero on a violation:
+- **Batch & Fast-Fail Serial Chaining**: Chain sequential checks with `&&`. Run Tier-1 sub-second static gates before heavy builds or `vitest` so failures short-circuit immediately. Pass multiple target test files into one `vitest run <fileA> <fileB>` invocation rather than spawning separate processes.
+- **Subagent Execution Ban**: Delegated subagents must NEVER run `build`, `vitest`, or `normproof` mid-flight. Subagents only research or edit their slice; the main agent runs verification serially once after integration.
+- Run focused validation tied to the files and behavior changed; do not default to full-repository validation when a focused gate covers the risk.
+- If only markdown files change, do not run build/tests (except `npm run verify:docs-drift:strict` when editing rule/index/active docs).
+- Classify failing tests before changing implementation or tests; never claim validation passed unless the command ran and passed.
 
-- `npm run verify:import-cycles` — dependency cycles. Note it checks cycles only; it does not report imports that fail to resolve.
-- `npm run check:config-consumers` — config fields declared with no production reader.
-- `npm run check:declarations` — hook events declared with no dispatch site, and tool factories the registry never calls.
-- `npm run check:node-floor` — enforces the `engines.node` floor (`>=20.3.0`, which CI runs on). Do not use Node 21/22+ APIs such as `Promise.withResolvers`, `Object.groupBy`, `Map.groupBy`, `Array.fromAsync`, `Set.prototype.union`/`intersection`/`difference`, `Symbol.dispose`, `process.getBuiltinModule`, or `fs.globSync`.
-- `npm run verify:docs-drift:strict` — dangling path references in binding rules and current-state docs.
-- `npm run test:ts` — the TypeScript suite.
-- `npm run test:scripts` — the gates' own tests, so a gate that stops detecting fails here rather than passing quietly.
-- `normproof judge` — blocks on the unresolved-specifier obligation only. The cycle and function-ceiling obligations are advisory, so they report without failing the build.
+Blocking CI & local static gates (covering all workspace packages):
 
-Run the `check:*` and `verify:*` gates locally before pushing; together they take under a second, against roughly three minutes for the suite. Measurements and the gate-by-gate audit are in `.wiki/refactor/plan.md` section 9.27.
+- `npm run verify:import-cycles` — TypeScript AST runtime import cycles and cross-package boundary violations.
+- `npm run check:config-consumers` — declared config fields with no production reader.
+- `npm run check:declarations` — hook events without dispatch sites and unregistered tool factories.
+- `npm run check:node-floor` — enforces `engines.node` (`>=20.3.0`, catching Node 21/22+ APIs such as `Promise.withResolvers`, `Object.groupBy`, `Map.groupBy`, `Array.fromAsync`, `Set.prototype.union`/`intersection`/`difference`, `Symbol.dispose`, `process.getBuiltinModule`, `fs.globSync`).
+- `npm run check:lint` — Biome lint checks (`--error-on-warnings`).
+- `npm run verify:docs-drift:strict` — dangling path references in binding rules and active docs.
+- `npm run test:ts` — TypeScript test suite across workspaces (`--workspaces --if-present`).
+- `npm run test:scripts` — tests for all repository static gates and NormProof adapter conformance.
+- `normproof judge` — structural proof judgement via the pinned archive (`.normproof/normproof-0.1.0.tgz`).
 
 Detailed rules: [testing and validation](agent-rules/testing-and-validation.md), [development workflow](agent-rules/development-workflow.md).
 
@@ -90,23 +87,9 @@ Detailed rules: [testing and validation](agent-rules/testing-and-validation.md),
 
 Read-only references:
 
-- Claude Code
-- codex
-- oh-my-pi
-- deepseek-harness
-- opencode
-- OpenHands
-- Stagehand
-- Playwright MCP
-- MemPalace
-- mem0
-- graphiti
-- Inspect AI
-- mini-swe-agent
-- pi: coding-agent/reference project for agent/runtime architecture comparison; exact useful parts must be determined by targeted inspection when a task needs it.
-- GitNexus: coding-agent/reference project for repository intelligence, graph/context, or developer workflow comparison; exact useful parts must be determined by targeted inspection when a task needs it.
+- Claude Code, codex, oh-my-pi, deepseek-harness, opencode, OpenHands, Stagehand, Playwright MCP, MemPalace, mem0, graphiti, Inspect AI, mini-swe-agent, pi, GitNexus.
 
-Use references only after inspecting the target implementation first, and only for task-relevant semantic comparison. Do not broad-scan references without a direct blocker. Do not mechanically copy implementation code or architecture wholesale. When a reference has already solved the same class of problem, compare its specific decisions against your plan before writing code, and keep a test that fails when a compared decision is reversed.
+Inspect the target repository implementation first, and consult references only for task-relevant semantic comparison on non-trivial runtime/architecture decisions. Do not broad-scan references without a direct blocker or copy code wholesale.
 
 Detailed rules: [reference repositories](agent-rules/reference-repositories.md).
 
@@ -124,31 +107,26 @@ Detailed rules: [reference repositories](agent-rules/reference-repositories.md).
 
 ## Architectural Norms (NormProof)
 
-Follow these architectural rules:
-1. No dependency cycles. No module may import, directly or transitively, a module that imports it.
-2. Every module import resolves within the declared source graph.
-3. Responsibility ceiling. No single module may declare more than 20 function-like names — counting named functions, functions or arrows bound to a name, and methods. Split a module that would exceed it rather than letting one module accumulate behaviour.
+NormProof governs structural invariants across all 9 workspace packages through both active hooks (`.agents/hooks.json`: PreToolUse `write-gate` and Stop `completion-gate`) and terminal judgement (`normproof judge`, pack `.normproof/norm-packs/software-structure-v0/profile.json`):
 
-How these are checked, so you know what will stop you:
-
-| Rule | Gate that catches it | Blocks? |
+| Obligation / Rule | Enforcement | Scope & Policy |
 |---|---|---|
-| 1 — cycles | `npm run verify:import-cycles` | yes, in CI |
-| 2 — imports resolve | `normproof judge` (unresolved-specifier obligation) | yes, in CI |
-| 3 — function ceiling | `npm run analyze:module-facades` | no, advisory |
-| 1 — cycles, as a NormProof obligation | `normproof judge` | no, advisory |
-
-Rule 3 has no blocking gate, so a module over the ceiling passes CI. Treat it as a rule to hold yourself to rather than one the pipeline will hold you to.
+| `source_graph_has_no_unresolved_specifiers` | **Blocking** (`judge`, Stop, `write-gate` export advisory) | Every relative and workspace package import resolves within the declared source graph with valid exports. |
+| `source_graph_is_acyclic` | **Blocking** (`judge`, Stop, `write-gate` `noNewCycle`, `verify:import-cycles`) | Zero runtime value dependency cycles (`type-only` edges are excluded from cycle checks). |
+| `domains_do_not_reach_shell` | **Blocking** (`judge`, Stop, `write-gate` `noReachableDependency`) | No package under `packages/**` (excluding `packages/ts-shell/**`) may directly or transitively reach `packages/ts-shell/**`. |
+| `execution_does_not_reach_cli` | Advisory (`judge`), **Blocking** on new paths (`write-gate`) | `packages/ts-shell/src/runtime/execution/**` must not reach `packages/ts-shell/src/cli/**`. |
+| `declared_functions_within_module_ceiling` | Advisory (`judge`), **Blocking** above ceiling (`write-gate` `moduleFunctionBaseline`) | Production modules (`packages/*/src/**/*.ts*`, excluding `**/*.test.ts*` and `**/*.spec.ts*`) stay within the v2 baseline seed floor (`20` functions, or legacy accepted ceiling in `.normproof/baseline.json`). Check facades via `npm run analyze:module-facades`. |
+| `filenames_carry_no_phase_labels` | **Blocking** (`write-gate`) | New files under `packages/**/*.ts*` must not carry temporary phase/version tokens (`-v2`, `-new`, `-old`, `-temp`, `-mvp`, `-phase`, etc.). |
 
 ### Architecture Watch Disposition Protocol
 
-`.normproof/dispositions.md` is where findings that you have reviewed and decided NOT to change get recorded. One line per finding:
+`.normproof/dispositions.md` is where reviewed advisory findings decided NOT to change yet get recorded (append-only):
 
-```
+```text
 - <obligation-id> | <finding> | reviewed <date> | decision: fix|defer|ignore | reason: <one line>
 ```
 
 Rules:
-- Recording a disposition NEVER changes the verdict — judge keeps reporting the finding every run.
-- If a finding appears repeatedly, first try to fix it; record only when deferring is a real decision.
+- Recording a disposition NEVER changes the verdict — `judge` keeps reporting the finding every run.
+- Prefer fixing repeated findings; record a disposition only when deferring is a real engineering decision.
 - Never delete previous disposition lines; append only.

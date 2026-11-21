@@ -35,6 +35,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { workspaceSourceRoots } from './build/workspaces.mjs'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const targetRoot = resolve(process.argv[2] ?? repoRoot)
@@ -291,12 +292,24 @@ export function findUnreferencedModules(files, readSource = (f) => readFileSync(
   return findings
 }
 
-function relOf(file) {
-  return relative(join(targetRoot, SOURCE_ROOT), file).split('\\').join('/')
+function relOf(file, roots) {
+  if (roots.length === 1 && roots[0] === join(targetRoot, SOURCE_ROOT)) {
+    return relative(roots[0], file).split('\\').join('/')
+  }
+  return relative(targetRoot, file).split('\\').join('/')
+}
+
+function isExempt(rel) {
+  const withinSrc = rel.replace(/^packages\/[^/]+\/src\//, '')
+  if (EXEMPT_PREFIXES.some((prefix) => withinSrc.startsWith(prefix))) return true
+  // Public package barrel entries in extracted domain packages are consumed across workspaces.
+  if (/^packages\/(?!ts-shell\/)[^/]+\/src\/index\.ts$/.test(rel)) return true
+  return ALLOWED.has(rel) || ALLOWED.has(withinSrc)
 }
 
 function main() {
-  const files = walk(join(targetRoot, SOURCE_ROOT))
+  const roots = workspaceSourceRoots(targetRoot)
+  const files = roots.flatMap((dir) => walk(dir))
   if (files.length === 0) {
     console.error(`[fail] call-reachability - ${SOURCE_ROOT} holds no source files`)
     process.exit(3)
@@ -306,14 +319,11 @@ function main() {
   // entry point is called by the process rather than by source, but it is also
   // the thing that calls most of the tree, so leaving it out of the scan would
   // report every module it drives as unreferenced.
-  const findings = findUnreferencedModules(files).filter(({ file }) => {
-    const rel = relOf(file)
-    return !EXEMPT_PREFIXES.some((prefix) => rel.startsWith(prefix)) && !ALLOWED.has(rel)
-  })
+  const findings = findUnreferencedModules(files).filter(({ file }) => !isExempt(relOf(file, roots)))
 
   if (findings.length > 0) {
     for (const { file, exported } of findings) {
-      console.error(`[advisory] call-unreferenced - ${relOf(file)} (${exported.length} export(s): ${exported.slice(0, 3).join(', ')})`)
+      console.error(`[advisory] call-unreferenced - ${relOf(file, roots)} (${exported.length} export(s): ${exported.slice(0, 3).join(', ')})`)
     }
     console.error(`\n[advisory] call-reachability - ${findings.length} module(s) export work nothing calls`)
     // Advisory: the tree currently holds this shape, and the count is what the

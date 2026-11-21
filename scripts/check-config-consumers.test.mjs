@@ -152,3 +152,15 @@ test('fails loudly when the config module is absent', (t) => {
   assert.match(result.stdout, /config-consumer-gate-source-missing/)
 })
 
+test('counts production reads from .tsx files and extracted workspace packages', (t) => {
+  const root = fixture(t, configSource(['alpha', 'beta']), {
+    'package.json': `${JSON.stringify({ workspaces: ['packages/ts-shell', 'packages/domain'] })}\n`,
+    'packages/ts-shell/package.json': `${JSON.stringify({ name: '@cheers/ts-shell' })}\n`,
+    'packages/domain/package.json': `${JSON.stringify({ name: '@cheers/domain' })}\n`,
+    'packages/ts-shell/src/view.tsx': 'export const View = (c: any) => `${c.alpha}${c.tui}${c.statusItems}`;\n',
+    'packages/domain/src/reader.ts': 'export const read = (c: any) => c.beta;\n',
+  })
+  const result = run(root)
+  assert.equal(result.status, 0, result.stdout + result.stderr)
+})
+

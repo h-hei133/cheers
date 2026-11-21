@@ -16,7 +16,7 @@ const graph = await load('adapters/sidecar-file/module-graph.js');
 const collector = await load('adapters/sidecar-file/evidence-collector.js');
 const { GRAPH_SAFETY } = await load('contracts/sidecar/graph-budget.js');
 const fixture = JSON.parse(fs.readFileSync(path.join(repository, '.normproof/adapter/fixtures/graph.json')));
-const nativeRuntime = { skip: Number(process.versions.node.split('.')[0]) < 24 && 'The native package requires Node 24' };
+const nativeRuntime = { skip: false };
 
 function workspace(name, source = 'export function value() { return 1; }', entry = 'packages/entry.ts') {
   const root = path.join(scratch, name);
@@ -122,22 +122,30 @@ test('capacity: source overflow remains a native not_proven verdict in shadow ob
   assert.match(JSON.stringify(ledger), /oversized:/);
 });
 
-test('report: native advisory cycle/name ceiling remain visible with partial verdict and exit 0', nativeRuntime, () => {
-  const root = workspace('advisory', "import './entry.js';\n" + Array.from({ length: 21 }, (_, i) => `export function f${i}() { return ${i}; }`).join('\n'), 'packages/example/src/entry.ts');
-  const output = path.join(scratch, 'advisory-out');
-  const run = command([path.join(scratch, 'package/dist/adapters/cli/normproof.js'), 'judge', path.join(root, '.normproof/judge-input.json'), output,
-    '--evidence-manifest', path.join(root, '.normproof/evidence-manifest.json')], { cwd: root });
-  assert.equal(run.status, 0, run.stdout + run.stderr);
-  const verdict = JSON.parse(fs.readFileSync(path.join(output, 'verdict.json')));
-  assert.equal(verdict.status, 'partial');
-  const report = fs.readFileSync(path.join(output, 'report.md'), 'utf8');
-  for (const id of ['source_graph_is_acyclic', 'declared_functions_within_module_ceiling']) {
-    assert.equal(verdict.obligations.find(item => item.id === id).blocking, false);
-    assert.equal(verdict.obligations.find(item => item.id === id).status, 'failed');
-    assert.match(report.split('## Obligations')[1].split('## Evidence')[0], new RegExp(`${id}: failed`));
-    assert.match(report.split('## Missing Or Failed Obligations (All Severities)')[1], new RegExp(`${id}: failed`));
-  }
-  console.log(JSON.stringify({ exitCode: run.status, verdict: verdict.status, advisoryVisible: true }));
+test('report: native blocking cycle fails exit 2 while advisory name ceiling remains visible with partial verdict and exit 0', nativeRuntime, () => {
+  const advisoryRoot = workspace('advisory', Array.from({ length: 21 }, (_, i) => `export function f${i}() { return ${i}; }`).join('\n'), 'packages/example/src/entry.ts');
+  const advisoryOut = path.join(scratch, 'advisory-out');
+  const advisoryRun = command([path.join(scratch, 'package/dist/adapters/cli/normproof.js'), 'judge', path.join(advisoryRoot, '.normproof/judge-input.json'), advisoryOut,
+    '--evidence-manifest', path.join(advisoryRoot, '.normproof/evidence-manifest.json')], { cwd: advisoryRoot });
+  assert.equal(advisoryRun.status, 0, advisoryRun.stdout + advisoryRun.stderr);
+  const advisoryVerdict = JSON.parse(fs.readFileSync(path.join(advisoryOut, 'verdict.json')));
+  assert.equal(advisoryVerdict.status, 'partial');
+  const advisoryReport = fs.readFileSync(path.join(advisoryOut, 'report.md'), 'utf8');
+  assert.equal(advisoryVerdict.obligations.find(item => item.id === 'declared_functions_within_module_ceiling').blocking, false);
+  assert.equal(advisoryVerdict.obligations.find(item => item.id === 'declared_functions_within_module_ceiling').status, 'failed');
+  assert.match(advisoryReport.split('## Obligations')[1].split('## Evidence')[0], /declared_functions_within_module_ceiling: failed/);
+  assert.match(advisoryReport.split('## Missing Or Failed Obligations (All Severities)')[1], /declared_functions_within_module_ceiling: failed/);
+
+  const cycleRoot = workspace('cycle-block', "import './entry.js';\nexport function f0() { return 0; }\n", 'packages/example/src/entry.ts');
+  const cycleOut = path.join(scratch, 'cycle-out');
+  const cycleRun = command([path.join(scratch, 'package/dist/adapters/cli/normproof.js'), 'judge', path.join(cycleRoot, '.normproof/judge-input.json'), cycleOut,
+    '--evidence-manifest', path.join(cycleRoot, '.normproof/evidence-manifest.json')], { cwd: cycleRoot });
+  assert.equal(cycleRun.status, 2, cycleRun.stdout + cycleRun.stderr);
+  const cycleVerdict = JSON.parse(fs.readFileSync(path.join(cycleOut, 'verdict.json')));
+  assert.equal(cycleVerdict.status, 'failed');
+  assert.equal(cycleVerdict.obligations.find(item => item.id === 'source_graph_is_acyclic').blocking, true);
+  assert.equal(cycleVerdict.obligations.find(item => item.id === 'source_graph_is_acyclic').status, 'failed');
+  console.log(JSON.stringify({ exitCode: advisoryRun.status, verdict: advisoryVerdict.status, advisoryVisible: true }));
 });
 
 test('policy: workspace direction and module function scope agree at write and completion', async () => {
@@ -145,19 +153,24 @@ test('policy: workspace direction and module function scope agree at write and c
   const manifest = JSON.parse(fs.readFileSync(path.join(root, '.normproof/evidence-manifest.json')));
   const profile = JSON.parse(fs.readFileSync(path.join(root, '.normproof/norm-packs/software-structure-v0/profile.json')));
   const rules = JSON.parse(fs.readFileSync(path.join(repository, '.normproof/write-rules.json')));
-  const { workspaces } = JSON.parse(fs.readFileSync(path.join(repository, 'package.json')));
-  const domains = workspaces.filter(dir => dir !== 'packages/ts-shell').map(dir => `${dir}/**`);
   const to = 'packages/ts-shell/**';
-  const boundaries = profile.obligationTemplates.filter(item => item.expression.kind === 'noDependency' && item.expression.to === to);
-  assert.deepEqual(boundaries.map(item => item.expression.from).sort(), domains.sort());
-  for (const { id, expression, severity } of boundaries) {
-    const write = rules.rules.find(item => item.id === id);
-    assert.deepEqual([severity, expression.reachable, write?.kind, write?.from, write?.to],
-      ['blocking', true, 'noReachableDependency', expression.from, to]);
-  }
+  const boundary = profile.obligationTemplates.find(item => item.id === 'domains_do_not_reach_shell');
+  assert.ok(boundary, 'expected consolidated domains_do_not_reach_shell obligation');
+  const write = rules.rules.find(item => item.id === boundary.id);
+  assert.deepEqual(
+    [boundary.severity, boundary.expression.reachable, boundary.expression.from, boundary.expression.excludeFrom, boundary.expression.to],
+    ['blocking', true, 'packages/**', ['packages/ts-shell/**'], to]
+  );
+  assert.deepEqual(
+    [write?.kind, write?.from, write?.excludeFrom, write?.to],
+    ['noReachableDependency', boundary.expression.from, boundary.expression.excludeFrom, to]
+  );
   const functionSource = manifest.entries.find(item => item.id === 'source_module_functions').source;
-  assert.equal(rules.rules.find(item => item.kind === 'moduleFunctionBaseline').pattern, functionSource.pattern);
+  const baselineRule = rules.rules.find(item => item.kind === 'moduleFunctionBaseline');
+  assert.equal(baselineRule.pattern, functionSource.pattern);
+  assert.deepEqual(baselineRule.exclude, functionSource.exclude);
   fs.writeFileSync(path.join(root, 'packages/browser/api.d.ts'), Array.from({ length: 21 }, (_, i) => `export declare function f${i}(): void;`).join('\n'));
+  fs.writeFileSync(path.join(root, 'packages/browser/src/entry.test.ts'), Array.from({ length: 25 }, (_, i) => `function t${i}() {}`).join('\n'));
   const captured = await collector.collectEvidence(manifest, path.join(root, '.normproof'));
   assert.deepEqual({ ...captured.moduleFunctionCounts.source_module_functions }, { 'packages/browser/src/entry.ts': 1 });
 });

@@ -71,10 +71,7 @@ Expected workflow:
 
 ## Compare Decisions Before Implementing
 
-When a reference has already solved the same class of problem, compare its **specific decisions**
-against your plan **before writing the code**, not after. Re-deriving a solution from first
-principles is how a known pitfall gets walked into: a sound local reason can still justify a
-choice the existing solution had already rejected for a reason you have not seen yet.
+When implementing a non-trivial runtime mechanism or architecture change where a reference has already solved the same class of problem, compare its **specific decisions** against your plan **before writing the code**, not after. (Do not apply this ceremony mechanically to trivial bug fixes, narrow refactors, or documentation edits.) Re-deriving a complex mechanism from scratch is how known pitfalls get walked into: a sound local reason can still justify a choice the existing solution already rejected for a reason you have not seen yet.
 
 Concretely, for the part of the reference that does the same job:
 

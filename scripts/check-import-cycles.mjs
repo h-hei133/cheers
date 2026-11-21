@@ -1,24 +1,17 @@
 #!/usr/bin/env node
 // Import-cycle gate.
 //
-// AGENTS.md norm #1 forbids dependency cycles, but until now nothing in the repo
-// enforced it: the B4 splits were each verified with an ad-hoc scanner that was
-// never committed, and one of those scanners was silently wrong, so a real
-// two-module runtime cycle shipped while its commit message claimed "0 cycles".
+// AGENTS.md norm #1 forbids dependency cycles. Everything here is resolved with
+// `path.resolve` before identity comparison and parsed with TypeScript's AST so
+// `import`, `export ... from`, dynamic `import('...')`, and `import type` are
+// classified accurately without comment/string false positives.
 //
-// The bug that made it wrong is worth recording, because it is easy to repeat:
-// file paths were collected relative (`src/a.ts`) while import specifiers were
-// resolved absolute (`/repo/src/a.ts`). The identity map therefore never matched,
-// every edge into a file not already reached by the same form was dropped, and the
-// graph looked acyclic. Everything here is resolved with `path.resolve` before it
-// is compared, and the regression test below pins that.
-//
-// `import type` is erased at emit, so it cannot form a runtime cycle. It is
-// reported separately: a type-only back-edge is load-safe but becomes a real cycle
-// the moment someone converts it to a value import.
+// `import type` and `export type` are erased at emit, so they cannot form a
+// runtime cycle. Type-only back-edges are reported separately as advisory notes.
 
 import fs from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 import { packageBoundaryFindings, stronglyConnected } from "./build/imports.mjs";
 import { workspacePackages } from "./build/workspaces.mjs";
 
@@ -42,24 +35,75 @@ function collectFiles(dir, acc = []) {
   return acc;
 }
 
-const RE_RUNTIME = /import\s+(?!type\b)(?:[^'"]*?)\bfrom\s*["']([^"']+)["']/g;
-const RE_TYPE_ONLY = /import\s+type\s+[^'"]*?\bfrom\s*["']([^"']+)["']/g;
-const RE_BARE = /import\s*["']([^"']+)["']/g;
-
 function resolveSpecifier(fromFile, specifier, known) {
   if (!specifier.startsWith(".")) return null;
-  const base = path.resolve(path.dirname(fromFile), specifier).replace(/\.js$/, "");
+  const base = path.resolve(path.dirname(fromFile), specifier).replace(/\.[cm]?js$/, "");
   for (const candidate of [
     `${base}.ts`,
     `${base}.tsx`,
+    `${base}.mts`,
+    `${base}.cts`,
     path.join(base, "index.ts"),
     path.join(base, "index.tsx"),
   ]) {
     if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-      return known.has(path.resolve(candidate)) ? path.resolve(candidate) : null;
+      const resolved = path.resolve(candidate);
+      return known.has(resolved) ? resolved : null;
     }
   }
   return null;
+}
+
+function isTypeOnlyImportClause(clause) {
+  if (!clause) return false;
+  if (clause.isTypeOnly) return true;
+  if (clause.name) return false;
+  if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+    return clause.namedBindings.elements.length > 0 && clause.namedBindings.elements.every(el => el.isTypeOnly);
+  }
+  return false;
+}
+
+function isTypeOnlyExportClause(clause) {
+  if (!clause) return false;
+  if (ts.isNamedExports(clause)) {
+    return clause.elements.length > 0 && clause.elements.every(el => el.isTypeOnly);
+  }
+  return false;
+}
+
+function extractDependencies(filePath, sourceText) {
+  const kind = filePath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const sf = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, false, kind);
+  const edges = new Map(); // specifier -> 'value' | 'type-only'
+  const record = (specifier, edgeKind) => {
+    const prev = edges.get(specifier);
+    if (prev !== "value") edges.set(specifier, edgeKind);
+  };
+
+  const visit = (node) => {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      record(node.moduleSpecifier.text, isTypeOnlyImportClause(node.importClause) ? "type-only" : "value");
+      return;
+    }
+    if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+      const typeOnly = node.isTypeOnly || isTypeOnlyExportClause(node.exportClause);
+      record(node.moduleSpecifier.text, typeOnly ? "type-only" : "value");
+      return;
+    }
+    if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)
+      && ts.isStringLiteral(node.moduleReference.expression)) {
+      record(node.moduleReference.expression.text, node.isTypeOnly ? "type-only" : "value");
+      return;
+    }
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword
+      && node.arguments.length === 1 && ts.isStringLiteralLike(node.arguments[0])) {
+      record(node.arguments[0].text, "value");
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return edges;
 }
 
 function buildGraph(files, known) {
@@ -67,17 +111,12 @@ function buildGraph(files, known) {
   const typeOnly = files.map(() => []);
   for (let i = 0; i < files.length; i += 1) {
     const source = fs.readFileSync(files[i], "utf8");
-    for (const [pattern, sink] of [
-      [RE_RUNTIME, runtime],
-      [RE_BARE, runtime],
-      [RE_TYPE_ONLY, typeOnly],
-    ]) {
-      pattern.lastIndex = 0;
-      let match;
-      while ((match = pattern.exec(source)) !== null) {
-        const target = resolveSpecifier(files[i], match[1], known);
-        if (target && known.has(target)) sink[i].push(known.get(target));
-      }
+    for (const [specifier, edgeKind] of extractDependencies(files[i], source)) {
+      const target = resolveSpecifier(files[i], specifier, known);
+      if (!target || !known.has(target)) continue;
+      const targetIndex = known.get(target);
+      if (edgeKind === "type-only") typeOnly[i].push(targetIndex);
+      else runtime[i].push(targetIndex);
     }
   }
   return { runtime, typeOnly };

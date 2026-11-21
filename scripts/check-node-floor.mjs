@@ -24,12 +24,13 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { workspaceSourceRoots } from './build/workspaces.mjs'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // The tree to check. Defaults to this repository; a test passes a fixture root so
 // the gate can be exercised against a known shape instead of only the live tree.
 const targetRoot = resolve(process.argv[2] ?? repoRoot)
-const SOURCE_ROOT = 'packages/ts-shell/src'
+const SOURCE_ROOT = 'packages/*/src'
 const PACKAGE_JSON = 'package.json'
 
 // APIs that do not exist at the declared floor, with the version that added them.
@@ -174,7 +175,7 @@ function findUses(file) {
 }
 
 const floor = declaredFloor()
-const files = walk(join(targetRoot, SOURCE_ROOT))
+const files = workspaceSourceRoots(targetRoot).flatMap((dir) => walk(dir))
 if (files.length === 0) {
   fail('nothing to check', `${SOURCE_ROOT} holds no source files`)
 }

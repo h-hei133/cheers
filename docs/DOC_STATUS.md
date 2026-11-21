@@ -19,11 +19,11 @@ It does not claim every historical note is perfectly classified.
 
 | Path | Status | When to read | Superseded by | Owner |
 |---|---|---|---|---|
-| `GOAL.md` | active | Strategic Evolution Roadmap: SOTA benchmark alignment, Phase 4-7 deliverables, and NormProof governance. |  | Architecture / Project Leadership |
-| `.wiki/_index.md` | active | Master project knowledge base, architecture concepts, RFCs, and references. |  | Documentation / Wiki Manager |
-| `.normproof/EXPERIENCE.md` | active | Retrospective on formal structural proof vs runtime semantic review. |  | Architecture / NormProof |
+| `GOAL.md` | historical | Prior Strategic Evolution Roadmap (Phase 4-7); superseded by current runtime upgrade plans under `.wiki/refactor/upgrade/` and `AGENTS.md`. | `.wiki/_index.md` | Architecture / Project Leadership |
+| `.wiki/_index.md` | active | Master project knowledge base, architecture concepts, and references. |  | Documentation / Wiki Manager |
+| `.normproof/EXPERIENCE.md` | historical | Early retrospective on formal structural proof vs runtime semantic review (2026-09). | `.wiki/wiki/topics/normproof-structural-governance.md` | Architecture / NormProof |
 | `.normproof/dispositions.md` | historical | Append-only dated decisions and source-bound audits. Paths describe the reviewed source generation; current findings require a fresh judge. |  | Architecture / NormProof |
-| `.wiki/refactor/plan.md` | active | Module-boundary refactor plan: current file counts, reachability, the rules a change must follow, and the per-step record. Read this before any structural change. |  | Architecture |
+| `.wiki/refactor/plan.md` | historical | Completed 2026-09 module-boundary refactor plan and per-step record. | `AGENTS.md` | Architecture |
 | `.wiki/refactor/architecture-exploration-2026-09-18.md` | active | Where modules are still mis-placed, and whether tests need their own tree. |  | Architecture |
 | `.wiki/refactor/drift-exploration-2026-09-18.md` | active | Documentation and rule drift: what is stale, and what actually blocks deleting it. |  | Architecture |
 | `scripts/verify-docs-and-rules-drift.mjs` | active | Gate that reports documents whose path references no longer resolve. |  | Architecture |
@@ -43,7 +43,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/architecture/reference-architecture-maps.md` | historical | Recovering reference-repo analysis behind the atlas. |  | Capability Contract Architecture |
 | `docs/product-architecture-reset/script-command-index.md` | historical | Checking grouped package-script aliases and Route G command compatibility.|  | Product Architecture Reset |
 | `docs/product-architecture-reset/final-compatibility-audit.md` | historical | Checking final reset compatibility, remaining route clutter, and validation ledger.|  | Product Architecture Reset |
-| `docs/product-architecture-reset/executionBoundary/README.md` | active | Checking current TypeScript-first runtime, explicit execution boundary, Rust-ready optional executor path, contracts boundary, and Python offline-eval isolation. |  | Product Architecture Reset |
+| `docs/product-architecture-reset/executionBoundary/README.md` | historical | Early architecture-reset note describing the retired Rust/Python execution-boundary split; superseded by `agent-rules/architecture-boundaries.md`. | `agent-rules/architecture-boundaries.md` | Product Architecture Reset |
 | `docs/product-architecture-reset/documentation-refresh/route230-important-docs-refresh.md` | historical | Checking which durable docs were refreshed after the architecture reset and which docs remain intentionally historical.|  | Product Architecture Reset |
 | `docs/product-architecture-reset/phase2-readiness-note.md` | historical | Checking Phase 2 Goal 0 readiness, corrected current-state assumptions, and Goal 1 start boundary.|  | Product Architecture Reset |
 | `docs/product-architecture-reset/harness-eval-artifact-index.md` | active | Current ownership and import boundaries for test support, browser evaluation, and the opt-in smoke command. |  | Test and evaluation ownership |

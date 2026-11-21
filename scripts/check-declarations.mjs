@@ -28,6 +28,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { workspaceSourceRoots } from './build/workspaces.mjs'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // The tree to check. Defaults to this repository; a test passes a fixture root so
@@ -64,18 +65,22 @@ function fail(reason, detail) {
 function walk(dir, files = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name)
-    if (entry.isDirectory()) walk(full, files)
-    else if (entry.name.endsWith('.ts')) files.push(full)
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name.startsWith('.')) continue
+      walk(full, files)
+    } else if (/\.tsx?$/.test(entry.name)) {
+      files.push(full)
+    }
   }
   return files
 }
 
-const sourceDir = resolve(targetRoot, SOURCE_ROOT)
-if (!existsSync(sourceDir)) fail('declaration-gate-source-missing', SOURCE_ROOT)
+const sourceRoots = workspaceSourceRoots(targetRoot)
+if (sourceRoots.length === 0) fail('declaration-gate-source-missing', SOURCE_ROOT)
 const hookTypesPath = resolve(targetRoot, HOOK_TYPES)
 if (!existsSync(hookTypesPath)) fail('declaration-gate-source-missing', HOOK_TYPES)
 
-const files = walk(sourceDir)
+const files = sourceRoots.flatMap((dir) => walk(dir))
 
 // --- hook events -----------------------------------------------------------
 
