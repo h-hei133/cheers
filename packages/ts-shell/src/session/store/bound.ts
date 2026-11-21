@@ -10,8 +10,7 @@ import type { SessionMetadata } from '../schema/sessionMetadataCodec.js';
 import type { SessionStateSnapshot } from '../schema/sessionStateSnapshot.js';
 import { projectSessionFileLayout, validateSessionId, type SessionFileLayout } from './sessionFileLayout.js';
 import { readSessionFileVersion } from './version.js';
-import { readSessionMetadataRecord, readSessionMetadataRecordAsync } from './sessionStore.js';
-import { readStateSnapshotRequired, readStateSnapshotRequiredAsync } from './sessionStateStore.js';
+import { readSessionSnapshot, readSessionSnapshotAsync, SessionSnapshotConflict, type SessionSnapshotLimits } from './snapshot.js';
 import { withFileLock, writeJsonFileAtomic } from './sessionFileStore.js';
 
 import type { BoundSessionHost, BoundSessionScope } from './contract.js';
@@ -27,7 +26,7 @@ class BoundState {
     readonly state: SessionStateSnapshot) { freezeDeep(this); }
 }
 export type BoundSessionState = BoundState;
-export interface BoundSessionReadLimits { readonly metadataBytes: number; readonly stateBytes: number }
+export type BoundSessionReadLimits = SessionSnapshotLimits;
 
 /** Optimistic freshness only; a successful bound read must admit the actual payload. */
 export function readBoundSessionRevision(host: BoundSessionHost, session: Session): string {
@@ -45,13 +44,9 @@ export function readBoundSessionRevision(host: BoundSessionHost, session: Sessio
 export function readBoundSessionState(host: BoundSessionHost, session: Session, limits?: BoundSessionReadLimits): BoundSessionState {
   try {
     const layout = layoutFor(host, session.id);
-    assertNoPromptIntent(layout);
-    const version = readSessionFileVersion(layout);
     const current = readCurrent(layout, session, limits);
-    if (readSessionFileVersion(layout) !== version) throw new SessionPublicationError('conflict');
-    assertNoPromptIntent(layout);
     return new BoundState(layout, directoryIdentity(layout), current.scope, current.state);
-  } catch (error) { throw error instanceof SessionPublicationError ? error : new SessionPublicationError('unavailable'); }
+  } catch (error) { throw mapReadError(error); }
 }
 
 /** Cancellable state acquisition for interactive inspection; validation matches the sync owner. */
@@ -64,19 +59,13 @@ export async function readBoundSessionStateAsync(
   try {
     signal?.throwIfAborted();
     const layout = layoutFor(host, session.id);
-    assertNoPromptIntent(layout);
-    const version = readSessionFileVersion(layout);
-    const metadata = await readSessionMetadataRecordAsync(layout.metadataPath, limits?.metadataBytes, signal);
-    const state = await readStateSnapshotRequiredAsync(layout.statePath, limits?.stateBytes, signal);
-    signal?.throwIfAborted();
+    const { metadata, state, assertCurrent } = await readSessionSnapshotAsync(layout, { limits, signal, includeTranscript: true });
     const current = projectBoundRead(metadata, state, session);
-    signal?.throwIfAborted();
-    if (readSessionFileVersion(layout) !== version) throw new SessionPublicationError('conflict');
-    assertNoPromptIntent(layout);
+    assertCurrent();
     return new BoundState(layout, directoryIdentity(layout), current.scope, current.state);
   } catch (error) {
     if (signal?.aborted) signal.throwIfAborted();
-    throw error instanceof SessionPublicationError ? error : new SessionPublicationError('unavailable');
+    throw mapReadError(error);
   }
 }
 
@@ -122,9 +111,14 @@ function layoutFor(host: BoundSessionHost, sessionId: string): SessionFileLayout
   if (layout.sessionDir !== directory) throw new SessionPublicationError('invalid'); return layout;
 }
 function readCurrent(layout: SessionFileLayout, expected: Session, limits?: BoundSessionReadLimits) {
-  const metadata = readSessionMetadataRecord(layout.metadataPath, limits?.metadataBytes);
-  const state = readStateSnapshotRequired(layout.statePath, limits?.stateBytes);
-  return projectBoundRead(metadata, state, expected);
+  const { metadata, state, assertCurrent } = readSessionSnapshot(layout, { limits, includeTranscript: true });
+  const current = projectBoundRead(metadata, state, expected);
+  assertCurrent();
+  return current;
+}
+function mapReadError(error: unknown): SessionPublicationError {
+  if (error instanceof SessionPublicationError) return error;
+  return new SessionPublicationError(error instanceof SessionSnapshotConflict ? 'conflict' : 'unavailable');
 }
 function projectBoundRead(metadata: SessionMetadata | undefined, state: SessionStateSnapshot, expected: Session) {
   if (!metadata || metadata.id !== expected.id || metadata.createdAt !== expected.createdAt || !state || typeof state !== 'object'

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createProfileContext } from '../../../core/paths/profile/context.js';
 import * as layoutOwner from '../sessionFileLayout.js';
+import { PromptPublicationError, promptIntentPath } from '../prompt/intent.js';
 import { locateCatalogDirectory, locateCatalogFiles, readCatalogFile, sessionCatalogReadBudget } from './files.js';
 
 vi.mock('node:fs/promises', async () => {
@@ -41,8 +42,15 @@ it('checks the shared profile directory once per location and stats every core f
   expect(found?.stats.map(stat => stat.size)).toEqual([6, 6, 6]);
   expect(guard.mock.calls.map(call => call[1])).toEqual([undefined, files.sessionDir]);
   expect(vi.mocked(io.lstat).mock.calls.map(call => call[0])).toEqual([
-    files.sessionDir, files.metadataPath, files.statePath, files.transcriptPath,
+    files.sessionDir, files.metadataPath, files.statePath, files.transcriptPath, promptIntentPath(files),
   ]);
+});
+
+it('refuses a catalog source with an unfinished publication before opening its core files', async () => {
+  const { store, files } = fixture();
+  fs.writeFileSync(promptIntentPath(files), '{}');
+  await expect(locateCatalogFiles(store, 'saved')).rejects.toThrow(PromptPublicationError);
+  expect(io.open).not.toHaveBeenCalled();
 });
 
 it.each(['metadataPath', 'statePath', 'transcriptPath'] as const)('refuses a linked %s without opening it', async key => {

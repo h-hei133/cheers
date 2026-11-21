@@ -9,21 +9,22 @@ import { buildSessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { projectBranchMessages, readTranscriptSnapshot, readTranscriptSnapshotAsync } from "../transcript/sessionTranscript.js";
 import { createTranscriptHeader, type TranscriptEvent } from "../sessionEventCodec.js";
 import { sessionThreadPath } from "../schema/sessionThread.js";
-import { readJsonFileWithRetry, readJsonFileWithRetryAsync, writeJsonFileAtomic } from "./sessionFileStore.js";
+import { readJsonFileWithRetry, writeJsonFileAtomic } from "./sessionFileStore.js";
 import { reserveSessionLayout, type SessionFileLayout, type SessionStoreLayout } from "./sessionFileLayout.js";
 import {
-  readStateSnapshotRequired,
-  readStateSnapshotRequiredAsync,
   writeSessionState,
   withSessionMetadataLock,
 } from "./sessionStateStore.js";
 import { projectSessionAnnotations } from '../context/projection.js';
-import { capturePromptRead, identifyPromptFile, PromptPublicationError, promptIntentPath, readPromptIntent } from './prompt/intent.js';
+import { identifyPromptFile, PromptPublicationError, promptIntentPath, readPromptIntent } from './prompt/intent.js';
 import { pathIdentity } from '../../core/workspace/files.js';
 import { previewTranscriptAppend } from '../transcript/append.js';
 import { parseTranscript } from '../transcript/read.js';
 import { fileVersion, readSessionFileVersion } from './version.js';
 import { projectLoadedSession } from './projection.js';
+import { readSessionSnapshot, readSessionSnapshotAsync, SessionSnapshotConflict, type SessionSnapshotLimits } from './snapshot.js';
+
+export { readSessionMetadataRecord } from './snapshot.js';
 
 export function sessionExistsAtLayout(layout: Pick<SessionFileLayout, "sessionDir">): boolean {
   return fs.existsSync(layout.sessionDir);
@@ -108,28 +109,6 @@ export function writeSessionMetadataRecord(input: {
   }, input.requireHeld);
 }
 
-export function readSessionMetadataRecord(metadataPath: string, maxBytes?: number, signal?: AbortSignal): SessionMetadata | undefined {
-  return readJsonFileWithRetry<SessionMetadata>(metadataPath, {
-    required: true,
-    parseErrorDetail: "Failed to load session metadata",
-    maxBytes,
-    signal,
-  });
-}
-
-export function readSessionMetadataRecordAsync(
-  metadataPath: string,
-  maxBytes?: number,
-  signal?: AbortSignal,
-): Promise<SessionMetadata | undefined> {
-  return readJsonFileWithRetryAsync<SessionMetadata>(metadataPath, {
-    required: true,
-    parseErrorDetail: "Failed to load session metadata",
-    maxBytes,
-    signal,
-  });
-}
-
 export function deleteSessionRecord(input: {
   readonly sessionId: string;
   readonly layout: Pick<SessionFileLayout, "sessionDir">;
@@ -149,9 +128,7 @@ interface SessionReadInput {
   readonly signal?: AbortSignal;
 }
 
-export interface SessionReadLimits {
-  readonly metadataBytes: number;
-  readonly stateBytes: number;
+export interface SessionReadLimits extends SessionSnapshotLimits {
   readonly transcriptBytes: number;
   readonly transcriptLines: number;
   readonly entries: number;
@@ -201,9 +178,7 @@ export function readSessionRecordSnapshot(input: SessionReadInput): SessionRecor
   assertSessionSources(input);
   try {
     input.signal?.throwIfAborted();
-    const assertCurrent = capturePromptRead(input.layout);
-    const metadata = readSessionMetadataRecord(input.layout.metadataPath, input.limits?.metadataBytes, input.signal);
-    const state = readStateSnapshotRequired(input.layout.statePath, input.limits?.stateBytes, input.signal);
+    const { metadata, state, assertCurrent } = readSessionSnapshot(input.layout, { ...input, includeTranscript: true });
     assertSessionEntryLimit(state, input.limits);
     input.signal?.throwIfAborted();
     const transcript = readTranscriptSnapshot(input.layout.transcriptPath, input.limits ? {
@@ -213,7 +188,7 @@ export function readSessionRecordSnapshot(input: SessionReadInput): SessionRecor
     assertCurrent();
     return snapshot;
   } catch (error) {
-    if (input.signal?.aborted || error instanceof PromptPublicationError) throw error;
+    if (input.signal?.aborted || error instanceof PromptPublicationError || error instanceof SessionSnapshotConflict) throw error;
     throw sessionReadError(input.sessionId, error);
   }
 }
@@ -223,10 +198,7 @@ export async function readSessionRecordSnapshotAsync(input: SessionReadInput): P
   input.signal?.throwIfAborted();
   assertSessionSources(input);
   try {
-    const assertCurrent = capturePromptRead(input.layout);
-    await yieldForAbort(input.signal);
-    const metadata = await readSessionMetadataRecordAsync(input.layout.metadataPath, input.limits?.metadataBytes, input.signal);
-    const state = await readStateSnapshotRequiredAsync(input.layout.statePath, input.limits?.stateBytes, input.signal);
+    const { metadata, state, assertCurrent } = await readSessionSnapshotAsync(input.layout, { ...input, includeTranscript: true });
     assertSessionEntryLimit(state, input.limits);
     await yieldForAbort(input.signal);
     const transcript = await readTranscriptSnapshotAsync(input.layout.transcriptPath, input.limits ? {
@@ -236,7 +208,7 @@ export async function readSessionRecordSnapshotAsync(input: SessionReadInput): P
     assertCurrent();
     return snapshot;
   } catch (error) {
-    if (input.signal?.aborted || error instanceof PromptPublicationError) throw error;
+    if (input.signal?.aborted || error instanceof PromptPublicationError || error instanceof SessionSnapshotConflict) throw error;
     throw sessionReadError(input.sessionId, error);
   }
 }

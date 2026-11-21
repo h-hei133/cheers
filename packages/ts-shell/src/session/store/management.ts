@@ -1,11 +1,8 @@
 import { normalizePathIdentity } from '../continuation/roots.js';
 import type { SessionMetadata } from '../schema/sessionMetadataCodec.js';
 import type { SessionStateSnapshot } from '../schema/sessionStateSnapshot.js';
-import { assertNoPromptIntent } from './prompt/intent.js';
 import type { SessionFileLayout } from './sessionFileLayout.js';
-import { readSessionMetadataRecord } from './sessionStore.js';
-import { readStateSnapshotRequired } from './sessionStateStore.js';
-import { readSessionFileVersion } from './version.js';
+import { readSessionSnapshot } from './snapshot.js';
 
 /** A management target carries identity and metadata, never conversation content. */
 export type SessionManagementTarget = Pick<SessionMetadata, 'id' | 'createdAt' | 'projectRoot' | 'title' | 'pinned'>;
@@ -19,10 +16,7 @@ export interface SessionManagementSnapshot {
 
 /** Keep all three source identities while reading only the management payload. */
 export function readSessionManagementSnapshot(layout: SessionFileLayout, id: string): SessionManagementSnapshot {
-  assertNoPromptIntent(layout);
-  const version = readSessionFileVersion(layout);
-  const metadata = readSessionMetadataRecord(layout.metadataPath);
-  const state = readStateSnapshotRequired(layout.statePath);
+  const { metadata, state, version, assertCurrent } = readSessionSnapshot(layout, { includeTranscript: true });
   if (!metadata || metadata.id !== id || typeof metadata.createdAt !== 'string' || !Number.isFinite(Date.parse(metadata.createdAt))
     || typeof metadata.updatedAt !== 'string' || !Number.isFinite(Date.parse(metadata.updatedAt))
     || (metadata.title !== undefined && typeof metadata.title !== 'string')
@@ -38,8 +32,7 @@ export function readSessionManagementSnapshot(layout: SessionFileLayout, id: str
   if (!projectRoot || metadataRoot && stateRoot && metadataRoot !== stateRoot) {
     throw new Error('The saved session project identity is unavailable or inconsistent.');
   }
-  if (readSessionFileVersion(layout) !== version) throw new Error('The saved session changed while reading management state.');
-  assertNoPromptIntent(layout);
+  assertCurrent();
   return { metadata, state, version, session: { id, createdAt: metadata.createdAt, projectRoot,
     ...(metadata.title === undefined ? {} : { title: metadata.title }), ...(metadata.pinned === true ? { pinned: true } : {}) } };
 }

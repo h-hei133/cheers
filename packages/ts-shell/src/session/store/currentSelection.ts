@@ -1,5 +1,6 @@
 import type { Session } from "../schema/sessionRecord.js";
 import { PromptPublicationError } from './prompt/intent.js';
+import { SessionSnapshotConflict } from './snapshot.js';
 
 export interface CurrentSessionSelectionRecord {
   readonly sessionId: string;
@@ -18,17 +19,20 @@ export type CurrentSessionSelectionReason =
   | "store-invalid"
   | "missing-session"
   | "load-failed"
+  | "activation-changed"
+  | "session-changed"
   | "prompt-publication-unknown"
   | "project-root-mismatch";
 
-export type CurrentSessionSelectionResolution =
+export type CurrentSessionSelectionResolution = (
   | { readonly ok: true; readonly session: Session }
   | {
       readonly ok: false;
       readonly reason: CurrentSessionSelectionReason;
       readonly sessionId?: string;
       readonly detail: string;
-    };
+    }
+) & { readonly activation?: CurrentSessionSelectionRecord };
 
 export interface CurrentSessionStoreParseResult {
   readonly store: CurrentSessionSelectionStore;
@@ -106,6 +110,12 @@ export function selectCurrentSession(
   }
 
   if (Object.prototype.hasOwnProperty.call(input, "loadError")) {
+    if (input.loadError instanceof SessionSnapshotConflict) {
+      return {
+        resolution: { ok: false, reason: 'session-changed', sessionId, detail: input.loadError.message },
+        clearSelection: false,
+      };
+    }
     if (input.loadError instanceof PromptPublicationError) {
       return {
         resolution: { ok: false, reason: 'prompt-publication-unknown', sessionId, detail: input.loadError.message },

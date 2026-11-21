@@ -18,6 +18,13 @@ export interface SessionActivationOptions {
   readonly publishMetadata?: () => void;
 }
 
+export class SessionActivationConflict extends Error {
+  constructor() {
+    super('Current session activation changed while preparing the switch.');
+    this.name = 'SessionActivationConflict';
+  }
+}
+
 function record(value: unknown): CurrentSessionSelectionRecord | undefined {
   if (value === undefined) return undefined;
   const captured = snapshotData(value, { bytes: 4096, nodes: 64, depth: 3 });
@@ -65,6 +72,6 @@ export function assertActivationGuard(guard: SessionActivationGuard | undefined,
   const { store, readError } = read();
   if (readError) throw new Error('Current session activation is unavailable.');
   if (!sameSessionActivation(selection(store, guard.source.projectRoot), guard.source.expected)
-    || !sameSessionActivation(selection(store, destinationRoot), guard.destination)) throw new Error('Current session activation changed while preparing the switch.');
+    || !sameSessionActivation(selection(store, destinationRoot), guard.destination)) throw new SessionActivationConflict();
   if (guard.signal) AbortSignal.prototype.throwIfAborted.call(guard.signal);
 }

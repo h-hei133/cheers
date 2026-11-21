@@ -3,6 +3,7 @@ import { lstat, open } from 'node:fs/promises';
 import { assertSessionStoreProfile, projectSessionFileLayout, validateSessionId, type SessionFileLayout, type SessionStoreLayout } from '../sessionFileLayout.js';
 import { CATALOG_LIMITS } from './model.js';
 import { fileVersion } from '../version.js';
+import { PromptPublicationError, promptIntentPath } from '../prompt/intent.js';
 
 export interface CatalogDirectory {
   readonly layout: SessionFileLayout;
@@ -94,6 +95,13 @@ export async function locateCatalogFiles(store: SessionStoreLayout, id: string, 
     const stat = await lstat(file);
     if (!stat.isFile() || !Number.isSafeInteger(stat.size) || stat.size < 0) throw new Error('Session file is unavailable.');
     stats.push(stat);
+  }
+  try {
+    await lstat(promptIntentPath(layout));
+    throw new PromptPublicationError('unknown');
+  } catch (error) {
+    signal?.throwIfAborted();
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
   signal?.throwIfAborted();
   return { layout, directory, stats: stats as [Stats, Stats, Stats],

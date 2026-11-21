@@ -176,7 +176,8 @@ export function resolveCurrentSessionForProject(input: {
   readonly readOnly?: boolean;
 }): CurrentSessionSelectionResolution {
   const normalizedProjectRoot = normalizePathIdentity(input.projectRoot) ?? '';
-  const registry = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]);
+  const paths = input.storeSearchPaths ?? [input.storePath];
+  const registry = readMergedSessionRegistryStore(paths);
   // Older stores folded case on every platform. A legacy entry is only usable
   // after its actual session binding passes the host's path identity check.
   const selection = registry.store.byProjectRoot[normalizedProjectRoot] ?? registry.store.byProjectRoot[normalizedProjectRoot.toLowerCase()];
@@ -189,24 +190,27 @@ export function resolveCurrentSessionForProject(input: {
     }).resolution;
   }
 
-  const clearInvalidSelection = () => {
-    if (!input.readOnly && !registry.readError) clearCurrentSessionSelection({
-      storePath: input.storePath,
-      normalizedProjectRoot,
-      expected: selection,
-    });
+  const finish = (projection: ReturnType<typeof selectCurrentSession>): CurrentSessionSelectionResolution => {
+    const current = readMergedSessionRegistryStore(paths);
+    const latest = current.store.byProjectRoot[normalizedProjectRoot]
+      ?? current.store.byProjectRoot[normalizedProjectRoot.toLowerCase()];
+    const unchanged = current.readError === registry.readError && sameSessionActivation(latest, selection);
+    if (!unchanged || (projection.clearSelection && !input.readOnly && !registry.readError && !clearCurrentSessionSelection({
+      storePath: input.storePath, storeSearchPaths: paths, normalizedProjectRoot, expected: selection,
+    }))) {
+      return { ok: false, reason: 'activation-changed', detail: 'The current session activation changed while loading.' };
+    }
+    return { ...projection.resolution, activation: selection };
   };
 
   if (!input.sessionExists(selection.sessionId)) {
-    const missingProjection = projectCurrentSessionRegistryResolution({
+    return finish(projectCurrentSessionRegistryResolution({
       projectRoot: input.projectRoot,
       normalizedProjectRoot,
       storeReadError: registry.readError,
       selection,
       sessionExists: false,
-    });
-    clearInvalidSelection();
-    return missingProjection.resolution;
+    }));
   }
 
   let projection: ReturnType<typeof selectCurrentSession>;
@@ -233,8 +237,7 @@ export function resolveCurrentSessionForProject(input: {
       loadError: error,
     });
   }
-  if (projection.clearSelection) clearInvalidSelection();
-  return projection.resolution;
+  return finish(projection);
 }
 
 export function setCurrentSessionSelection(input: {
@@ -290,15 +293,16 @@ export function clearCurrentSessionSelection(input: {
   readonly normalizedProjectRoot: string;
   /** Automatic cleanup compares the invalid activation it actually inspected. */
   readonly expected?: CurrentSessionSelectionRecord;
-}): void {
+}): boolean {
   if (!input.normalizedProjectRoot) {
-    return;
+    return false;
   }
-  withFileLock(`${input.storePath}.lock`, () => {
+  return withFileLock(`${input.storePath}.lock`, () => {
     const registry = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]);
     const current = registry.store;
-    if (input.expected && (registry.readError
-      || !sameSessionActivation(current.byProjectRoot[input.normalizedProjectRoot], input.expected))) return;
+    const selected = current.byProjectRoot[input.normalizedProjectRoot]
+      ?? current.byProjectRoot[input.normalizedProjectRoot.toLowerCase()];
+    if (input.expected && (registry.readError || !sameSessionActivation(selected, input.expected))) return false;
     const next = removeCurrentSessionSelectionFromStore({
       current,
       normalizedProjectRoot: input.normalizedProjectRoot,
@@ -309,6 +313,7 @@ export function clearCurrentSessionSelection(input: {
         store: next,
       });
     }
+    return true;
   }, { recovery: 'local-dead' });
 }
 

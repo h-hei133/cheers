@@ -1,11 +1,13 @@
 import { projectSessionBinding, type ProjectBindingOptions } from "./projectBindingPolicy.js";
 import type { Session } from "../schema/sessionRecord.js";
+import { captureActivationGuard, type SessionActivationGuard, type SessionActivationOptions } from './activation.js';
 
 export interface SessionCreationOptions extends ProjectBindingOptions {
   /** A title to start with, for a session that is born carrying another's. */
   readonly title?: string;
   /** The session this one is copied from, when it is a fork. */
   readonly parentSession?: string;
+  readonly activationGuard?: SessionActivationGuard;
 }
 
 interface SessionCreationCallbacks {
@@ -16,6 +18,7 @@ interface SessionCreationCallbacks {
   readonly setCurrentSessionForProject: (
     projectRoot: string,
     sessionId: string,
+    options?: SessionActivationOptions,
   ) => void;
   readonly now: () => string;
 }
@@ -57,6 +60,7 @@ function createBoundSession(input: {
   readonly projectRoot: string;
   readonly options?: SessionCreationOptions;
 }): Session {
+  const guard = captureActivationGuard(input.options?.activationGuard);
   const now = input.callbacks.now();
   const binding = projectSessionBinding({
     projectRoot: input.projectRoot,
@@ -73,6 +77,7 @@ function createBoundSession(input: {
     turns: [],
   };
   input.callbacks.writeSession(session);
-  input.callbacks.setCurrentSessionForProject(input.projectRoot, session.id);
+  if (guard) input.callbacks.setCurrentSessionForProject(input.projectRoot, session.id, { guard });
+  else input.callbacks.setCurrentSessionForProject(input.projectRoot, session.id);
   return session;
 }

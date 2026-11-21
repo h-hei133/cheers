@@ -342,20 +342,24 @@ export class SessionCatalog {
     if (resident && resident.version !== before.version) {
       throw new Error('Session page changed while browsing. Reopen the session picker to refresh.');
     }
-    let summary = cached?.version === before.version ? cached : undefined;
-    if (!summary) {
-      const metadata = await readCatalogFile(before.layout.metadataPath, before.stats[0], CATALOG_LIMITS.metadataBytes, signal, readBudget);
-      if (metadata === undefined) throw new Error('Session metadata exceeds the listing limit.');
-      const state = await readCatalogFile(before.layout.statePath, before.stats[1], CATALOG_LIMITS.stateBytes, signal, readBudget);
-      const transcript = await readCatalogFile(before.layout.transcriptPath, before.stats[2], CATALOG_LIMITS.transcriptBytes, signal, readBudget);
-      summary = await decodeSessionSummary(id, metadata, state, transcript, before.version, signal);
+    if (cached?.version === before.version) {
+      // This version already passed acquisition and the latest lookup checked its journal.
+      signal?.throwIfAborted();
+      readBudget?.check();
+      this.remember([cached]);
+      return cached;
     }
+    const metadata = await readCatalogFile(before.layout.metadataPath, before.stats[0], CATALOG_LIMITS.metadataBytes, signal, readBudget);
+    if (metadata === undefined) throw new Error('Session metadata exceeds the listing limit.');
+    const state = await readCatalogFile(before.layout.statePath, before.stats[1], CATALOG_LIMITS.stateBytes, signal, readBudget);
+    const transcript = await readCatalogFile(before.layout.transcriptPath, before.stats[2], CATALOG_LIMITS.transcriptBytes, signal, readBudget);
+    const summary = await decodeSessionSummary(id, metadata, state, transcript, before.version, signal);
     const after = await locateCatalogFiles(this.layout, id, signal, onSource);
     if (after?.version !== before.version) { this.cache.delete(id); throw new Error('Session changed while listing.'); }
     signal?.throwIfAborted();
     readBudget?.check();
     // A long sequential scan must not evict every resident just before reaching it.
-    // Cache hits refresh their version/order; new admissions use spare space.
+    // Replaced entries refresh their version/order; new admissions use spare space.
     // Current and final visible results are retained explicitly by the query.
     if (cached || this.cache.size < CATALOG_LIMITS.cacheEntries) this.remember([summary]);
     return summary;

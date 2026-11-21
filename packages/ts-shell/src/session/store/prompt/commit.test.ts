@@ -8,6 +8,7 @@ import { readBoundSessionRevision, readBoundSessionState, readBoundSessionStateA
 import { readSessionManagementSnapshot } from '../management.js';
 import { readSessionRecordSnapshotAsync } from '../sessionStore.js';
 import { SessionStoreAccess } from '../sessionStoreAccess.js';
+import { SessionSnapshotConflict } from '../snapshot.js';
 import type { SessionFileLayout } from '../sessionFileLayout.js';
 import { PromptPublicationError, promptIntentPath } from './intent.js';
 
@@ -74,6 +75,67 @@ it('reads a legacy recovery snapshot once and preserves its readable transcript 
   }
   expect(fs.readFileSync(layout.transcriptPath, 'utf8')).toBe(transcript);
   expect(fs.readFileSync(layout.statePath, 'utf8')).toBe(state);
+});
+
+it.each(['bound', 'management', 'session'] as const)(
+  'rejects a mixed metadata and state read through %s',
+  consumer => {
+    const session = manager.getSession(sessionId)!;
+    const readFile = fs.readFileSync.bind(fs);
+    const read = vi.spyOn(fs, 'readFileSync').mockImplementation(((target: fs.PathOrFileDescriptor, options?: unknown) => {
+      const result = Reflect.apply(readFile, fs, [target, options]);
+      if (target === layout.metadataPath) fs.appendFileSync(layout.statePath, '\n');
+      return result;
+    }) as typeof fs.readFileSync);
+    syncBuiltinESMExports();
+    try {
+      if (consumer === 'bound') {
+        expect(() => readBoundSessionState(manager, session)).toThrow(expect.objectContaining({ code: 'conflict' }));
+      } else if (consumer === 'management') {
+        expect(() => readSessionManagementSnapshot(layout, sessionId)).toThrow(SessionSnapshotConflict);
+      } else {
+        expect(() => new SessionStoreAccess().readSnapshot(sessionId, { readOnly: true }))
+          .toThrow('The saved session changed during acquisition.');
+      }
+      expect(read.mock.calls.some(([target]) => target === layout.statePath)).toBe(true);
+    } finally { read.mockRestore(); syncBuiltinESMExports(); }
+    expect(manager.getSession(sessionId)).toEqual(session);
+  },
+);
+
+it('rejects a mixed metadata and state read through the cancellable bound consumer', async () => {
+  const session = manager.getSession(sessionId)!;
+  const readFile = fs.promises.readFile.bind(fs.promises);
+  const read = vi.spyOn(fs.promises, 'readFile').mockImplementation((async (target: unknown, options?: unknown) => {
+    const result = await Reflect.apply(readFile, fs.promises, [target, options]);
+    if (target === layout.metadataPath) fs.appendFileSync(layout.statePath, '\n');
+    return result;
+  }) as typeof fs.promises.readFile);
+  try {
+    await expect(readBoundSessionStateAsync(manager, session)).rejects.toMatchObject({ code: 'conflict' });
+    expect(read.mock.calls.some(([target]) => target === layout.statePath)).toBe(true);
+  } finally { read.mockRestore(); }
+  expect(manager.getSession(sessionId)).toEqual(session);
+});
+
+it('preserves the current activation when the transcript changes during acquisition', () => {
+  const session = manager.getSession(sessionId)!;
+  manager.setCurrentSessionForProject(session.projectRoot, sessionId);
+  const activation = manager.readCurrentSessionSelection(session.projectRoot);
+  const readFile = fs.readFileSync.bind(fs);
+  const read = vi.spyOn(fs, 'readFileSync').mockImplementation(((target: fs.PathOrFileDescriptor, options?: unknown) => {
+    const result = Reflect.apply(readFile, fs, [target, options]);
+    if (target === layout.transcriptPath) fs.appendFileSync(layout.transcriptPath, '\n');
+    return result;
+  }) as typeof fs.readFileSync);
+  syncBuiltinESMExports();
+  try {
+    expect(manager.resolveCurrentSessionForProject(session.projectRoot)).toMatchObject({
+      ok: false, reason: 'session-changed', sessionId, activation,
+    });
+  } finally { read.mockRestore(); syncBuiltinESMExports(); }
+  expect(manager.readCurrentSessionSelection(session.projectRoot)).toEqual(activation);
+  expect(manager.resolveCurrentSessionForProject(session.projectRoot)).toMatchObject({ ok: true, activation });
 });
 
 it.each(['none', 'torn', 'metadata', 'state', 'published'] as const)('reconciles the exact %s interruption without duplicating the prompt', async stage => {

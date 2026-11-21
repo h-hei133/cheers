@@ -29,7 +29,7 @@ import type {
   ApprovalAuditMemoryState,
   SessionContinuitySnapshot,
 } from "./sessionContinuityTypes.js";
-import { type WorkspaceRootMode, type ProjectBindingOptions } from "./store/projectBindingPolicy.js";
+import type { WorkspaceRootMode } from "./store/projectBindingPolicy.js";
 import { applySessionWorkspaceBinding } from "./store/sessionProjectBinding.js";
 import { SessionReentrySurface } from "./recovery/reentry.js";
 import { rebindSessionProjectRootContinuity, SessionRootRebindError, type SessionRootRebindOptions } from "./continuation/sessionProjectRootRebind.js";
@@ -95,8 +95,11 @@ export class SessionManager extends SessionReentrySurface {
       validateSessionId,
       createSessionId: () => this.host.store.createSessionId(),
       writeSession: (session: Session) => this.host.store.writeSession(session),
-      setCurrentSessionForProject: (projectRoot: string, sessionId: string) =>
-        activate ? this.setCurrentSessionForProject(projectRoot, sessionId) : undefined,
+      setCurrentSessionForProject: (projectRoot: string, sessionId: string, options?: SessionActivationOptions) => {
+        if (!activate) return;
+        if (options) this.setCurrentSessionForProject(projectRoot, sessionId, options);
+        else this.setCurrentSessionForProject(projectRoot, sessionId);
+      },
       now: () => new Date().toISOString(),
     };
   }
@@ -135,7 +138,7 @@ export class SessionManager extends SessionReentrySurface {
   createNewWithId(
     sessionId: string,
     projectRoot: string = process.cwd(),
-    options?: ProjectBindingOptions,
+    options?: SessionCreationOptions,
   ): Session {
     return createSessionWithId({
       callbacks: this.createSessionCreationCallbacks(),

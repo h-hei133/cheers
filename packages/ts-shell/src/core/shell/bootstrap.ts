@@ -17,6 +17,7 @@ import { getWorkflowGitContext } from "../workspace/git.js";
 import path from "node:path";
 import { createSessionId, projectSessionFileLayout, validateSessionId } from "../../session/store/sessionFileLayout.js";
 import { readSessionFileVersion } from '../../session/store/version.js';
+import { sameSessionActivation, SessionActivationConflict } from '../../session/store/activation.js';
 import { sameValue } from '../../config/values.js';
 import type { WorkspaceRoot } from '../workspace/model.js';
 import { validateWorkspaceRoots } from '../workspace/roots.js';
@@ -41,7 +42,7 @@ export interface ShellBootstrapResult {
   readonly lifecycleNotices: readonly string[];
 }
 
-type SessionBootstrapCode = 'session-not-found' | 'session-root-mismatch' | 'prompt-publication-unknown';
+type SessionBootstrapCode = 'session-not-found' | 'session-root-mismatch' | 'prompt-publication-unknown' | 'activation-changed' | 'session-changed';
 
 export class SessionBootstrapError extends Error {
   readonly code: SessionBootstrapCode;
@@ -283,6 +284,19 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
         requestedProjectRoot,
         readOnly,
       );
+      if (!currentSelection.ok) {
+        if (currentSelection.reason === 'activation-changed') throw changedStartupActivation();
+        if (currentSelection.reason === 'session-changed') throw changedStartupSession(currentSelection.detail);
+      }
+      const activationGuard = {
+        source: { projectRoot: requestedProjectRoot, expected: currentSelection.activation },
+        destination: currentSelection.activation,
+      };
+      const assertSelection = () => {
+        if (!sameSessionActivation(manager.readCurrentSessionSelection(requestedProjectRoot), currentSelection.activation)) {
+          throw changedStartupActivation();
+        }
+      };
       const unresolved = !currentSelection.ok && currentSelection.reason === 'prompt-publication-unknown';
       if (unresolved && (!staged || !currentSelection.sessionId)) throw unknownPromptPublication(currentSelection.sessionId);
       const source = staged && (currentSelection.ok || unresolved)
@@ -306,12 +320,17 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
       }
       if (selected && (input.adoptCurrentSession === true || unfinished)) {
         if (source) {
-          yield captureStartupBinding(manager, selected.id, selected.projectRoot || requestedProjectRoot, selected.workspaceRoots, source.assertCurrent);
+          assertSelection();
+          yield captureStartupBinding(manager, selected.id, selected.projectRoot || requestedProjectRoot, selected.workspaceRoots, () => {
+            assertSelection();
+            source.assertCurrent();
+          });
           const resumed = requireResume(manager.tryResume(selected.id, requestedProjectRoot,
-            { mode: 'continuity-only', expectedVersion: source.settle() }), selected.id);
+            { mode: 'continuity-only', expectedVersion: source.settle(), activation: { guard: activationGuard } }), selected.id);
           emitLifecycleMessage(`Resumed session ${resumed.id}`);
           return resumed;
         }
+        assertSelection();
         try {
           const resumed = input.sessionManager.resume(
             selected.id,
@@ -333,9 +352,18 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
       }
       if (staged) {
         const id = createSessionId();
-        yield captureStartupBinding(manager, id, requestedProjectRoot, undefined, source?.assertCurrent);
+        assertSelection();
+        yield captureStartupBinding(manager, id, requestedProjectRoot, undefined, () => {
+          assertSelection();
+          source?.assertCurrent();
+        });
         source?.settle();
-        return manager.createNewWithId(id, requestedProjectRoot, createOptions);
+        try {
+          return manager.createNewWithId(id, requestedProjectRoot, { ...createOptions, activationGuard });
+        } catch (error) {
+          if (error instanceof SessionActivationConflict) throw changedStartupActivation();
+          throw error;
+        }
       }
       return manager.createNew(requestedProjectRoot, createOptions);
     }
@@ -425,6 +453,20 @@ function unknownPromptPublication(id?: string): SessionBootstrapError {
   });
 }
 
+function changedStartupActivation(): SessionBootstrapError {
+  return new SessionBootstrapError({
+    code: 'activation-changed', message: 'The current session activation changed while preparing startup.',
+    recoveryHint: 'Retry startup to use the latest saved session activation.',
+  });
+}
+
+function changedStartupSession(detail: string): SessionBootstrapError {
+  return new SessionBootstrapError({
+    code: 'session-changed', message: detail,
+    recoveryHint: 'Retry startup to load the latest saved session.',
+  });
+}
+
 function captureStartupSource(manager: SessionManager, sessionId: string) {
   const directory = manager.getSessionDirPath(sessionId);
   const layout = projectSessionFileLayout({ sessionsDir: path.dirname(directory), sessionId });
@@ -499,6 +541,8 @@ function resolveForkSourceId(
   if (source === "current") {
     const current = sessionManager.resolveCurrentSessionForProject(projectRoot, options);
     if (!current.ok) {
+      if (current.reason === 'activation-changed') throw changedStartupActivation();
+      if (current.reason === 'session-changed') throw changedStartupSession(current.detail);
       if (current.reason === 'prompt-publication-unknown') {
         if (options?.readOnly && current.sessionId) return current.sessionId;
         throw unknownPromptPublication(current.sessionId);

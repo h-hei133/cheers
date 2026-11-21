@@ -1,5 +1,4 @@
 import { lstatSync } from 'node:fs';
-import { assertNoPromptIntent } from './prompt/intent.js';
 import path from 'node:path';
 import { sameValue } from '../../config/values.js';
 import { captureWorkspaceRoot } from '../../core/workspace/roots.js';
@@ -9,8 +8,7 @@ import { ModelAdmissionError, type BudgetConstraint, type LedgerBinding, type Re
 import type { Session } from '../schema/sessionRecord.js';
 import type { SessionStateSnapshot } from '../schema/sessionStateSnapshot.js';
 import { projectSessionFileLayout, validateSessionId, type SessionFileLayout } from './sessionFileLayout.js';
-import { readSessionMetadataRecord } from './sessionStore.js';
-import { readStateSnapshotRequired } from './sessionStateStore.js';
+import { readSessionSnapshot } from './snapshot.js';
 import { withFileLock, writeJsonFileAtomic } from './sessionFileStore.js';
 
 interface RequestStoreHost { readonly getSessionDirPath: (sessionId: string) => string }
@@ -26,7 +24,6 @@ export function sessionRequestStore(host: RequestStoreHost, session: Session, sc
       let persistence: ModelAdmissionError['persistence'] = 'unchanged';
       try {
         return withFileLock(layout.stateLockPath, () => {
-          assertNoPromptIntent(layout);
           if (layoutFor(host, session.id).sessionDir !== layout.sessionDir || directoryIdentity(layout) !== binding.directoryIdentity) throw new ModelAdmissionError('unavailable');
           const current = readCurrent(layout, binding);
           const decoded = current.state.requestLedger === undefined ? createRequestLedger(binding) : decodeRequestLedger(current.state.requestLedger);
@@ -56,8 +53,7 @@ export function sessionRequestStore(host: RequestStoreHost, session: Session, sc
 }
 
 function readCurrent(layout: SessionFileLayout, binding: LedgerBinding): RequestStoreView {
-  const metadata = readSessionMetadataRecord(layout.metadataPath);
-  const state = readStateSnapshotRequired(layout.statePath);
+  const { metadata, state } = readSessionSnapshot(layout);
   if (!metadata || metadata.id !== binding.sessionId || metadata.createdAt !== binding.sessionCreatedAt
     || !state || typeof state !== 'object' || Array.isArray(state) || typeof metadata.projectRoot !== 'string'
     || typeof state.projectRoot !== 'string') throw new ModelAdmissionError('unavailable');

@@ -5,7 +5,6 @@ import { isRecord } from '../../../core/values/record.js';
 import { decodeTranscriptLine } from '../../sessionEventCodec.js';
 import type { TranscriptAppendSource } from '../../transcript/append.js';
 import type { SessionFileLayout } from '../sessionFileLayout.js';
-import { fileVersion } from '../version.js';
 
 const MAX_INTENT_BYTES = 192 * 1024 * 1024;
 const MAX_METADATA_BYTES = 1024 * 1024;
@@ -53,17 +52,6 @@ export function hasPromptIntent(layout: Pick<SessionFileLayout, 'stateLockPath'>
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
     throw new PromptPublicationError('unknown');
   }
-}
-
-/** Keep read-only projections out of a prompt that begins or survives the read. */
-export function capturePromptRead(layout: SessionFileLayout): () => void {
-  const version = () => [layout.metadataPath, layout.statePath].map(file => fileVersion(fs.lstatSync(file)).join(':')).join('/');
-  assertNoPromptIntent(layout);
-  const before = version();
-  return () => {
-    if (version() !== before) throw new Error('The saved session changed during acquisition.');
-    assertNoPromptIntent(layout);
-  };
 }
 
 export function readPromptIntent(layout: SessionFileLayout, sessionId: string): PromptIntent | undefined {

@@ -363,6 +363,42 @@ describe('shell bootstrap', () => {
     expect(result.context.session.turns.map(turn => turn.content)).toEqual(['kept conversation']);
   });
 
+  it.each([true, false])('preserves a replacement activation after resolving startup (adopt=%s)', adoptCurrentSession => {
+    const sessionManager = new SessionManager();
+    const cwd = fs.mkdtempSync(path.join(fakeHome, 'project-replaced-selection-'));
+    sessionManager.createNew(cwd);
+    const resolve = sessionManager.resolveCurrentSessionForProject.bind(sessionManager);
+    const replacement = new SessionManager();
+    vi.spyOn(sessionManager, 'resolveCurrentSessionForProject').mockImplementationOnce((root, options) => {
+      const observed = resolve(root, options);
+      replacement.createNew(cwd);
+      return observed;
+    });
+    const input = { cwd, runtimeConfig: getRuntimeConfig(cwd), gitContext: getWorkflowGitContext(cwd),
+      sessionManager, renderer: new StreamingRenderer(), adoptCurrentSession };
+    expect(() => prepareShellStartup(input)).toThrow(expect.objectContaining({ code: 'activation-changed' }));
+    expect(sessionManager.listSessions()).toHaveLength(2);
+  });
+
+  it.each([true, false])('preserves a competing activation during implicit session creation (had selection=%s)', hadSelection => {
+    const sessionManager = new SessionManager();
+    const cwd = fs.mkdtempSync(path.join(fakeHome, 'project-create-selection-'));
+    if (hadSelection) sessionManager.createNew(cwd);
+    const input = { cwd, runtimeConfig: getRuntimeConfig(cwd), gitContext: getWorkflowGitContext(cwd),
+      sessionManager, renderer: new StreamingRenderer() };
+    const startup = prepareShellStartup(input);
+    const publish = sessionManager.setCurrentSessionForProject.bind(sessionManager);
+    let replacementId: string | undefined;
+    vi.spyOn(sessionManager, 'setCurrentSessionForProject').mockImplementationOnce((root, id, options) => {
+      expect(sessionManager.sessionExists(id)).toBe(true);
+      replacementId = new SessionManager().createNew(root).id;
+      publish(root, id, options);
+    });
+    expect(() => startup.activate()).toThrow(expect.objectContaining({ code: 'activation-changed' }));
+    expect(replacementId).toBeDefined();
+    expect(sessionManager.readCurrentSessionSelection(cwd)?.sessionId).toBe(replacementId);
+  });
+
   it('starts fresh with a safe notice when recovery cannot be read, while retaining the old session', () => {
     const sessionManager = new SessionManager();
     const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-unreadable-recovery-'));

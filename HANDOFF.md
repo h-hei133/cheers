@@ -85,6 +85,7 @@ This file is the curated, compact index of reusable engineering pitfalls, enviro
 - **Symptom**: Concurrent session creations overwrite the same ID, or an async pre-switch hook overwrites a newer active selection.
 - **Root Cause**: Non-exclusive existence checks race across processes, and registry writes without source/destination CAS clobber competing selections.
 - **Rule**: Use non-recursive exclusive `mkdir` + `wx` creation and lock-guarded CAS (`activationId` + `expectedVersion`) on session activation; retain `unknown` outcomes on write/fsync/readback uncertainty instead of faking rollback.
+- **Read boundary**: Carry the observed activation into implicit startup admission. Preserve the selection after a snapshot version conflict so startup can retry. Compare export file versions before attaching accounting since a completed transaction may already have removed its marker.
 
 ### Async Admission Must Recheck Generation, Grants, And Cancellation After Every `await`
 - **Symptom**: A dismissed picker saves stale state, a revoked grant reads attachment content, or a late reload resurrects a closed host/extension.

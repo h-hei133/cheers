@@ -49,7 +49,7 @@ it('refuses a competing source activation acquired while the caller waits for th
 });
 
 it.each(['missing-session', 'load-failed', 'project-root-mismatch'] as const)(
-  'preserves a same-id reactivation acquired while clearing an observed %s selection',
+  'reports a same-id reactivation acquired while clearing an observed %s selection',
   reason => {
     set(sourceRoot, 'target');
     const inspected = current(sourceRoot)!;
@@ -69,12 +69,40 @@ it.each(['missing-session', 'load-failed', 'project-root-mismatch'] as const)(
       },
     });
 
-    expect(result).toMatchObject({ ok: false, reason });
+    expect(result).toMatchObject({ ok: false, reason: 'activation-changed' });
     expect(replacement).toBeDefined();
     expect(fs.readFileSync(file)).toEqual(replacement);
     expect(current(sourceRoot)?.activationId).not.toBe(inspected.activationId);
   },
 );
+
+it('does not return a session loaded across a newer activation with the same id and timestamp', () => {
+  set(sourceRoot, 'target');
+  const inspected = current(sourceRoot)!;
+  const loadSession = () => {
+    set(sourceRoot, inspected.sessionId, inspected.updatedAt);
+    return { id: inspected.sessionId, projectRoot: sourceRoot } as Session;
+  };
+
+  expect(resolveCurrentSessionForProject({
+    storePath: file, projectRoot: sourceRoot, sessionExists: () => true, loadSession, readOnly: true,
+  })).toMatchObject({ ok: false, reason: 'activation-changed' });
+  expect(current(sourceRoot)).toMatchObject({ sessionId: inspected.sessionId, updatedAt: inspected.updatedAt });
+  expect(current(sourceRoot)?.activationId).not.toBe(inspected.activationId);
+});
+
+it('refuses a load failure observed before a competing activation', () => {
+  set(sourceRoot, 'target');
+  const result = resolveCurrentSessionForProject({
+    storePath: file, projectRoot: sourceRoot, sessionExists: () => true, readOnly: true,
+    loadSession: () => {
+      set(sourceRoot, 'competitor');
+      throw new Error('Could not load the previous session');
+    },
+  });
+  expect(result).toMatchObject({ ok: false, reason: 'activation-changed' });
+  expect(current(sourceRoot)?.sessionId).toBe('competitor');
+});
 
 it.each(['source', 'destination'] as const)('refuses an absent %s selection that becomes present', side => {
   const captured = guard(); let competitor!: Buffer;

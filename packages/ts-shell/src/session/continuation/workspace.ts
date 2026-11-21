@@ -7,9 +7,10 @@ import { captureWorkspaceRoot, validateWorkspaceRoots } from '../../core/workspa
 import { decodeWorkspaceRoots, type WorkspaceRoot } from '../../core/workspace/model.js';
 import { normalizePathIdentity } from './roots.js';
 import { projectSessionFileLayout } from '../store/sessionFileLayout.js';
-import { readSessionMetadataRecord, readSessionRecordSnapshot } from '../store/sessionStore.js';
+import { readSessionRecordSnapshot } from '../store/sessionStore.js';
+import { readSessionSnapshot } from '../store/snapshot.js';
 import { readSessionFileVersion } from '../store/version.js';
-import { readStateSnapshotRequired, withSessionStateLock } from '../store/sessionStateStore.js';
+import { withSessionStateLock } from '../store/sessionStateStore.js';
 import { writeJsonFileAtomic } from '../store/sessionFileStore.js';
 
 export interface WorkspaceChangeResult {
@@ -22,16 +23,15 @@ export interface WorkspaceChangeResult {
 export function sessionWorkspaceAdmission(manager: Pick<SessionManager, 'getSessionDirPath'>, session: Session): string | undefined {
   try {
     const layout = projectSessionFileLayout({ sessionsDir: dirname(manager.getSessionDirPath(session.id)), sessionId: session.id });
-    const version = readSessionFileVersion(layout);
-    const metadata = readSessionMetadataRecord(layout.metadataPath);
-    const state = readStateSnapshotRequired(layout.statePath);
+    const { metadata, state, assertCurrent } = readSessionSnapshot(layout, { includeTranscript: true });
     if (!metadata || metadata.id !== session.id || metadata.createdAt !== session.createdAt
       || normalizePathIdentity(metadata.projectRoot || state.projectRoot || session.projectRoot) !== normalizePathIdentity(session.projectRoot)
       || (state.projectRoot !== undefined && normalizePathIdentity(state.projectRoot) !== normalizePathIdentity(session.projectRoot))
       || JSON.stringify(decodeWorkspaceRoots(state.workspaceRoots)) !== JSON.stringify(session.workspaceRoots ?? [])
-      || readSessionFileVersion(layout) !== version || manager.getSessionDirPath(session.id) !== layout.sessionDir) {
+      || manager.getSessionDirPath(session.id) !== layout.sessionDir) {
       return 'The saved workspace binding or grants changed. Reopen the session before starting new actions.';
     }
+    assertCurrent();
   } catch { return 'The saved workspace authority could not be checked. Reopen the session before starting new actions.'; }
   return undefined;
 }
