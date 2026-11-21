@@ -9,9 +9,10 @@ import { parseCodemodeScript } from './options.js'
 import { CODEMODE_WORKER_SOURCE } from './prelude.js'
 import { loadCodemodeStore, MAX_STORE_TOTAL_CHARS, MAX_STORE_VALUE_CHARS } from './store.js'
 import { CodemodeStoreError, type CodemodeStoreStatus } from './state.js'
-import { runCodemodeWorker, type ScriptRpc } from './execution.js'
+import { runCodemodeWorker, type ScriptReply, type ScriptRpc } from './execution.js'
 import { projectCallableCatalog } from './catalog.js'
 import { projectCodemodeModels } from './models.js'
+import { parseReplayMode, prepareReplay, REPLAY_ID_PATTERN, replayFailure, settleReplay, type ReplayRun } from './replay/index.js'
 
 export const CODEMODE_TOOL_NAME = 'codemode'
 const MAX_CONCURRENT_WORKERS = 4
@@ -73,6 +74,15 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
           type: 'string',
           description: 'Raw JavaScript async function body. Optional line 1: // @options: {"timeout_ms": 30000, "max_output_tokens": 16000}',
         },
+        record: {
+          type: 'boolean',
+          description: 'Record a read-only script in the current saved session and return its replay ID. Date and Math.random are reproducible. Cannot be used with replay_id.',
+        },
+        replay_id: {
+          type: 'string',
+          pattern: REPLAY_ID_PATTERN.source,
+          description: 'Verify a recording on this session branch with the original code. Recording and replay allow local computation, load(), and catalogue queries.',
+        },
       },
     },
     async execute(args, context) {
@@ -81,8 +91,10 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
       if (context.abortSignal?.aborted) return deniedResult('Script failed\n\nScript error: Operation aborted.')
 
       let parsedScript: ReturnType<typeof parseCodemodeScript>
+      let replayMode: ReturnType<typeof parseReplayMode>
       try {
         parsedScript = parseCodemodeScript(code)
+        replayMode = parseReplayMode(args)
       } catch (err) {
         return deniedResult(`Script failed\n\nScript error: ${err instanceof Error ? err.message : String(err)}`)
       }
@@ -95,6 +107,7 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
       let storeHandle: ReturnType<typeof loadCodemodeStore>
       let allToolsList: string[]
       let worker: Worker
+      let replay: ReplayRun | undefined
       const output = new CodemodeOutput(parsedScript.maxOutputChars)
       const scriptController = new AbortController()
       let callable: ReturnType<typeof projectCallableCatalog>
@@ -108,30 +121,37 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
         })
         storeHandle = loadCodemodeStore(context.sessionId, context.workspaceRoot)
         allToolsList = [...catalog.keys()].filter(name => name !== CODEMODE_TOOL_NAME)
+        const workerInputs = {
+          allTools: allToolsList,
+          callableTools: callable.tools,
+          initialStore: storeHandle.initial,
+          models: projectCodemodeModels(context.modelCatalog),
+          maxOutputChars: parsedScript.maxOutputChars,
+          maxStoreValueChars: MAX_STORE_VALUE_CHARS,
+          maxStoreTotalChars: MAX_STORE_TOTAL_CHARS,
+        }
+        if (replayMode) replay = prepareReplay(replayMode, context, code, workerInputs)
         worker = new Worker(CODEMODE_WORKER_SOURCE, {
           eval: true,
           env: {},
+          execArgv: [],
           resourceLimits: { maxOldGenerationSizeMb: 64, maxYoungGenerationSizeMb: 16 },
           workerData: {
             code: parsedScript.strippedCode,
-            allTools: allToolsList,
-            callableTools: callable.tools,
-            initialStore: storeHandle.initial,
-            models: projectCodemodeModels(context.modelCatalog),
-            maxOutputChars: parsedScript.maxOutputChars,
-            maxStoreValueChars: MAX_STORE_VALUE_CHARS,
-            maxStoreTotalChars: MAX_STORE_TOTAL_CHARS,
+            ...workerInputs,
+            determinism: replay?.clock,
           },
         })
       } catch (err) {
         releaseSlot()
+        if (replayMode) return replayFailure(err, context.abortSignal)
         if (err instanceof CodemodeStoreError) return deniedResult(`Script failed\n\n${err.message}`, {
           codemodeStore: { status: err.status, reason: err.reason },
         })
         throw err
       }
 
-      const handleRpc = async ({ op, payload }: ScriptRpc): Promise<{ ok: boolean; json: string; terminate?: boolean }> => {
+      const handleRpc = async ({ op, payload }: ScriptRpc): Promise<ScriptReply> => {
         try {
           if (op === 'call') {
             return { ok: true, json: JSON.stringify(await runner.call(String(payload.name ?? ''), payload.args)),
@@ -184,7 +204,10 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
           signal: context.abortSignal, timeoutMs: parsedScript.timeoutMs,
           onText: (kind, value) => output.text(kind, value),
           onRpc: handleRpc,
+          observer: replay?.observer,
         })
+
+        if (replay) return settleReplay(replay, result, output, storeHandle.assertCurrent, context.abortSignal)
 
         const nestedCalls = runner.recorder.snapshot()
         let storeStatus: CodemodeStoreStatus = 'unchanged'

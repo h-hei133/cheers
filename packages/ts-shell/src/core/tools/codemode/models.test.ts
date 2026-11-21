@@ -230,4 +230,28 @@ describe('native model metadata inside the actual script worker', () => {
     }
     expect(route).not.toHaveBeenCalled()
   })
+
+  it('admits a full synced multi-thousand-model catalogue inside the worker without hitting the structural limit', async () => {
+    const models: CatalogModel[] = Array.from({ length: 10_000 }, (_, index) => ({
+      id: `model-${index}`,
+      modelType: 'chat',
+      contextWindow: 128_000,
+      maxTokens: 8_192,
+      reasoning: index % 2 === 0,
+      toolCalling: true,
+      input: ['text'],
+      output: ['text'],
+      cost: { promptPerMTok: 1, completionPerMTok: 2 },
+    }))
+    const physical: readonly CatalogProvider[] = [{
+      id: 'synced', label: 'Synced fixture', runtime: 'openai-compatible', auth: 'api-key',
+      baseUrl: 'https://synced.invalid/v1', models,
+    }]
+    const modelCatalog = sessionModelCatalog(workspace, 'large-catalog-owner', physical)
+    const result = await run<{ count: number; picked: string | null }>(
+      `return { count: models.list('synced').length, picked: models.get('synced', 'model-9999')?.id ?? null };`,
+      modelCatalog,
+    )
+    expect(result).toEqual({ count: 10_000, picked: 'model-9999' })
+  })
 })

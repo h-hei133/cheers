@@ -8,11 +8,27 @@ export interface ScriptOutcome {
 }
 
 const SCRIPT_OPERATIONS = ['call', 'searchTools', 'describeTool', 'describeNamespace', 'image', 'generateImages'] as const
+export const READ_ONLY_SCRIPT_OPERATIONS = ['searchTools', 'describeTool', 'describeNamespace'] as const
+export const READ_ONLY_SCRIPT_ERROR = 'Script recording and replay only allow read-only catalogue operations and local computation.'
+export const MAX_SCRIPT_RPC = 512
 
 export interface ScriptRpc {
   readonly id: number
   readonly op: typeof SCRIPT_OPERATIONS[number]
   readonly payload: Record<string, unknown>
+}
+
+export interface ScriptReply {
+  readonly ok: boolean
+  readonly json: string
+  readonly terminate?: boolean
+}
+
+export interface ScriptObserver {
+  readonly ready: (environment: string) => void
+  readonly request: (rpc: ScriptRpc) => void
+  readonly reply: (rpc: ScriptRpc, reply: ScriptReply) => void
+  readonly text: (kind: 'text' | 'console', value: string) => void
 }
 
 interface WorkerFrame { readonly kind: string; readonly json: string }
@@ -23,7 +39,7 @@ function object(value: unknown): value is Record<string, unknown> {
 
 function frame(value: unknown): WorkerFrame {
   if (!object(value) || typeof value.json !== 'string' || typeof value.kind !== 'string'
-    || !['rpc', 'text', 'console', 'done', 'exit', 'error'].includes(value.kind)) {
+    || !['rpc', 'text', 'console', 'done', 'exit', 'error', 'ready', 'effect'].includes(value.kind)) {
     throw new Error('BridgeError: invalid worker message frame.')
   }
   return { kind: value.kind, json: value.json }
@@ -53,11 +69,13 @@ export function runCodemodeWorker(worker: Worker, controller: AbortController, o
   readonly signal?: AbortSignal
   readonly timeoutMs: number
   readonly onText: (kind: 'text' | 'console', value: string) => void
-  readonly onRpc: (rpc: ScriptRpc) => Promise<{ readonly ok: boolean; readonly json: string; readonly terminate?: boolean }>
+  readonly onRpc: (rpc: ScriptRpc) => Promise<ScriptReply>
+  readonly observer?: ScriptObserver
 }): Promise<ScriptOutcome> {
   return new Promise(resolve => {
     let retired = false
     let lastId = 0
+    let ready = options.observer === undefined
     const pending = new Set<Promise<void>>()
     const finish = (outcome: ScriptOutcome): void => {
       if (retired) return
@@ -83,34 +101,52 @@ export function runCodemodeWorker(worker: Worker, controller: AbortController, o
     timer.unref?.()
     const onError = (error: Error): void => finish({ ok: false, error: error.message })
     const onExit = (code: number): void => finish({ ok: false, error: `Sandbox worker exited unexpectedly (${code}).` })
+    const fail = (error: unknown): void => {
+      finish({ ok: false, error: error instanceof Error ? error.message : 'BridgeError: invalid worker payload.' })
+    }
+    const onText = (kind: 'text' | 'console', value: string): void => {
+      options.onText(kind, value)
+      options.observer?.text(kind, value)
+    }
     const onMessage = (message: unknown): void => {
       if (retired) return
       try {
         const received = frame(message)
-        if (received.kind === 'text' || received.kind === 'console') {
-          options.onText(received.kind, received.json)
+        if (received.kind === 'error') {
+          finish({ ok: false, error: received.json.slice(0, 2000) })
+        } else if (received.kind === 'ready' && !ready && options.observer) {
+          options.observer.ready(received.json)
+          ready = true
+        } else if (!ready || received.kind === 'ready') {
+          throw new Error('BridgeError: invalid worker startup sequence.')
+        } else if (received.kind === 'effect') {
+          finish({ ok: false, error: READ_ONLY_SCRIPT_ERROR })
+        } else if (received.kind === 'text' || received.kind === 'console') {
+          onText(received.kind, received.json)
         } else if (received.kind === 'done' || received.kind === 'exit') {
           const outcome = completion(received.json, received.kind)
-          if (outcome.returnJson) options.onText('text', outcome.returnJson)
+          if (outcome.returnJson) onText('text', outcome.returnJson)
           finish(outcome)
-        } else if (received.kind === 'error') {
-          finish({ ok: false, error: received.json.slice(0, 2000) })
         } else {
           const rpc = request(received.json)
-          if (rpc.id <= lastId || rpc.id > 512) throw new Error('BridgeError: RPC request identity or call limit is invalid.')
+          if (rpc.id <= lastId || rpc.id > MAX_SCRIPT_RPC) throw new Error('BridgeError: RPC request identity or call limit is invalid.')
           lastId = rpc.id
+          options.observer?.request(rpc)
           const operation = options.onRpc(rpc).then(reply => {
             pending.delete(operation)
             if (retired) return
             if (reply.terminate) {
               finish({ ok: false, error: 'A nested tool requires this run to end.', terminate: true })
-            } else worker.postMessage({ kind: 'reply', id: rpc.id, ok: reply.ok, json: reply.json })
-          }).catch(() => finish({ ok: false, error: 'BridgeError: nested RPC settlement failed.' }))
+            } else {
+              options.observer?.reply(rpc, reply)
+              worker.postMessage({ kind: 'reply', id: rpc.id, ok: reply.ok, json: reply.json })
+            }
+          }, () => finish({ ok: false, error: 'BridgeError: nested RPC settlement failed.' })).catch(fail)
           pending.add(operation)
           void operation.then(() => pending.delete(operation))
         }
       } catch (error) {
-        finish({ ok: false, error: error instanceof Error ? error.message : 'BridgeError: invalid worker payload.' })
+        fail(error)
       }
     }
     worker.on('message', onMessage)

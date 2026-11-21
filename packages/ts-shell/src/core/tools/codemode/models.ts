@@ -10,7 +10,9 @@ export type CodemodeModel = Readonly<Record<string, JsonValue>> & {
 
 type FieldRule = 'string' | 'number' | 'boolean' | 'strings' | 'stringOrFalse' | 'stringOrNull'
 type PublicFields = { readonly [field: string]: FieldRule | PublicFields }
-const METADATA_LIMITS = { bytes: 1024 * 1024, nodes: 50_000, depth: 16 }
+// Remote catalogues ship thousands of provider/model entries (~260k nodes, ~4 MiB JSON).
+// Keep structural headroom above full synced catalogues while still bounding adversarial inputs.
+const METADATA_LIMITS = { bytes: 16 * 1024 * 1024, nodes: 1_000_000, depth: 16 }
 
 const MODEL_FIELDS: PublicFields = {
   id: 'string', modelType: 'string', tokenizer: 'stringOrFalse', contextWindow: 'number', inputLimit: 'number',

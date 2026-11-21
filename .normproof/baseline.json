@@ -1863,7 +1863,7 @@
     "packages/ts-shell/src/core/tools/codemode/declarations.test.ts": 8,
     "packages/ts-shell/src/core/tools/codemode/declarations.ts": 10,
     "packages/ts-shell/src/core/tools/codemode/execution.test.ts": 4,
-    "packages/ts-shell/src/core/tools/codemode/execution.ts": 10,
+    "packages/ts-shell/src/core/tools/codemode/execution.ts": 12,
     "packages/ts-shell/src/core/tools/codemode/image.ts": 1,
     "packages/ts-shell/src/core/tools/codemode/models.test.ts": 5,
     "packages/ts-shell/src/core/tools/codemode/models.ts": 4,
@@ -1872,8 +1872,11 @@
     "packages/ts-shell/src/core/tools/codemode/output.test.ts": 8,
     "packages/ts-shell/src/core/tools/codemode/output.ts": 3,
     "packages/ts-shell/src/core/tools/codemode/prelude.ts": 0,
+    "packages/ts-shell/src/core/tools/codemode/replay/index.ts": 9,
+    "packages/ts-shell/src/core/tools/codemode/replay/runtime.ts": 0,
+    "packages/ts-shell/src/core/tools/codemode/replay/trace.ts": 7,
     "packages/ts-shell/src/core/tools/codemode/state.ts": 0,
-    "packages/ts-shell/src/core/tools/codemode/store.test.ts": 5,
+    "packages/ts-shell/src/core/tools/codemode/store.test.ts": 9,
     "packages/ts-shell/src/core/tools/codemode/store.ts": 3,
     "packages/ts-shell/src/core/tools/codemode/tool.test.ts": 1,
     "packages/ts-shell/src/core/tools/codemode/tool.ts": 6,
@@ -3568,7 +3571,7 @@
   "moduleFunctionSeed": 20,
   "values": {
     "declaredFunctionCount": 22,
-    "moduleEdgeCount": 17822
+    "moduleEdgeCount": 17835
   },
   "version": 2
 }

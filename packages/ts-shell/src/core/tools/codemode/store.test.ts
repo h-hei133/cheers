@@ -3,12 +3,14 @@ import { syncBuiltinESMExports } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ToolDefinition, ToolExecutionResult } from '../../../tools/types.js';
+import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '../../../tools/types.js';
 import { SessionManager } from '../../../session/SessionManager.js';
+import type { BranchStoreTranscriptEntry } from '../../../session/branch/store/contract.js';
 import { locateExistingSessionLayout, createSessionStoreLayout } from '../../../session/store/sessionFileLayout.js';
 import { loadSessionRecord } from '../../../session/store/sessionStore.js';
 import { switchDurableSessionActiveLeaf } from '../../../session/store/threadState.js';
 import { appendTranscriptEvent, readTranscriptEvents, TranscriptAppendError } from '../../../session/transcript/sessionTranscript.js';
+import { sessionModelCatalog } from '../../catalog/models.js';
 import { fileIdentity } from '../../workspace/files.js';
 import { loadCodemodeStore, MAX_STORE_TOTAL_CHARS } from './store.js';
 import { createCodemodeToolDefinition } from './tool.js';
@@ -47,6 +49,29 @@ function switchLeaf(leafEntryId: string) {
   switchDurableSessionActiveLeaf({ session: loadSessionRecord({ sessionId, layout: files, cwd: workspace }), layout: files, leafEntryId });
 }
 function messageIds() { return readTranscriptEvents(layout().transcriptPath).filter(event => event.type === 'message').map(event => event.id!); }
+
+function replayEvents() {
+  return readTranscriptEvents(layout().transcriptPath)
+    .filter((event): event is BranchStoreTranscriptEntry => event.type === 'branch-store' && event.namespace === 'codemode-replay');
+}
+
+const replayToolName = 'mcp__records__lookup';
+function replayTool(description = 'Read fixture catalogue records'): ToolDefinition {
+  return { name: replayToolName, description, argsSchema: { type: 'object' },
+    execute: vi.fn(async () => ({ success: true, output: 'unexpected tool call' })) };
+}
+
+function runReplay(args: Record<string, unknown>, context: Partial<ToolExecutionContext> = {}, tool = replayTool()) {
+  return createCodemodeToolDefinition(() => new Map([[tool.name, tool]])).execute(args, {
+    workspaceRoot: workspace, sessionId, taskId: 'cm-replay', ...context,
+  });
+}
+
+function recordedId(result: ToolExecutionResult): string {
+  expect(result.success, result.error).toBe(true);
+  expect(result.metadata?.codemodeReplay).toMatchObject({ status: 'recorded', id: expect.any(String) });
+  return (result.metadata?.codemodeReplay as { id: string }).id;
+}
 
 describe('codemode saved branch storage', () => {
   it('reloads disk values and deletions through a new worker without retaining failed writes', async () => {
@@ -328,5 +353,163 @@ describe('codemode saved branch storage', () => {
     expect(result.metadata?.codemodeStore).toMatchObject({ status: 'unchanged' });
     expect(fs.readFileSync(target, 'utf8')).toBe('nested landed');
     expect(loadCodemodeStore(sessionId, workspace).initial.value).toBe('"newer"');
+  });
+});
+
+describe('codemode deterministic recordings', () => {
+  it('reopens ordered observations, a fixed clock, seeded randomness and saved script inputs', async () => {
+    expect((await run('store("answer", 42);')).success).toBe(true);
+    const code = [
+      'const time = Date.now(); const random = Math.random();',
+      'const [found, described, namespace] = await Promise.all([',
+      '  searchTools("lookup"), describeTool("mcp__records__lookup"), describeNamespace("mcp__records"),',
+      ']);',
+      'text("recorded-fixture-source"); console.log(described);',
+      'return { time, sameDate: Date() === new Date().toString() && time === new Date().getTime(),',
+      '  random, distinctRandom: Math.random() !== random, answer: load("answer"),',
+      '  found: found.map(tool => tool.name), namespace,',
+      '  deterministicGlobals: [typeof Intl, typeof WeakRef, typeof SharedArrayBuffer],',
+      '};',
+    ].join('\n');
+    const recorded = await runReplay({ code, record: true });
+    const id = recordedId(recorded);
+    expect(recorded.output).toContain('"sameDate": true');
+    expect(recorded.output).toContain('"distinctRandom": true');
+    expect(recorded.output).toContain('"answer": 42');
+    expect(recorded.output).toContain(replayToolName);
+    expect(recorded.output).toContain(`Replay ID ${id}`);
+    expect(recorded.output).toMatch(/"deterministicGlobals": \[\s+"undefined",\s+"undefined",\s+"undefined"/);
+    const [event] = replayEvents();
+    const receipt = JSON.parse(event!.entries[id]!);
+    expect(receipt.trace.observations.map(([sequence]: [number]) => sequence)).toEqual([1, 2, 3]);
+    expect(JSON.stringify(event)).not.toMatch(/recorded-fixture-source|Read fixture catalogue records|mcp__records__lookup/);
+    expect(loadCodemodeStore(sessionId, workspace).initial[id]).toBeUndefined();
+
+    manager = new SessionManager();
+    const before = fs.readFileSync(layout().transcriptPath);
+    const replayed = await runReplay({ code, replay_id: id });
+    expect(replayed.success, replayed.error).toBe(true);
+    expect(replayed.metadata?.codemodeReplay).toEqual({ status: 'verified', id });
+    expect(replayed.output).toBe(recorded.output);
+    expect(fs.readFileSync(layout().transcriptPath)).toEqual(before);
+  });
+
+  it('refuses drift in the exact source, tool names, model metadata and initial store', async () => {
+    const code = 'return "unaffected";';
+    const id = recordedId(await runReplay({ code, record: true }));
+    const changedCode = await runReplay({ code: code + '\n', replay_id: id });
+    const changedTools = await runReplay({ code, replay_id: id }, { toolCatalog: new Map() });
+    const changedModels = await runReplay({ code, replay_id: id }, {
+      modelCatalog: sessionModelCatalog(workspace, sessionId, [{
+        id: 'fixture', label: 'Fixture', runtime: 'openai', auth: 'none', models: [{ id: 'available' }],
+      }]),
+    });
+    expect((await run('store("newer", 1);')).success).toBe(true);
+    const changedStore = await runReplay({ code, replay_id: id });
+    for (const result of [changedCode, changedTools, changedModels, changedStore]) {
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('source or inputs differ');
+      expect(result.output).toBeUndefined();
+    }
+    expect(replayEvents()).toHaveLength(1);
+  });
+
+  it('rejects a changed catalogue reply even when the script does not use it', async () => {
+    const code = `text("unverified"); await describeTool("${replayToolName}"); return true;`;
+    const id = recordedId(await runReplay({ code, record: true }));
+    const changed = await runReplay({ code, replay_id: id }, {}, replayTool('Modified fixture description'));
+    expect(changed.success).toBe(false);
+    expect(changed.error).toContain('catalogue observation differs');
+    expect(changed.error).not.toContain('unverified');
+    expect(changed.output).toBeUndefined();
+    expect(replayEvents()).toHaveLength(1);
+  });
+
+  it.each(['delivery order', 'output'] as const)('rejects a recording with a mismatched %s', async mismatch => {
+    const code = `await Promise.all([describeTool("${replayToolName}"), describeNamespace("mcp__records")]); return "same";`;
+    const id = recordedId(await runReplay({ code, record: true }));
+    const event = replayEvents()[0]!;
+    const receipt = JSON.parse(event.entries[id]!);
+    if (mismatch === 'delivery order') receipt.trace.observations.reverse();
+    else receipt.trace.output = '0'.repeat(64);
+    appendTranscriptEvent(layout().transcriptPath, {
+      ...event, id: 'receipt-mismatch', entries: { [id]: JSON.stringify(receipt) },
+    }, undefined, { requireExisting: true });
+    const replayed = await runReplay({ code, replay_id: id });
+    expect(replayed.success).toBe(false);
+    expect(replayed.error).toContain(mismatch === 'delivery order' ? 'catalogue observation differs' : 'output differs');
+  });
+
+  it('keeps receipts on the saved session branch that recorded them', async () => {
+    manager.addTurn(sessionId, { role: 'user', content: 'common ancestor' });
+    const ancestor = messageIds()[0]!;
+    manager.addTurn(sessionId, { role: 'assistant', content: 'original branch' });
+    const original = messageIds()[1]!;
+    const code = 'return "bound";';
+    const id = recordedId(await runReplay({ code, record: true }));
+    const forked = manager.fork(sessionId, workspace, { activate: false });
+    expect((await runReplay({ code, replay_id: id }, { sessionId: forked.id })).success).toBe(false);
+    switchLeaf(ancestor);
+    manager.addTurn(sessionId, { role: 'assistant', content: 'sibling branch' });
+    const sibling = await runReplay({ code, replay_id: id });
+    expect(sibling.success).toBe(false);
+    expect(sibling.error).toContain('unavailable on this session branch');
+    switchLeaf(original);
+    expect((await runReplay({ code, replay_id: id })).success).toBe(true);
+  });
+
+  it.each([
+    `await tools.${replayToolName}({});`,
+    'store("effect", true);',
+    'await image("fixture");',
+    'await models.generateImages(null, null);',
+  ])('fails even when the script catches a refused operation (%s)', async attempt => {
+    const tool = replayTool();
+    const executeNestedTool = vi.fn(async () => ({ success: true }));
+    const result = await runReplay({ code: `try { ${attempt} } catch {} return "caught";`, record: true }, { executeNestedTool }, tool);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('only allow read-only');
+    expect(result.output).toBeUndefined();
+    expect(replayEvents()).toHaveLength(0);
+    expect(storeEvents()).toHaveLength(0);
+    expect(tool.execute).not.toHaveBeenCalled();
+    expect(executeNestedTool).not.toHaveBeenCalled();
+  });
+
+  it.each(['abort', 'retire'] as const)('refuses publication when an active observation causes %s', async reason => {
+    const controller = new AbortController();
+    let admitted = true;
+    const tool = replayTool();
+    const observe = vi.fn(() => {
+      if (reason === 'abort') controller.abort();
+      else admitted = false;
+      return 'fixture changed admission';
+    });
+    Object.defineProperty(tool, 'description', { get: observe });
+    const result = await runReplay({ code: `await describeTool("${replayToolName}"); return true;`, record: true }, {
+      abortSignal: controller.signal, admission: () => admitted ? undefined : 'test turn ended',
+    }, tool);
+    expect(observe).toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain(reason === 'abort' ? 'Operation aborted' : 'conflict');
+    expect(replayEvents()).toHaveLength(0);
+  });
+
+  it('requires an explicit mode and a saved session', async () => {
+    const code = 'return true;';
+    const regular = await runReplay({ code, record: false }, { sessionId: undefined });
+    expect(regular.success).toBe(true);
+    expect(regular.metadata?.codemodeReplay).toBeUndefined();
+    const unsaved = await runReplay({ code, record: true }, { sessionId: undefined });
+    expect(unsaved.success).toBe(false);
+    expect(unsaved.error).toContain('saved session');
+    const malformed = await runReplay({ code, replay_id: 'not-an-id' });
+    expect(malformed.success).toBe(false);
+    expect(malformed.error).toContain('valid script replay ID');
+    const id = recordedId(await runReplay({ code, record: true }));
+    const ambiguous = await runReplay({ code, record: true, replay_id: id });
+    expect(ambiguous.success).toBe(false);
+    expect(ambiguous.error).toContain('either record or replay_id');
+    expect(replayEvents()).toHaveLength(1);
   });
 });

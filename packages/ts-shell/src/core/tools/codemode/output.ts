@@ -38,14 +38,14 @@ export class CodemodeOutput {
     if (bounded.metadata?.outputNotice) this.notice = '[Image content omitted: the four-image/4MiB encoded media budget was reached.]'
   }
 
-  result(header: 'Script completed' | 'Script failed', error?: string): ScriptOutput {
+  result(header: 'Script completed' | 'Script failed', error?: string, additionalNotice = ''): ScriptOutput {
     const parts: string[] = [header]
     if (this.textItems.length === 1) parts.push(this.textItems[0]!)
     else this.textItems.forEach((item, index) => parts.push(`==> text ${index + 1}/${this.textItems.length} <==\n${item}`))
     if (this.consoleLines.length) parts.push(`<console_output>\n${this.consoleLines.join('\n')}\n</console_output>`)
     if (error) parts.push(`Script error: ${error}`)
     let text = parts.join('\n\n')
-    let notice = this.notice
+    let notice = [additionalNotice, this.notice].filter(Boolean).join('\n')
     if (Buffer.byteLength(text + (notice ? '\n' + notice : ''), 'utf8') > this.maxBytes) {
       notice = [notice, '[Script output truncated to its byte budget.]'].filter(Boolean).join('\n')
       const reserved = Buffer.byteLength(notice, 'utf8') + 2

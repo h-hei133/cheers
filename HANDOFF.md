@@ -3045,3 +3045,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom** A standalone `esbuild` bundle for a secondary hook entrypoint exits with the usage message of an imported CLI module.
 - **Root cause** Combining multiple modules into one ESM file makes every module's `import.meta.url === pathToFileURL(resolve(process.argv[1])).href` self-execution guard evaluate to `true` at once.
 - **Rule** Disable secondary imported modules' top-level self-execution guards explicitly in the bundler plugin (failing loudly if the expected guard pattern changes) and verify the bundled CLI end-to-end on real payloads.
+
+### Codemode Sandbox Workers Must Clear `execArgv` And Size Model Metadata For Full Catalogues
+
+- **Symptom** Codemode workers throw `require is not defined in ES module scope` when the host runs with `--input-type=module`, and real synced catalogues (~9,000 models, ~260k nodes, ~4 MiB) fail before script start with `Model metadata exceeds its structural limit.`
+- **Root cause** `new Worker(..., { eval: true })` inherits `process.execArgv` unless `execArgv: []` is explicitly passed, and unit tests only exercised 4-model fixtures against a 50k-node / 1 MiB projection ceiling.
+- **Rule** Pass `execArgv: []` alongside `env: {}` on isolated codemode workers, keep `METADATA_LIMITS` above full synced catalogue sizes while still bounded, and cover a 10,000-model catalogue in `models.test.ts`.

@@ -17,16 +17,23 @@ export function replayCodemodeBranchStore(events: readonly TranscriptEvent[], ac
 
 export function loadCodemodeStore(sessionId: string | undefined, cwd?: string): {
   readonly initial: Readonly<Record<string, string>>;
+  readonly assertCurrent: (admission?: () => void) => void;
   readonly commit: (writes: Readonly<Record<string, string | null>>, admission?: () => void) => CodemodeStoreStatus;
 } {
-  if (!sessionId) return { initial: {}, commit: (writes, admission) => {
+  if (!sessionId) return { initial: {}, assertCurrent: admission => admission?.(), commit: (writes, admission) => {
     admission?.();
     if (Object.keys(writes).length) throw new CodemodeStoreError('unavailable'); return 'unchanged';
   } };
   try {
     const handle = captureBranchStore({ sessionId, cwd, namespace: CODEMODE_STORE_NAMESPACE });
-    return { initial: handle.initial, commit: (writes, admission) => {
-      try { return handle.commit(writes, admission); } catch (error) { return failure(error); }
-    } };
+    return {
+      initial: handle.initial,
+      assertCurrent: admission => {
+        try { handle.assertCurrent(undefined, admission); } catch (error) { return failure(error); }
+      },
+      commit: (writes, admission) => {
+        try { return handle.commit(writes, admission); } catch (error) { return failure(error); }
+      },
+    };
   } catch (error) { return failure(error); }
 }

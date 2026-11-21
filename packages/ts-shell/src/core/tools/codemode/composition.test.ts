@@ -97,6 +97,25 @@ function held() {
 }
 
 describe('the composed catalog consumed by the actual codemode worker', () => {
+  it('records and verifies read-only code through the normal tool gate', async () => {
+    const tools = new Map<string, ToolDefinition>()
+    tools.set('lookup', fixtureTool('lookup'))
+    tools.set('codemode', createCodemodeToolDefinition(() => tools))
+    const gate: ToolGateOptions = { sessionId: SESSION_ID, workspaceRoot: workspace,
+      permissionScope: 'allow-all', hooks: quietHooks, emit: () => {} }
+    const script = adaptTools(tools, gate).find(tool => tool.name === 'codemode')!
+    const code = 'return { namespace: await describeNamespace("core"), time: Date.now() };'
+    const recorded = await script.execute('record-script', { code, record: true })
+    expect(recorded.isError, recorded.output).toBeFalsy()
+    expect(recorded.metadata?.codemodeReplay).toMatchObject({ status: 'recorded', id: expect.any(String) })
+    const { id } = recorded.metadata!.codemodeReplay as { id: string }
+    expect(recorded.output).toContain(`Replay ID ${id}`)
+    const replayed = await script.execute('replay-script', { code, replay_id: id })
+    expect(replayed.isError, replayed.output).toBeFalsy()
+    expect(replayed.metadata?.codemodeReplay).toEqual({ status: 'verified', id })
+    expect(replayed.output).toBe(recorded.output)
+  })
+
   it.each(['mutable', 'frozen'] as const)('keeps %s caller definitions isolated across catalog composition', async kind => {
     const registry = new Map<string, ToolDefinition>()
     const original = createCodemodeToolDefinition(() => registry)

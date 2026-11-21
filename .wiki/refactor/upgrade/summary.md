@@ -158,7 +158,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 
 真实模型沿用既有active连接和凭据。用户models目录的原JSON损坏，相关新原生测试在隔离home使用原目标的最小有效目录entry；原用户配置未修改，该证据不代表原损坏目录可加载。失败、setup错误和observer错误均单独保存。没有Windows、物理终端、真实Azure／Mistral／Anthropic原生control、OAuth真人同意／续期、服务账单对照或性能收益基准。本次只跑聚焦检查，未宣称全仓测试／全仓类型通过；六静态门保留119条既有非阻断文档source提示。
 
-## 文档中尚未完成的12项功能任务
+## 文档中尚未完成的11项功能任务
 
 “已有待验收”表示代码／消费者存在，缺本轮整项证据；“部分”表示实现已有进展但仍缺行为或资格验证。以下列出每个未勾选编号，恢复时以tasks.md逐项继续。
 
@@ -166,7 +166,6 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 | --- | --- | --- |
 | C.6 | 部分 | 历史声明、转换、压缩／重开已有实现；Anthropic原生历史control缺真实服务证据。 |
 | E.3 | 部分 | 声明、namespace、冻结session list/get、native image/输出预算已过；richer classify/generateImages派发与provider image缺。 |
-| E.4 | 缺口 | 固定执行环境、记录结果交付、可验证的恢复及未知副作用零重派发。 |
 | E.7 | 部分 | virtual注册／逻辑路由已接通；provider、MCP、renderer和其余runtime setters仍缺，worker virtual明确unsupported。 |
 | E.9 | 部分 | npm／git／local安装adapter和顶层CLI入口、完整性／精确版本／批准边界。 |
 | F1.2 | 部分 | Azure 和账户 WebSocket 的真实服务资格。Mistral 独立 Conversations 协议仍缺。 |

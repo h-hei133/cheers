@@ -1,3 +1,6 @@
+import { READ_ONLY_SCRIPT_ERROR, READ_ONLY_SCRIPT_OPERATIONS } from './execution.js';
+import { REPLAY_RUNTIME_SOURCE } from './replay/runtime.js';
+
 export const CODEMODE_WORKER_SOURCE = `
 const vm = require('node:vm');
 const { parentPort, workerData } = require('node:worker_threads');
@@ -38,6 +41,11 @@ Object.defineProperty(vmCtx, '__MODELS_JSON', { value: JSON.stringify(workerData
 Object.defineProperty(vmCtx, '__MAX_OUTPUT_CHARS', { value: Number(workerData.maxOutputChars || 65536), enumerable: false, configurable: true });
 Object.defineProperty(vmCtx, '__MAX_STORE_VALUE', { value: Number(workerData.maxStoreValueChars || 262144), enumerable: false, configurable: true });
 Object.defineProperty(vmCtx, '__MAX_STORE_TOTAL', { value: Number(workerData.maxStoreTotalChars || 1048576), enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__DETERMINISM_JSON', { value: JSON.stringify(workerData.determinism ?? null), enumerable: false, configurable: true });
+
+if (workerData.determinism) {
+  parentPort.postMessage({ kind: 'ready', json: vm.runInContext('JSON.stringify(new Intl.DateTimeFormat().resolvedOptions())', vmCtx) });
+}
 
 const bootstrap = new vm.Script(\`
 (() => {
@@ -54,6 +62,8 @@ const bootstrap = new vm.Script(\`
   const MAX_OUT = globalThis.__MAX_OUTPUT_CHARS;
   const MAX_VAL = globalThis.__MAX_STORE_VALUE;
   const MAX_TOT = globalThis.__MAX_STORE_TOTAL;
+  const determinism = JSON.parse(globalThis.__DETERMINISM_JSON);
+  const observations = new Set(${JSON.stringify(READ_ONLY_SCRIPT_OPERATIONS)});
   delete globalThis.__registerExit;
   delete globalThis.__send;
   delete globalThis.__onReply;
@@ -66,6 +76,14 @@ const bootstrap = new vm.Script(\`
   delete globalThis.__MAX_OUTPUT_CHARS;
   delete globalThis.__MAX_STORE_VALUE;
   delete globalThis.__MAX_STORE_TOTAL;
+  delete globalThis.__DETERMINISM_JSON;
+
+${REPLAY_RUNTIME_SOURCE}
+
+  function refuseEffect() {
+    send('effect', '');
+    throw new Error(${JSON.stringify(READ_ONLY_SCRIPT_ERROR)});
+  }
 
   function freezeData(value) {
     if (value && typeof value === 'object') {
@@ -93,6 +111,7 @@ const bootstrap = new vm.Script(\`
   });
 
   function rpc(op, payload) {
+    if (determinism && !observations.has(op)) refuseEffect();
     const id = ++seq;
     return new Promise((resolve, reject) => {
       pending.set(id, { resolve, reject });
@@ -178,6 +197,7 @@ const bootstrap = new vm.Script(\`
   });
 
   globalThis.store = (key, value) => {
+    if (determinism) refuseEffect();
     if (typeof key !== 'string' || !key) throw new Error('store(key, value) requires a string key.');
     if (value === undefined) {
       storeMap.delete(key);
@@ -215,6 +235,7 @@ const bootstrap = new vm.Script(\`
       : modelsCatalog,
     get: (provider, id) => modelsCatalog.find(m => m.provider === String(provider) && m.id === String(id)) ?? null,
     async generateImages(model, input) {
+      if (determinism) refuseEffect();
       if (!model || !modelsCatalog.includes(model) || model.provider !== 'openrouter' || model.modelType !== 'image') {
         throw new Error('models.generateImages requires a supported catalogue image model.');
       }
