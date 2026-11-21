@@ -11,7 +11,7 @@ const spec: SshJobSpec = { id: '00000000-0000-0000-0000-000000000000', command: 
     directoryIdentity: '1:2', uid: 1000, bootId: 'd'.repeat(36), namespace: 'e'.repeat(32) } };
 const authority = { mode: 'read-only', source: 'tool-runtime-approval', reason: 'fixture' } as const;
 function clientFor(snapshot: () => { bytes: Buffer; dropped: '0' | 'unknown' }, cursor: () => number): SshClient {
-  return new SshClient({ profile: { identity: spec.binding.profileIdentity, check() {} },
+  return new SshClient({ connected: true, profile: { identity: spec.binding.profileIdentity, check() {} },
     run: async () => {
       const { bytes, dropped } = snapshot(); const offset = cursor();
       return { outputLimited: false, cleanup: 'complete', transport: { status: 'completed', exitCode: 0 },

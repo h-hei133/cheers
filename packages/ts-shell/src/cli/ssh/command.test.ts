@@ -7,8 +7,9 @@ import { JobStore } from '../../workflow/jobs/store.js';
 import { JobService, type RemoteJobBackend } from '../../workflow/jobs/service.js';
 import { sshCommandFor, installSshRuntime, sshFeatureTools, closeSshFor } from '../runtime/ssh.js';
 import { sshHosts } from './state.js';
-import type { SshProfile, SshWorkspace } from '../../runtime/execution/ssh/model.js';
+import { SshError, type SshProfile, type SshWorkspace } from '../../runtime/execution/ssh/model.js';
 import { SshClient } from '../../runtime/execution/ssh/client.js';
+import { SshTransport } from '../../runtime/execution/ssh/transport.js';
 import { runPreparedTool } from '../../turn/invoke.js';
 import { runSessionGoalCommand } from '../../planning/goal/command.js';
 import { ConfigState } from '../../config/state.js';
@@ -50,6 +51,35 @@ it('rejects remote execution under a denied ordinary gate even when local edits 
   expect(result.kind === 'local' && result.output).toContain('refused'); expect(s.port.start).not.toHaveBeenCalled();
   expect(s.host.jobs.read().jobs).toHaveLength(0);
 });
+
+it('requires a separate one-time approval for an exact workspace file and withholds sensitive pages', async () => {
+  const s = await setup();
+  const connect = vi.spyOn(SshClient.prototype, 'connect').mockResolvedValue(workspace);
+  const connection = vi.spyOn(SshTransport.prototype, 'checkConnection').mockImplementation(() => {});
+  const context = Buffer.from('token=SYNTHETIC_PAGE_SECRET_12345678');
+  const stat = vi.spyOn(SshClient.prototype, 'stat').mockResolvedValue({ size: context.length });
+  const read = vi.spyOn(SshClient.prototype, 'read').mockResolvedValue({ bytes: context, context, size: context.length, nextOffset: context.length, version: 'b'.repeat(64) });
+  const invoke = async (...args: string[]) => {
+    const result = await s.command(args);
+    if (result.kind !== 'local') throw new Error('Expected a local SSH response.');
+    return result.output;
+  };
+  try {
+    s.approve();
+    expect(await invoke('connect')).toContain('persistent connection');
+    expect(await invoke('read', '../outside')).toContain('refused');
+    expect(read).not.toHaveBeenCalled();
+    expect(await invoke('stat', 'folder/report.txt')).toContain(`${context.length} bytes`);
+    const result = await invoke('read', 'folder/report.txt');
+    expect(result).toContain('withheld');
+    expect(result).not.toContain('SYNTHETIC_PAGE_SECRET');
+    expect(stat).toHaveBeenCalledWith(workspace, 'folder/report.txt', expect.anything(), expect.any(AbortSignal));
+    expect(read).toHaveBeenCalledWith(workspace, 'folder/report.txt', 0, undefined, expect.anything(), expect.any(AbortSignal));
+    s.afterApprove(() => { s.host.cancellationRevision++; });
+    expect(await invoke('read', 'folder/report.txt')).toContain('refused');
+    expect(read).toHaveBeenCalledOnce();
+  } finally { connect.mockRestore(); connection.mockRestore(); stat.mockRestore(); read.mockRestore(); }
+});
 it('preserves exact shell source and publishes durable unknown/native results without local completion proof', async () => {
   const s = await setup(); s.approve(); const source = 'printf "%s\\n" "α β"; false';
   const result = await s.command(['run', 'tokenized-wrong'], 'run ' + source);
@@ -78,6 +108,7 @@ it.each(['1:2', '1:3'])('refuses an old tool approval after reconnecting the sam
   const s = await setup(); s.approve(); const oldTool = sshFeatureTools(s.context)[0]!;
   const nextWorkspace = { ...workspace, directoryIdentity };
   const connect = vi.spyOn(SshClient.prototype, 'connect').mockResolvedValue(nextWorkspace);
+  const connection = vi.spyOn(SshTransport.prototype, 'checkConnection').mockImplementation(() => {});
   const start = vi.spyOn(SshClient.prototype, 'start').mockResolvedValue('d'.repeat(32));
   let entered!: () => void; const approving = new Promise<void>(resolve => { entered = resolve; });
   let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
@@ -100,7 +131,124 @@ it.each(['1:2', '1:3'])('refuses an old tool approval after reconnecting the sam
     expect((await runPreparedTool(next, { command: 'printf CURRENT' }, s.gate())).isError).toBe(false);
     expect(start).toHaveBeenCalledOnce();
     expect(s.host.jobs.read().jobs[0]).toMatchObject({ binding: nextWorkspace, status: 'running', dispatchPossible: true });
-  } finally { release(); await pending; connect.mockRestore(); start.mockRestore(); }
+  } finally { release(); await pending; connect.mockRestore(); connection.mockRestore(); start.mockRestore(); }
+});
+
+it('does not publish a new master lost while the previous connection is closing', async () => {
+  const s = await setup();
+  s.approve();
+  const clients: SshClient[] = [];
+  const available = new Set<SshTransport>();
+  const candidateWorkspace = { ...workspace, directoryIdentity: '1:3' };
+  const connect = vi.spyOn(SshClient.prototype, 'connect').mockImplementation(async function (this: SshClient) {
+    clients.push(this);
+    available.add(this.transport);
+    return clients.length === 1 ? workspace : candidateWorkspace;
+  });
+  const check = vi.spyOn(SshTransport.prototype, 'checkConnection').mockImplementation(function (this: SshTransport) {
+    if (!available.has(this)) throw new SshError('unavailable');
+  });
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  let entering!: () => void;
+  const closing = new Promise<void>(resolve => { entering = resolve; });
+  let replacement: ReturnType<typeof s.command> | undefined;
+  try {
+    const initial = await s.command(['connect']);
+    expect(initial.kind === 'local' && initial.output).toContain('persistent connection');
+    const prior = clients[0]!.transport;
+    const close = prior.close.bind(prior);
+    vi.spyOn(prior, 'close').mockImplementationOnce(async () => { entering(); await held; await close(); });
+    replacement = s.command(['connect']);
+    await closing;
+    expect(clients).toHaveLength(2);
+    const candidateClose = vi.spyOn(clients[1]!.transport, 'close');
+    available.delete(clients[1]!.transport);
+    release();
+    const result = await replacement;
+    expect(result.kind === 'local' && result.output).toContain('could not be confirmed');
+    expect(s.host.client).toBeUndefined();
+    expect(s.host.service).toBeUndefined();
+    expect(s.host.jobs.read().remote).toEqual(workspace);
+    expect(candidateClose).toHaveBeenCalledOnce();
+  } finally { release(); await replacement; connect.mockRestore(); check.mockRestore(); }
+});
+
+it('rejects new job intent when its approved master was already lost', async () => {
+  const s = await setup();
+  s.approve();
+  const connect = vi.spyOn(SshClient.prototype, 'connect').mockResolvedValue(workspace);
+  const check = vi.spyOn(SshTransport.prototype, 'checkConnection').mockImplementationOnce(() => {})
+    .mockImplementation(() => { throw new SshError('unavailable'); });
+  const start = vi.spyOn(SshClient.prototype, 'start').mockResolvedValue('d'.repeat(32));
+  try {
+    const initial = await s.command(['connect']);
+    expect(initial.kind === 'local' && initial.output).toContain('persistent connection');
+    const tool = sshFeatureTools(s.context)[0]!;
+    const result = await runPreparedTool(tool, { command: 'printf AFTER_LOSS' }, s.gate());
+    expect(result.isError).toBe(true);
+    expect(start).not.toHaveBeenCalled();
+    expect(s.host.jobs.read().jobs).toEqual([]);
+  } finally { connect.mockRestore(); check.mockRestore(); start.mockRestore(); }
+});
+
+it.each([false, true])('joins unpublished SSH cleanup during shutdown (unverified=%s)', async unverified => {
+  const s = await setup();
+  s.approve();
+  const clients: SshClient[] = [];
+  const connect = vi.spyOn(SshClient.prototype, 'connect').mockImplementation(async function (this: SshClient) {
+    clients.push(this);
+    return clients.length === 1 ? workspace : { ...workspace, directoryIdentity: '1:3' };
+  });
+  const check = vi.spyOn(SshTransport.prototype, 'checkConnection').mockImplementation(() => {});
+  let releasePrior!: () => void;
+  let beginPrior!: () => void;
+  const priorCleanup = new Promise<void>(resolve => { releasePrior = resolve; });
+  const priorClosing = new Promise<void>(resolve => { beginPrior = resolve; });
+  let releaseCandidate!: () => void;
+  let beginCandidate!: () => void;
+  const candidateCleanup = new Promise<void>(resolve => { releaseCandidate = resolve; });
+  const candidateClosing = new Promise<void>(resolve => { beginCandidate = resolve; });
+  let replacement: ReturnType<typeof s.command> | undefined;
+  let shutdown: Promise<void> | undefined;
+  try {
+    const initial = await s.command(['connect']);
+    expect(initial.kind === 'local' && initial.output).toContain('persistent connection');
+    vi.spyOn(clients[0]!.transport, 'close').mockImplementation(() => { beginPrior(); return priorCleanup; });
+    replacement = s.command(['connect']);
+    await priorClosing;
+    const candidate = clients[1]!.transport;
+    let settlement: Promise<void> | undefined;
+    vi.spyOn(candidate, 'close').mockImplementation(() => {
+      beginCandidate();
+      return settlement ??= candidateCleanup.then(() => {
+        if (unverified) throw new SshError('cleanup');
+      });
+    });
+    const pending = s.host.pending!.signal;
+    shutdown = closeSshFor(s.context);
+    const observed = vi.fn();
+    const completed = shutdown.then(observed, observed);
+    expect(closeSshFor(s.context)).toBe(shutdown);
+    await candidateClosing;
+    expect(pending.aborted).toBe(true);
+    releasePrior();
+    await new Promise<void>(resolve => setImmediate(resolve));
+    expect(observed).not.toHaveBeenCalled();
+    expect(sshHosts.get(s.context)).toBe(s.host);
+    releaseCandidate();
+    if (unverified) await expect(shutdown).rejects.toMatchObject({ code: 'cleanup' });
+    else await expect(shutdown).resolves.toBeUndefined();
+    await completed;
+    expect(sshHosts.has(s.context)).toBe(false);
+    const result = await replacement;
+    expect(result.kind === 'local' && result.output).not.toContain('persistent connection');
+    expect(s.host.jobs.read().remote).toEqual(workspace);
+  } finally {
+    releasePrior(); releaseCandidate();
+    await Promise.allSettled([replacement, shutdown]);
+    connect.mockRestore(); check.mockRestore();
+  }
 });
 it('aborts a held local request promptly on parent revocation and uses the separately approved exact cancellation capability', async () => {
   const s = await setup(true); s.approve(); let began!: () => void; const started = new Promise<void>(resolve => { began = resolve; });

@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { StreamableHTTPClientTransport, StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import { McpClassifiedError, classifyMcpFailure } from '../errorTaxonomy.js';
@@ -12,13 +13,20 @@ import type { RequestId } from '@modelcontextprotocol/sdk/types.js';
 export class McpHttpTransport extends StreamableHTTPClientTransport {
   failure?: McpClassifiedError;
   private readonly requests: McpHttpRequests;
+  private readonly admissions: AsyncLocalStorage<Admission | undefined>;
   private readonly externalBearer: boolean;
   constructor(config: ScopedMcpServerConfig, admission?: Admission, authorization?: McpHttpAuthorization) {
     const requests = new McpHttpRequests();
-    super(mcpHttpUrl(config.url!), { fetch: mcpFetch(config.url!, { admission, authorization, headers: config.headers, bearerTokenEnvVar: config.bearerTokenEnvVar, authRequired: config.authRequired, requests }),
+    const admissions = new AsyncLocalStorage<Admission | undefined>();
+    super(mcpHttpUrl(config.url!), { fetch: mcpFetch(config.url!, { admission, requestAdmission: () => admissions.getStore(),
+      authorization, headers: config.headers, bearerTokenEnvVar: config.bearerTokenEnvVar, authRequired: config.authRequired, requests }),
       reconnectionOptions: { initialReconnectionDelay: 1_000, maxReconnectionDelay: 1_000, reconnectionDelayGrowFactor: 1, maxRetries: 0 } });
     this.requests = requests;
+    this.admissions = admissions;
     this.externalBearer = config.bearerTokenEnvVar !== undefined;
+  }
+  withAdmission<T>(admission: Admission | undefined, operation: () => T): T {
+    return this.admissions.run(admission, operation);
   }
   override async start(): Promise<void> {
     const onerror = this.onerror;

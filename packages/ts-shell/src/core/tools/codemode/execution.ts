@@ -7,7 +7,7 @@ export interface ScriptOutcome {
   readonly terminate?: boolean
 }
 
-const SCRIPT_OPERATIONS = ['call', 'searchTools', 'describeTool', 'describeNamespace', 'image', 'generateImages'] as const
+const SCRIPT_OPERATIONS = ['call', 'searchTools', 'describeTool', 'describeNamespace', 'image', 'generateImages', 'classify'] as const
 export const READ_ONLY_SCRIPT_OPERATIONS = ['searchTools', 'describeTool', 'describeNamespace'] as const
 export const READ_ONLY_SCRIPT_ERROR = 'Script recording and replay only allow read-only catalogue operations and local computation.'
 export const MAX_SCRIPT_RPC = 512

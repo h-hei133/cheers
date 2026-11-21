@@ -17,6 +17,7 @@ export interface SshComposition {
   readonly report?: (message: string) => void;
   readonly operations: Map<AbortController, Promise<void>>;
   readonly submissions: Set<Promise<unknown>>;
+  readonly candidates: Set<SshTransport>;
   closing?: boolean;
   shutdown?: Promise<void>;
   retiringTransport?: SshTransport;

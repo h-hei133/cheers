@@ -11,7 +11,7 @@ import { releaseParentJobs, cancelLocalOperations } from '../ssh/lifetime.js';
 
 export function installSshRuntime(context: ShellRuntimeContext, manager: SessionManager, runtime: ShellSessionRuntime,
   gate: (tool?: string) => ToolGateOptions, report?: (message: string) => void): void {
-  sshHosts.set(context, { context, manager, runtime, gate, report, operations: new Map(), submissions: new Set(), cancellationRevision: 0,
+  sshHosts.set(context, { context, manager, runtime, gate, report, operations: new Map(), submissions: new Set(), candidates: new Set(), cancellationRevision: 0,
     jobs: new JobStore(manager, () => context.session) });
 }
 export function sshCommandFor(context: ShellRuntimeContext): NonNullable<CommandContext['sshCommand']> {
@@ -34,13 +34,20 @@ export function cancelSshFor(context: ShellRuntimeContext): void { const host = 
 export function closeSshFor(context: ShellRuntimeContext): Promise<void> {
   const host = sshHosts.get(context); if (!host) return Promise.resolve();
   if (host.shutdown) return host.shutdown;
-  const transport = host.client?.transport ?? host.retiringTransport; host.closing = true;
+  host.closing = true;
+  const transport = host.client?.transport ?? host.retiringTransport;
+  const candidates = [...host.candidates].filter(candidate => candidate !== transport);
   return host.shutdown = Promise.resolve().then(async () => {
     cancelLocalOperations(host); transport?.abort();
-    try { await releaseParentJobs(host); }
-    finally {
-      try { await transport?.close(); }
-      finally { if (sshHosts.get(context) === host) sshHosts.delete(context); }
+    try {
+      const results = await Promise.allSettled([
+        releaseParentJobs(host).finally(() => transport?.close()),
+        ...candidates.map(candidate => candidate.close()),
+      ]);
+      const failure = results.find(result => result.status === 'rejected');
+      if (failure) throw failure.reason;
+    } finally {
+      if (sshHosts.get(context) === host) sshHosts.delete(context);
     }
   });
 }

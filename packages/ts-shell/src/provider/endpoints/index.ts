@@ -11,6 +11,7 @@
  * no other protocol, has to know it exists.
  */
 import "./openaiCompatible.js";
+import "./decisions.js";
 import "./anthropicMessages.js";
 import "./bedrockConverse.js";
 import "./googleGenAI.js";

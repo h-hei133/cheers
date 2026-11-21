@@ -463,6 +463,7 @@ describe('codemode deterministic recordings', () => {
     'store("effect", true);',
     'await image("fixture");',
     'await models.generateImages(null, null);',
+    'await models.classify(null, null);',
   ])('fails even when the script catches a refused operation (%s)', async attempt => {
     const tool = replayTool();
     const executeNestedTool = vi.fn(async () => ({ success: true }));

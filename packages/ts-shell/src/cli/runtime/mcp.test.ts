@@ -167,6 +167,57 @@ it('keeps discovered MCP tools in the unrestricted search and load catalogue', a
   expect(starts()).toHaveLength(1);
 });
 
+it('searches, loads and invokes a ready MCP tool while another server is still connecting', async () => {
+  const slow = addSlowServer();
+  const base = input();
+  const name = 'mcp__local__echo_message';
+  let step = 0;
+  const run = await runCliRuntimeInvocation({ ...base, maxTurns: 4,
+    runtimeConfig: { ...base.runtimeConfig!, toolDiscovery: 'dynamic' },
+    mcpGateway: gateway, providerModeEnv: 'real', permissionScope: 'allow-all' }, {
+    checkProviderReadiness: async () => ({ ok: true }), hooks: new HookDispatcher(),
+    createStep: (_request, tools, discovery) => async () => {
+      step++;
+      if (step === 1) {
+        expect(tools.has(name)).toBe(false);
+        expect(fs.existsSync(log)).toBe(false);
+        expect(fs.existsSync(slow)).toBe(false);
+        return { text: '', toolCalls: [{ id: 'search-pending', name: 'tool_search',
+          args: { query: name } }], stopReason: 'toolUse' };
+      }
+      if (step === 2) {
+        await vi.waitFor(() => {
+          expect(fs.existsSync(slow)).toBe(true);
+          expect(gateway.peekSnapshot(server => server === 'local')?.tools.map(tool => tool.qualifiedName)).toEqual([name]);
+        }, { timeout: 2000 });
+        return { text: '', toolCalls: [{ id: 'search-ready', name: 'tool_search',
+          args: { query: name, limit: 1, load: true } }], stopReason: 'toolUse' };
+      }
+      if (step === 3) {
+        expect(discovery?.snapshot().has(name)).toBe(true);
+        return { text: '', toolCalls: [{ id: 'invoke-ready', name, args: { message: 'while discovery runs' } }], stopReason: 'toolUse' };
+      }
+      return { text: 'finished', toolCalls: [], stopReason: 'stop' };
+    },
+  });
+  const events = [];
+  for await (const event of run.events) events.push(event);
+  const searches = events.filter(event => event.type === 'tool.result' && event.toolName === 'tool_search');
+  expect(searches).toHaveLength(2);
+  expect(searches[0]).toMatchObject({ success: true, output: expect.stringContaining('"mcpCatalog":"incomplete"') });
+  expect(searches[1]).toMatchObject({ success: true, output: expect.stringContaining('"loaded":["' + name + '"]') });
+  expect(events.find(event => event.type === 'tool.result' && event.toolName === name))
+    .toMatchObject({ success: true, output: 'echo:while discovery runs' });
+  expect(gateway.peekSnapshot(server => server === 'slow')).toBeUndefined();
+  const ready = starts();
+  expect(ready).toHaveLength(1);
+  const slowPid = JSON.parse(fs.readFileSync(slow, 'utf8').split('\n', 1)[0]!).pid;
+  expect(alive(slowPid)).toBe(true);
+  await expect(gateway.close()).resolves.toBeUndefined();
+  expect(alive(ready[0]!)).toBe(false);
+  expect(alive(slowPid)).toBe(false);
+}, 5000);
+
 it.each(["allow-once", "deny"] as const)("runs an annotated plan MCP call only after %s", async decision => {
   const approve = vi.fn(async (prompt: { id: string }) => ({ promptId: prompt.id, decision, respondedAt: 1 }));
   const admissions: boolean[] = [];

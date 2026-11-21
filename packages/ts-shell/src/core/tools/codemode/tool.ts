@@ -64,7 +64,7 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
   return {
     name: CODEMODE_TOOL_NAME,
     description:
-      'Run JavaScript in an isolated sandbox to compose, batch (Promise.allSettled), chain, and filter tool calls in a single turn. Globals: `await tools.<name>(args)`, `ALL_TOOLS`, `text(value)`, `await image(dataUriOrObj)`, `console.log(...)`, `store(key, value)` / `load(key)` (branch-scoped), `await searchTools(query, { limit?, namespace? })`, `await describeTool(name)`, `await describeNamespace(name)`, `models.list()` / `models.get(provider, id)`, `await models.generateImages(model, { prompt })` for admitted image models, `exit()`, and top-level `return`.',
+      'Run JavaScript in an isolated sandbox to compose, batch (Promise.allSettled), chain, and filter tool calls in a single turn. Globals: `await tools.<name>(args)`, `ALL_TOOLS`, `text(value)`, `await image(dataUriOrObj)`, `console.log(...)`, `store(key, value)` / `load(key)` (branch-scoped), `await searchTools(query, { limit?, namespace? })`, `await describeTool(name)`, `await describeNamespace(name)`, `models.list()` / `models.get(provider, id)`, `await models.generateImages(model, { prompt, references? })`, `await models.classify(model, { state, questions, images? })` for admitted models, `exit()`, and top-level `return`.',
     argsSchema: {
       type: 'object',
       additionalProperties: false,
@@ -159,7 +159,16 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
           }
           if (op === 'generateImages') {
             if (!context.executeNestedTool || !catalog.has('generate_image')) throw new Error('Image generation is unavailable in this script.');
-            return { ok: true, json: JSON.stringify(await runner.call('generate_image', { model: payload.model, prompt: payload.prompt })),
+            return { ok: true, json: JSON.stringify(await runner.call('generate_image', { model: payload.model, prompt: payload.prompt,
+              ...(payload.references !== undefined ? { references: payload.references } : {}) })),
+              ...(runner.terminate ? { terminate: true } : {}) }
+          }
+          if (op === 'classify') {
+            if (!context.executeNestedTool || !catalog.has('classify')) throw new Error('Classification is unavailable in this script.')
+            const result = await runner.call('classify', { model: payload.model, state: payload.state, questions: payload.questions,
+              ...(payload.images !== undefined ? { images: payload.images } : {}) })
+            if (typeof result !== 'string') throw new Error('Classification result could not be verified.')
+            return { ok: true, json: JSON.stringify(JSON.parse(result)),
               ...(runner.terminate ? { terminate: true } : {}) }
           }
           if (op === 'searchTools') {

@@ -28,7 +28,9 @@ export function discoveryTools(discovery: ToolDiscovery, discover?: DiscoverTool
         return { success: true, output: JSON.stringify({ query, matches,
           ...(loadResult ? { loaded: loadResult.loaded, rejected: loadResult.rejected } : {}),
           generation: discovery.generation, ...(complete ? {} : { mcpCatalog: 'incomplete' }),
-          ...(matches.length === 0 && complete ? { note: 'No visible tool matches. Try a broader name or a capability word from the tool description.' } : {}) }) };
+          ...(matches.length === 0 ? { note: complete
+            ? 'No visible tool matches. Try a broader name or a capability word from the tool description.'
+            : 'MCP discovery is incomplete. Search again later or load a known tool by its exact name.' } : {}) }) };
       },
     },
     {

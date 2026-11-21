@@ -13,7 +13,7 @@ import { filterVisibleToolNames } from './prefilter.js';
 import { approvedResult, deniedResult, runtimeErrorResult } from './toolResultLifecycle.js';
 
 type McpInvoker = Pick<CoreMcpGateway, 'invokeTool'>;
-export type ToolMcpGateway = Pick<CoreMcpGateway, 'snapshot'> & Partial<McpInvoker>;
+export type ToolMcpGateway = Pick<CoreMcpGateway, 'snapshot'> & Partial<McpInvoker & Pick<CoreMcpGateway, 'availableSnapshot'>>;
 
 /** False skips discovery. Undefined keeps every configured server eligible. */
 export function mcpCatalogFilter(config?: RuntimeConfig, forcedTool?: string, captured?: readonly McpToolDescriptor[],
@@ -47,7 +47,7 @@ interface McpRunInput { readonly runtimeConfig?: RuntimeConfig; readonly forcedT
 
 /** Include only live descriptors that the existing tool gate can expose. */
 export async function mcpToolsForRun(request: McpRunInput, operation?: {
-  readonly reached?: readonly string[]; readonly admission?: Admission; readonly signal?: AbortSignal;
+  readonly reached?: readonly string[]; readonly admission?: Admission; readonly signal?: AbortSignal; readonly background?: boolean;
 }): Promise<{
     readonly tools: readonly McpToolDescriptor[];
     readonly gateway: McpInvoker | undefined;
@@ -60,13 +60,17 @@ export async function mcpToolsForRun(request: McpRunInput, operation?: {
   if (filter === false) return undefined;
   const signal = operation?.signal ?? request.signal;
   try {
-    const snapshot = await gateway.snapshot(operation?.admission ?? request.admission, signal, filter);
+    const admission = operation?.admission ?? request.admission;
+    const available = operation?.background
+      ? await gateway.availableSnapshot?.(admission, signal, filter)
+      : undefined;
+    const snapshot = available?.snapshot ?? await gateway.snapshot(admission, signal, filter);
     const unavailable = snapshot.clients.flatMap(client => {
       return client.type === 'connected' ? [] : [`${client.name} (${client.type}). ${describeMcpConnectionState(client).doNext}`];
     });
     if (unavailable.length) createComponentLogger('mcp').warn(`MCP tools unavailable this run. ${unavailable.join(' ')}`);
     const tools = captured ? snapshot.tools.filter(tool => captured.some(saved => sameValue(saved, tool))) : snapshot.tools;
-    return { tools, complete: unavailable.length === 0, gateway: gateway.invokeTool ? {
+    return { tools, complete: (available?.complete ?? true) && unavailable.length === 0, gateway: gateway.invokeTool ? {
       invokeTool: (server, tool, args, admission, options) => gateway.invokeTool!(server, tool, args,
         combineAdmission(request.admission, admission), options),
     } : undefined };
@@ -106,11 +110,9 @@ export function mcpToolDefinitions(tools: readonly McpToolDescriptor[], gateway?
   }));
 }
 
-/** Only a discovery action can add validated MCP definitions to its own run. */
+/** Only a discovery action can change the MCP definitions visible to its own run. */
 export function deferredMcpTools(request: McpRunInput, catalog: Map<string, ToolDefinition>) {
-  let complete = false;
-  let bytes = 0;
-  let count = 0;
+  let registered = new Map<string, McpToolDescriptor>();
   return async (names: readonly string[] | undefined, context: ToolExecutionContext): Promise<boolean> => {
     const admission = combineAdmission(request.admission, context.admission);
     const signal = request.signal && context.abortSignal && request.signal !== context.abortSignal
@@ -119,29 +121,29 @@ export function deferredMcpTools(request: McpRunInput, catalog: Map<string, Tool
     assertAdmission(admission);
     const candidates = names?.map(name => name.trim());
     const reached = candidates?.includes('codemode') && catalog.has('codemode')
-      ? undefined : candidates?.filter(name => !catalog.has(name));
+      ? undefined : candidates?.filter(name => !catalog.has(name) || registered.has(name));
     const config = request.runtimeConfig;
-    if (complete || mcpCatalogFilter(config, request.forcedTool, undefined, reached) === false) return true;
-    const resolved = await mcpToolsForRun(request, { reached, admission, signal });
+    if (mcpCatalogFilter(config, request.forcedTool, undefined, reached) === false) return true;
+    const resolved = await mcpToolsForRun(request, { reached, admission, signal, background: names === undefined });
     signal?.throwIfAborted();
     assertAdmission(admission);
-    if (!resolved) return false;
-    const discovered = resolved.tools.filter(tool => tool.qualifiedName === mcpServerToolPrefix(tool.serverName) + tool.toolName
-      && (!reached || reached.includes(tool.qualifiedName)) && !catalog.has(tool.qualifiedName));
+    const discovered = (resolved?.tools ?? []).filter(tool => tool.qualifiedName === mcpServerToolPrefix(tool.serverName) + tool.toolName
+      && (!reached || reached.includes(tool.qualifiedName))
+      && (!catalog.has(tool.qualifiedName) || registered.has(tool.qualifiedName)));
     const visible = new Set(filterVisibleToolNames(discovered.map(tool => tool.qualifiedName), config!));
-    const candidatesByName = new Map<string, McpToolDescriptor>();
+    const next = new Map(registered);
+    if (reached) for (const name of reached) next.delete(name);
+    else next.clear();
     for (const tool of discovered) {
-      if (!visible.delete(tool.qualifiedName)) { candidatesByName.delete(tool.qualifiedName); continue; }
-      candidatesByName.set(tool.qualifiedName, tool);
+      if (!visible.delete(tool.qualifiedName)) { next.delete(tool.qualifiedName); continue; }
+      next.set(tool.qualifiedName, tool);
     }
-    const additions = [...candidatesByName.values()];
-    const nextBytes = bytes + (additions.length ? Buffer.byteLength(JSON.stringify(additions)) : 0);
-    if (nextBytes > MCP_CATALOG_BYTES) throw new McpCatalogLimitError('bytes');
-    if (count + additions.length > MCP_CATALOG_TOOLS) throw new McpCatalogLimitError('tools');
-    for (const tool of mcpToolDefinitions(additions, resolved.gateway)) catalog.set(tool.name, tool);
-    bytes = nextBytes;
-    count += additions.length;
-    complete ||= reached === undefined && resolved.complete;
-    return resolved.complete;
+    if (next.size > MCP_CATALOG_TOOLS) throw new McpCatalogLimitError('tools');
+    if (Buffer.byteLength(JSON.stringify([...next.values()])) > MCP_CATALOG_BYTES) throw new McpCatalogLimitError('bytes');
+    for (const name of registered.keys()) if (!next.has(name)) catalog.delete(name);
+    const changed = [...next].filter(([name, tool]) => !sameValue(registered.get(name), tool)).map(([, tool]) => tool);
+    for (const tool of mcpToolDefinitions(changed, resolved?.gateway)) catalog.set(tool.name, tool);
+    registered = next;
+    return resolved?.complete === true;
   };
 }

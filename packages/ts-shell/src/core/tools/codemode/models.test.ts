@@ -8,7 +8,7 @@ import { sessionModelCatalog } from '../../catalog/models.js'
 import type { CatalogModel, CatalogProvider } from '../../models/catalog.js'
 import { loadCatalog, writeCatalogCache } from '../../models/catalogStore.js'
 import { createCodemodeToolDefinition } from './tool.js'
-import { imageGenerationTool } from '../../../cli/provider/media.js'
+import { classificationTool, imageGenerationTool } from '../../../cli/provider/media.js'
 import * as media from '../../../provider/request/media.js'
 import { pngImage } from '../../../test-utils/image.js'
 import { adaptTools } from '../../../turn/tools.js'
@@ -86,7 +86,7 @@ describe('native model metadata inside the actual script worker', () => {
     const physical: readonly CatalogProvider[] = [{
       id: 'openrouter', label: 'Image fixture', runtime: 'openai-compatible', auth: 'api-key',
       baseUrl: 'https://openrouter.ai/api/v1', models: [
-        { id: 'fixture-image', modelType: 'image', input: ['text'], output: ['image'] },
+        { id: 'fixture-image', modelType: 'image', input: ['text', 'image'], output: ['image'] },
         { id: 'fixture-chat', modelType: 'chat', input: ['text'], output: ['text'] },
       ],
     }]
@@ -104,7 +104,7 @@ describe('native model metadata inside the actual script worker', () => {
       taskId: 'script-image-owner', modelCatalog, toolCatalog: catalog }
     const script = createCodemodeToolDefinition(() => catalog)
     const args = { code: `const model = models.get('openrouter', 'fixture-image');
-      await image(await models.generateImages(model, {prompt:'Blue squares'}));` }
+      await image(await models.generateImages(model, {prompt:'Blue squares', references:[${JSON.stringify(png)}]}));` }
     const unavailable = await script.execute(args, host)
     expect(unavailable).toMatchObject({ success: false, error: expect.stringContaining('unavailable') })
     expect(request).not.toHaveBeenCalled()
@@ -129,7 +129,55 @@ describe('native model metadata inside the actual script worker', () => {
     } })
     expect(allowed.approval).toHaveBeenCalledOnce()
     expect(request).toHaveBeenCalledOnce()
-    expect(request).toHaveBeenCalledWith(expect.objectContaining({ model: 'fixture-image', prompt: 'Blue squares' }))
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ model: 'fixture-image', prompt: 'Blue squares', references: [png] }))
+  })
+
+  it('dispatches admitted script classification with inline images and returns named answers', async () => {
+    const { id: sessionId } = new SessionManager().createNew(workspace)
+    const classifier = { id: 'fixture-classifier', modelType: 'classifier', input: ['text', 'image'],
+      compat: { endpoint: 'openai-decisions' } } as const
+    const physical: readonly CatalogProvider[] = [{
+      id: 'openai', label: 'Classification fixture', runtime: 'openai', auth: 'api-key',
+      baseUrl: 'https://api.openai.com/v1', models: [classifier],
+    }]
+    const host = { providerMode: 'real', providerCatalog: physical, workspaceRoot: workspace, sessionId,
+      providerCredentialResolution: { provider: 'openai', expectedEnvVarName: 'FIXTURE_KEY',
+        credential: { provider: 'openai', source: 'cli', authMode: 'api-key', apiKey: 'synthetic fixture key', envVarName: 'FIXTURE_KEY' } },
+    } as const
+    expect(classificationTool({ ...host, providerMode: 'synthetic' })).toBeUndefined()
+    expect(classificationTool({ ...host, providerCredentialResolution: { ...host.providerCredentialResolution,
+      baseUrl: 'https://proxy.invalid/v1' } })).toBeUndefined()
+    const tool = classificationTool(host)!
+    const answers = { shape: { type: 'bool', probability: 0.75 } } as const
+    const request = vi.spyOn(media, 'requestClassification').mockResolvedValue(answers)
+    const png = pngImage(2, 2)
+    const state = { feature: 'illustration' }
+    const questions = { shape: { type: 'bool', instructions: 'Is this rectangular?', criteria: { true: 'Rectangle', false: 'Other' } } }
+    const args = { code: `const model = models.get('openai', 'fixture-classifier');
+      const result = await models.classify(model, ${JSON.stringify({ state, questions, images: [png] })});
+      return result.shape.probability;` }
+    const catalog = new Map([[tool.name, tool]])
+    const script = createCodemodeToolDefinition(() => catalog)
+    catalog.set(script.name, script)
+    const modelCatalog = sessionModelCatalog(workspace, sessionId, physical)
+    const runWithApproval = (decision: 'deny' | 'allow-once') => {
+      const approval = vi.fn(async (prompt: { readonly id: string }) => ({ promptId: prompt.id, decision, respondedAt: Date.now() }))
+      const adapted = adaptTools(catalog, { workspaceRoot: workspace, sessionId, modelCatalog,
+        hooks: new HookDispatcher(), emit() {}, permissionScope: 'ask', escalationPromptHandler: approval })
+        .find(candidate => candidate.name === 'codemode')!
+      return { approval, result: adapted.execute('script-classification-owner', args) }
+    }
+    const denied = runWithApproval('deny')
+    await expect(denied.result).resolves.toMatchObject({ isError: true })
+    expect(denied.approval).toHaveBeenCalledOnce()
+    expect(request).not.toHaveBeenCalled()
+    const allowed = runWithApproval('allow-once')
+    await expect(allowed.result).resolves.toMatchObject({ isError: false,
+      output: expect.stringContaining('0.75'), metadata: { nestedCalls: { calls: [{ name: 'classify', status: 'ok' }] } },
+    })
+    expect(allowed.approval).toHaveBeenCalledOnce()
+    expect(request).toHaveBeenCalledOnce()
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ model: classifier.id, state, questions, images: [png] }))
   })
 
   it('uses the captured physical and virtual catalogue despite ambient replacements', async () => {

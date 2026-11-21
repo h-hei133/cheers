@@ -31,7 +31,7 @@ export interface McpToolListOptions {
 export class CoreMcpClient {
   private client?: Client;
   private transport?: Transport;
-  private opening?: Promise<McpConnectionState>;
+  private opening?: { readonly result: Promise<McpConnectionState>; readonly signal?: AbortSignal };
   private connected = false;
   private closed = false;
   private closing?: Promise<void>;
@@ -49,6 +49,7 @@ export class CoreMcpClient {
     private readonly timeoutMs: number = MCP_CATALOG_TIMEOUT_MS,
     private readonly changed?: () => void,
     private readonly authorization?: McpHttpAuthorization,
+    private readonly connectionAdmission?: Admission,
   ) {}
 
   async connect(admission?: Admission, signal?: AbortSignal): Promise<McpConnectionState> {
@@ -61,9 +62,10 @@ export class CoreMcpClient {
     if (this.config.transport === 'stdio' && !this.config.command) return this.failed("Missing stdio command");
     if (this.config.transport === 'http' && !this.config.url) return this.failed('Missing HTTP URL');
     if (this.connected) return { type: "connected", name: this.name, config: this.config };
-    if (this.opening) return this.opening;
-    this.opening = this.open(admission, signal);
-    try { return await this.opening; }
+    if (this.opening) return this.opening.result;
+    const result = this.open(admission, signal);
+    this.opening = { result, signal };
+    try { return await result; }
     finally { this.opening = undefined; }
   }
 
@@ -77,7 +79,7 @@ export class CoreMcpClient {
     const client = new Client({ name: "cheers", version: packageVersion() ?? "unknown" }, {
       capabilities: {}, enforceStrictCapabilities: true, jsonSchemaValidator: new SchemaValidatorProvider(),
     });
-    const transport = this.config.transport === 'http' ? new McpHttpTransport(this.config, admission, this.authorization) : new McpStdioTransport({
+    const transport = this.config.transport === 'http' ? new McpHttpTransport(this.config, this.connectionAdmission ?? admission, this.authorization) : new McpStdioTransport({
       command: this.config.command!,
       args: this.config.args,
       env: this.config.env,
@@ -111,7 +113,7 @@ export class CoreMcpClient {
     this.transport = transport;
     this.contentChannel = new McpContentChannel(client, () => !this.closed && this.client === client && this.connected, this.changed);
     try {
-      await this.withCancellation(signal => client.connect(transport, { timeout: this.timeoutMs, signal }), signal);
+      await this.withCancellation(signal => client.connect(transport, { timeout: this.timeoutMs, signal }), signal, admission);
       assertAdmission(admission);
       signal?.throwIfAborted();
       if (this.closed) throw new Error("MCP client closed during connection");
@@ -156,7 +158,7 @@ export class CoreMcpClient {
         // SDK listTools replaces its metadata cache per page; retain the complete catalog ourselves.
         const result = await this.withCancellation(signal => client.request(
           { method: "tools/list", params: cursor ? { cursor } : {} },
-          ListToolsResultSchema, { timeout: remaining, signal }), signal);
+          ListToolsResultSchema, { timeout: remaining, signal }), signal, admission);
         assertAdmission(admission);
         signal?.throwIfAborted();
         if (this.closed || !this.connected || revision !== this.catalogRevision) throw new Error("MCP tool catalog changed during listing");
@@ -197,11 +199,13 @@ export class CoreMcpClient {
       ? structuredClone(this.listedTools) : undefined;
   }
 
+  get toolsReady(): boolean { return !this.closed && this.connected && this.listedTools !== undefined; }
+
   async content(request: McpContentRequest, admission?: Admission, signal?: AbortSignal): Promise<McpContentResult> {
     try {
       await this.requireClient(admission, signal);
       const channel = this.contentChannel!;
-      return await this.withCancellation(signal => channel.run(request, signal, this.timeoutMs, admission), signal);
+      return await this.withCancellation(signal => channel.run(request, signal, this.timeoutMs, admission), signal, admission);
     } catch (error) {
       throw protocolFailure(error, "protocol");
     }
@@ -225,7 +229,7 @@ export class CoreMcpClient {
     try {
       response = await this.withCancellation(signal => client.request(
         { method: "tools/call", params: { name: toolName, arguments: args } }, ResultSchema,
-        { timeout: this.timeoutMs, signal }), signal);
+        { timeout: this.timeoutMs, signal }), signal, admission);
     } catch (error) {
       if (signal?.aborted) throw new McpClassifiedError(classifyMcpFailure({ failureClass: 'timeout-cancelled',
         detail: 'MCP tool result is unconfirmed after cancellation; remote effects may have occurred. No operation was replayed.' }));
@@ -245,7 +249,7 @@ export class CoreMcpClient {
     return this.closing ??= this.finishClose();
   }
 
-  private async withCancellation<T>(operation: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal): Promise<T> {
+  private async withCancellation<T>(operation: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal, admission?: Admission): Promise<T> {
     // SDK request listeners stay on their signal after settlement. Give each
     // request its own signal, and release its link to the connection in finally.
     const controller = new AbortController();
@@ -255,7 +259,10 @@ export class CoreMcpClient {
     else this.abort.signal.addEventListener("abort", close, { once: true });
     if (signal?.aborted) cancel();
     else signal?.addEventListener("abort", cancel, { once: true });
-    try { return await operation(controller.signal); }
+    try {
+      return await (this.transport instanceof McpHttpTransport
+        ? this.transport.withAdmission(admission, () => operation(controller.signal)) : operation(controller.signal));
+    }
     catch (error) {
       // The SDK may surface its own timeout/AbortError after a caller-supplied
       // reason has already fired. Preserve the reason that owns this boundary.
@@ -270,9 +277,11 @@ export class CoreMcpClient {
   }
 
   private async finishClose(): Promise<void> {
-    try { await this.opening; }
+    const opening = this.opening;
+    try { await opening?.result; }
     catch (error) {
-      if (!(error instanceof Error && error.name === "AbortError")) throw error;
+      const signal = opening?.signal;
+      if (error !== this.abort.signal.reason && !(signal?.aborted && error === signal.reason)) throw error;
     } finally { await this.disposeTransport(); }
   }
 

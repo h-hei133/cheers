@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { ExecutionAuthority } from '../types.js';
 import { SshTransport } from './transport.js';
 import { requireSsh, type SshWorkspace, type SshJobSpec } from './model.js';
@@ -6,6 +6,7 @@ import { workspaceProbe } from './remote/workspace.js';
 import { startRemoteJob } from './remote/start.js';
 import { queryRemoteJob, readRemoteOutput, observationFields } from './remote/query.js';
 import { cancelRemoteJob } from './remote/cancel.js';
+import { fileFields, remoteFile, remoteFileInfo, remoteFilePage, statFields, validateFileCursor } from './remote/file.js';
 import { parseRemoteFrame, decoded } from './remote/protocol.js';
 import { validateWorkspace } from './validation.js';
 import { utf8PageEnd } from '../../../core/text/utf8.js';
@@ -21,16 +22,25 @@ export interface RemoteObservation {
 }
 export class SshClient {
   private readonly owner = currentProfile();
+  private readonly fileGeneration = randomUUID();
   constructor(readonly transport: SshTransport) {}
   async connect(scope: unknown, authority: ExecutionAuthority, signal?: AbortSignal): Promise<SshWorkspace> {
     const profile = this.transport.profile;
-    const value = await this.request(workspaceProbe(profile.selection.workspace), ['root', 'identity', 'uid', 'boot', 'manager', 'cgroup'], authority, signal);
-    requireSsh(value.manager === 'systemd-user' && value.cgroup === 'v2', 'unavailable');
-    const namespaceScope = this.owner && this.owner.id !== 'default' ? { profile: profileScope('ssh', this.owner), session: scope } : scope;
-    const binding = { profileIdentity: profile.identity, fingerprint: profile.fingerprint, root: decoded(value.root!, 4096).toString('utf8'),
-      directoryIdentity: value.identity!, uid: Number(value.uid), bootId: value.boot!,
-      namespace: createHash('sha256').update(JSON.stringify([namespaceScope, profile.identity, value.root, value.identity, value.boot])).digest('hex').slice(0, 32) };
-    validateWorkspace(binding); return Object.freeze(binding);
+    if (this.owner) assertProfileIdentity(this.owner);
+    await this.transport.open(authority, signal);
+    try {
+      signal?.throwIfAborted();
+      const value = await this.request(workspaceProbe(profile.selection.workspace), ['root', 'identity', 'uid', 'boot', 'manager', 'cgroup'], authority, signal);
+      requireSsh(value.manager === 'systemd-user' && value.cgroup === 'v2', 'unavailable');
+      const namespaceScope = this.owner && this.owner.id !== 'default' ? { profile: profileScope('ssh', this.owner), session: scope } : scope;
+      const binding = { profileIdentity: profile.identity, fingerprint: profile.fingerprint, root: decoded(value.root!, 4096).toString('utf8'),
+        directoryIdentity: value.identity!, uid: Number(value.uid), bootId: value.boot!,
+        namespace: createHash('sha256').update(JSON.stringify([namespaceScope, profile.identity, value.root, value.identity, value.boot])).digest('hex').slice(0, 32) };
+      validateWorkspace(binding); return Object.freeze(binding);
+    } catch (error) {
+      await this.transport.close();
+      throw error;
+    }
   }
   async start(job: SshJobSpec, authority: ExecutionAuthority, signal?: AbortSignal): Promise<string> {
     this.check(job.binding); const value = await this.request(startRemoteJob(job), ['id', 'digest', 'invocation', 'status'], authority, signal);
@@ -72,6 +82,17 @@ export class SshClient {
     return { bytes: context.subarray(offset, nextOffset), context, nextOffset, size,
       truncated: value.dropped === 'unknown' ? 'unknown' as const : BigInt(value.dropped!) > 0n };
   }
+  async stat(binding: SshWorkspace, relative: string, authority: ExecutionAuthority, signal?: AbortSignal) {
+    this.check(binding);
+    const value = await this.request(remoteFile(binding, relative, false), statFields, authority, signal);
+    return { size: remoteFileInfo(value, relative).size };
+  }
+  async read(binding: SshWorkspace, relative: string, offset: number, version: string | undefined, authority: ExecutionAuthority, signal?: AbortSignal) {
+    this.check(binding);
+    validateFileCursor(offset, version);
+    const value = await this.request(remoteFile(binding, relative, true), fileFields, authority, signal);
+    return remoteFilePage(value, this.fileGeneration, binding, relative, offset, version);
+  }
   private check(binding: SshWorkspace): void { validateWorkspace(binding); requireSsh(binding.profileIdentity === this.transport.profile.identity, 'changed'); this.transport.profile.check(); }
   private async request(script: string, fields: readonly string[], authority: ExecutionAuthority, signal?: AbortSignal) {
     if (this.owner) assertProfileIdentity(this.owner);
@@ -79,7 +100,7 @@ export class SshClient {
     if (this.owner) assertProfileIdentity(this.owner);
     signal?.throwIfAborted(); this.transport.profile.check();
     requireSsh(!result.outputLimited, 'output-limit'); requireSsh(result.cleanup === 'complete', 'cleanup');
-    requireSsh(result.transport.status === 'completed' && result.transport.exitCode === 0, 'transport');
+    requireSsh(this.transport.connected && result.transport.status === 'completed' && result.transport.exitCode === 0, 'transport');
     return parseRemoteFrame(result.stdout, fields);
   }
 }

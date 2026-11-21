@@ -15,6 +15,7 @@ export interface McpHttpAuthorization {
 /** SDK framing uses the shared bounded connection; no implicit redirects or operation retries. */
 export function mcpFetch(serverUrl: string, options: {
   readonly admission?: Admission; readonly headers?: Record<string, string>;
+  readonly requestAdmission?: () => Admission | undefined;
   readonly authorization?: McpHttpAuthorization; readonly authRequired?: boolean;
   readonly bearerTokenEnvVar?: string;
   readonly streaming?: boolean;
@@ -29,6 +30,10 @@ export function mcpFetch(serverUrl: string, options: {
     if (!['GET', 'POST', 'DELETE'].includes(method) || body !== undefined && body !== null && typeof body !== 'string') throw new Error('Unsupported MCP HTTP request.');
     if (typeof body === 'string' && Buffer.byteLength(body) > 4 * 1024 * 1024) throw new Error('MCP HTTP request exceeds 4 MiB.');
     const request = options.requests?.find(typeof body === 'string' && method === 'POST' ? body : undefined);
+    // Notification GETs and connection cleanup belong to the physical connection.
+    const operation = method === 'POST' ? options.requestAdmission?.() : undefined;
+    const admission = !operation || operation === options.admission ? options.admission
+      : () => options.admission?.() ?? operation();
     const parent = new AbortController();
     const cancel = () => parent.abort();
     // The SDK supplies the connection signal; cancellation notifications own POSTs.
@@ -36,13 +41,13 @@ export function mcpFetch(serverUrl: string, options: {
     for (const signal of parents) { signal?.addEventListener('abort', cancel, { once: true }); if (signal?.aborted) cancel(); }
     const lifetime = requestScope(15_000, parent.signal);
     const dispose = () => { lifetime.dispose(); request?.release(); for (const signal of parents) signal?.removeEventListener('abort', cancel); };
-    const scope = { ...lifetime, check: () => { lifetime.check(); assertAdmission(options.admission); if (url.href === server.href) bearer?.(); } };
+    const scope = { ...lifetime, check: () => { lifetime.check(); assertAdmission(admission); if (url.href === server.href) bearer?.(); } };
     try {
       scope.check();
       const headers = new Headers(init?.headers);
       if (init?.body instanceof URLSearchParams && !headers.has('content-type')) headers.set('content-type', 'application/x-www-form-urlencoded');
       if (url.href === server.href) {
-        const token = bearer ? bearer() : await options.authorization?.token(options.admission, scope.signal);
+        const token = bearer ? bearer() : await options.authorization?.token(admission, scope.signal);
         if (token) headers.set('Authorization', `Bearer ${token}`);
         for (const [name, value] of Object.entries(options.headers ?? {})) headers.set(name, value);
         if (options.authRequired && !headers.has('authorization')) throw new Error('MCP authentication is required.');

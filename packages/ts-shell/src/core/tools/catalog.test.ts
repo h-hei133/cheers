@@ -94,6 +94,39 @@ it('fills only reached MCP descriptors through the dynamic discovery tools', asy
   expect(catalog.discovery!.catalog.has(hidden.qualifiedName)).toBe(false);
 });
 
+it('uses only ready MCP contracts for broad searches and preserves named selection', async () => {
+  const tool: McpToolDescriptor = { serverName: 'fixture', toolName: 'lookup', qualifiedName: 'mcp__fixture__lookup',
+    contractId: 'initial', description: 'Lookup a fixture.', inputSchema: { type: 'object' } };
+  const replacement = { ...tool, contractId: 'updated', description: 'Lookup an updated fixture.' };
+  const snapshot = vi.fn<ToolMcpGateway['snapshot']>(async () => ({ clients: [], tools: [tool] }));
+  const availableSnapshot = vi.fn<NonNullable<ToolMcpGateway['availableSnapshot']>>()
+    .mockResolvedValueOnce({ complete: false, snapshot: { clients: [], tools: [tool] } })
+    .mockResolvedValueOnce({ complete: false, snapshot: { clients: [], tools: [] } })
+    .mockResolvedValueOnce({ complete: true, snapshot: { clients: [], tools: [replacement] } });
+  const workspaceRoot = process.cwd();
+  const runtimeConfig = { enableMcpTools: true, disabledTools: [], hiddenToolPrefixes: [] } as unknown as RuntimeConfig;
+  const catalog = await loadToolCatalog({ workspaceRoot, discover: true, runtimeConfig, sdkSkills: new Map(),
+    mcpGateway: { snapshot, availableSnapshot } });
+  const context = { workspaceRoot, taskId: 'available' };
+  const search = catalog.tools.get('tool_search')!;
+  const load = catalog.tools.get('tool_load')!;
+  expect(availableSnapshot).not.toHaveBeenCalled();
+
+  const found = await search.execute({ query: tool.qualifiedName, limit: 1 }, context);
+  expect(JSON.parse(found.output!)).toMatchObject({ matches: [{ name: tool.qualifiedName }], mcpCatalog: 'incomplete' });
+  const held = catalog.discovery!.snapshot(true).get(tool.qualifiedName)!;
+  await search.execute({ query: tool.qualifiedName }, context);
+  expect(catalog.discovery!.catalog.has(tool.qualifiedName)).toBe(false);
+  await expect(held.execute({}, context)).rejects.toThrow('older discovery generation');
+  const updated = await search.execute({ query: tool.qualifiedName, limit: 1 }, context);
+  expect(JSON.parse(updated.output!)).toMatchObject({ matches: [{ name: tool.qualifiedName, summary: expect.stringContaining('updated') }] });
+  expect(snapshot).not.toHaveBeenCalled();
+
+  await load.execute({ names: [tool.qualifiedName] }, context);
+  expect(snapshot).toHaveBeenCalledOnce();
+  expect(['fixture', 'other'].filter(snapshot.mock.calls[0]![2]!)).toEqual(['fixture']);
+});
+
 it('admits late MCP tools for an activated script and discards results after run revocation', async () => {
   const tool: McpToolDescriptor = { serverName: 'docs', toolName: 'read_item', qualifiedName: 'mcp__docs__read_item',
     description: 'Read an item.', inputSchema: { type: 'object' } };

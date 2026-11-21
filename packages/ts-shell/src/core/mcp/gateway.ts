@@ -3,6 +3,7 @@ import {
   loadMcpConfigs,
 } from "./config.js";
 import { CoreMcpConnectionManager } from "./connectionManager.js";
+import { McpBackgroundDiscovery, type AvailableMcpSnapshot } from './background.js';
 import { projectTrust } from "../security/projectTrust.js";
 import { assertAdmission, type Admission } from '../network/admission.js';
 import type { McpContentRequest, McpContentResponse, McpNotificationSnapshot } from "./content/types.js";
@@ -43,13 +44,16 @@ export class CoreMcpGateway {
   private closed = false;
   private closing?: Promise<void>;
   private readonly contentLifetime = new McpContentLifetime();
+  private readonly background: McpBackgroundDiscovery;
   private readonly unsubscribeDefinitions?: () => void;
 
   constructor(private readonly root: string | (() => string), private readonly admissionForOperation?: () => Admission,
     authorizationFor?: (name: string, config: ScopedMcpServerConfig) => McpHttpAuthorization | undefined,
     private readonly snapshotTimeoutMs = MCP_CATALOG_TIMEOUT_MS, private readonly definitions?: McpDefinitionSource) {
     this.workspaceRoot = typeof root === "string" ? root : root();
-    this.connectionManager = new CoreMcpConnectionManager(authorizationFor);
+    this.connectionManager = new CoreMcpConnectionManager(authorizationFor,
+      (name, config, workspaceRoot) => this.connectionAdmission(name, config, workspaceRoot));
+    this.background = new McpBackgroundDiscovery(this.connectionManager, this.snapshotTimeoutMs);
     this.unsubscribeDefinitions = definitions?.subscribe(() => {
       if (!this.closed) void this.configurationChanged().catch(() => {});
     });
@@ -77,6 +81,19 @@ export class CoreMcpGateway {
       const configs = await this.prepare(admission);
       signal?.throwIfAborted();
       return this.readSnapshot(selectMcpServers(configs, filter), admission, signal);
+    }, signal);
+  }
+
+  /** Start discovery without making broad tool searches wait for transport I/O. */
+  availableSnapshot(admission = this.admissionForOperation?.(), signal?: AbortSignal, filter?: McpServerFilter): Promise<AvailableMcpSnapshot> {
+    return this.run(async () => {
+      await this.prepare(admission);
+      const root = this.workspaceRoot;
+      return this.background.discover({ root, admission, signal, current: () => {
+        const currentRoot = typeof this.root === 'string' ? this.root : this.root();
+        if (this.closed || root !== this.workspaceRoot || root !== currentRoot) throw new Error('MCP workspace changed during discovery.');
+        return this.loadConfigs();
+      } }, filter);
     }, signal);
   }
 
@@ -114,6 +131,7 @@ export class CoreMcpGateway {
 
   /** Revocation begins before queued work settles; config publication never starts discovery. */
   async configurationChanged(target?: string): Promise<void> {
+    this.background.cancel();
     // Close only changed owners immediately, including a request holding the lane.
     // The normal admission fence rejects its late result without replay.
     try { if (target) await this.connectionManager.close(target); await this.connectionManager.reconcile(this.loadConfigs()); }
@@ -128,27 +146,35 @@ export class CoreMcpGateway {
       const configs = await this.prepare(admission);
       const config = Object.hasOwn(configs, serverName) ? configs[serverName] : undefined;
       if (!config) throw unknownServer(serverName);
-      assertAdmission(admission);
-      const client = this.connectionManager.get(serverName, config, this.workspaceRoot);
-      const state = await client.connect(admission, options?.signal);
-      if (state.type !== "connected") throw unavailableServer(state);
-      assertAdmission(admission);
-      const liveTools = await client.listTools(admission, options?.signal);
-      if (!liveTools.some(tool => tool.toolName === toolName && (options?.contractId === undefined || tool.contractId === options.contractId))) {
-        throw new McpGatewayBlockedError({
-          message: "MCP tool " + toolName + " is unavailable or its definition/connection changed on server " + serverName,
-          blockerKind: "unknown", mcpFailureClass: "tool-unavailable",
-          doNext: "Run /mcp refresh " + serverName + " and retry with a visible MCP tool.",
-        });
-      }
-      assertAdmission(admission);
-      if (JSON.stringify(this.loadConfigs()[serverName]) !== JSON.stringify(config)
-        || this.workspaceRoot !== (typeof this.root === 'string' ? this.root : this.root())) {
-        throw new McpGatewayBlockedError({ message: 'MCP source or workspace changed before tool dispatch.',
-          blockerKind: 'unknown', mcpFailureClass: 'tool-unavailable', doNext: 'Refresh tools and obtain a new approval.' });
-      }
-      return client.invokeTool(toolName, args, admission, options);
-    });
+      const root = this.workspaceRoot;
+      const current = this.connectionAdmission(serverName, config, root);
+      const authorized: Admission = () => {
+        assertAdmission(admission);
+        if (current()) {
+          throw new McpGatewayBlockedError({ message: 'MCP source or workspace changed before tool dispatch.',
+            blockerKind: 'unknown', mcpFailureClass: 'tool-unavailable', doNext: 'Refresh tools and obtain a new approval.' });
+        }
+        return undefined;
+      };
+      return this.connectionManager.withToolDiscovery(serverName, async () => {
+        options?.signal?.throwIfAborted();
+        assertAdmission(authorized);
+        const client = this.connectionManager.get(serverName, config, root);
+        const state = await client.connect(authorized, options?.signal);
+        if (state.type !== "connected") throw unavailableServer(state);
+        assertAdmission(authorized);
+        const liveTools = await client.listTools(authorized, options?.signal);
+        if (!liveTools.some(tool => tool.toolName === toolName && (options?.contractId === undefined || tool.contractId === options.contractId))) {
+          throw new McpGatewayBlockedError({
+            message: "MCP tool " + toolName + " is unavailable or its definition/connection changed on server " + serverName,
+            blockerKind: "unknown", mcpFailureClass: "tool-unavailable",
+            doNext: "Run /mcp refresh " + serverName + " and retry with a visible MCP tool.",
+          });
+        }
+        assertAdmission(authorized);
+        return client.invokeTool(toolName, args, authorized, options);
+      }, options?.signal);
+    }, options?.signal);
   }
 
   content(serverName: string, request: McpContentRequest, signal?: AbortSignal): Promise<McpContentResponse> {
@@ -206,7 +232,7 @@ export class CoreMcpGateway {
     this.unsubscribeDefinitions?.();
     for (const cancel of this.pending) cancel();
     this.contentLifetime.cancel();
-    return this.closing = Promise.all([this.connectionManager.shutdown(), this.queue]).then(() => {});
+    return this.closing = Promise.all([this.background.close(), this.connectionManager.shutdown(), this.queue]).then(() => {});
   }
 
   private run<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
@@ -223,9 +249,8 @@ export class CoreMcpGateway {
       };
       this.pending.add(abort);
       const queued = this.queue.then(() => {
-        // Close retires only waiting callers. The active operation remains part
-        // of the physical cleanup join and cannot dispatch queued successors.
-        this.pending.delete(abort);
+        // Once active, the operation owns cancellation and its outcome.
+        finish();
         if (this.closed) throw new Error("MCP gateway is closed");
         signal?.throwIfAborted();
         return operation();
@@ -243,8 +268,20 @@ export class CoreMcpGateway {
   private async synchronizeWorkspace(): Promise<void> {
     const next = typeof this.root === "string" ? this.root : this.root();
     if (next === this.workspaceRoot) return;
+    this.background.cancel();
     await this.connectionManager.close();
     this.workspaceRoot = next;
+  }
+
+  private connectionAdmission(name: string, config: ScopedMcpServerConfig, root: string): Admission {
+    const expected = JSON.stringify(config);
+    return () => {
+      const current = typeof this.root === 'string' ? this.root : this.root();
+      if (this.closed || current !== root || this.workspaceRoot !== root || JSON.stringify(this.loadConfigs()[name]) !== expected) {
+        return 'MCP workspace or server definition changed during the request.';
+      }
+      return this.admissionForOperation?.()();
+    };
   }
 
   private async prepare(admission?: Admission): Promise<Record<string, ScopedMcpServerConfig>> {
@@ -277,30 +314,32 @@ export class CoreMcpGateway {
     let bytes = 0;
     try {
       for (const [name, config] of Object.entries(configs)) {
-        lifecycle.throwIfAborted();
-        assertAdmission(admission);
-        const client = this.connectionManager.get(name, config, this.workspaceRoot);
-        let state = await client.connect(admission, lifecycle);
-        if (state.type === "connected") {
+        await this.connectionManager.withToolDiscovery(name, async () => {
           lifecycle.throwIfAborted();
           assertAdmission(admission);
-          try {
-            const listed = await client.listTools(admission, lifecycle, { deadline });
-            const listedBytes = Buffer.byteLength(JSON.stringify(listed), 'utf8');
-            if (bytes + listedBytes > MCP_CATALOG_BYTES) throw new McpCatalogLimitError('bytes');
-            if (tools.length + listed.length > MCP_CATALOG_TOOLS) throw new McpCatalogLimitError('tools');
-            bytes += listedBytes;
-            tools.push(...listed);
-          } catch (error) {
-            if (error instanceof McpCatalogLimitError || lifecycle.aborted) throw error;
-            await this.connectionManager.close(name);
-            state = { type: "failed", name, config, error: classifyMcpFailure({
-              failureClass: "protocol",
-              detail: error instanceof Error ? error.message : String(error),
-            }).safeDetail };
+          const client = this.connectionManager.get(name, config, this.workspaceRoot);
+          let state = await client.connect(admission, lifecycle);
+          if (state.type === "connected") {
+            lifecycle.throwIfAborted();
+            assertAdmission(admission);
+            try {
+              const listed = await client.listTools(admission, lifecycle, { deadline });
+              const listedBytes = Buffer.byteLength(JSON.stringify(listed), 'utf8');
+              if (bytes + listedBytes > MCP_CATALOG_BYTES) throw new McpCatalogLimitError('bytes');
+              if (tools.length + listed.length > MCP_CATALOG_TOOLS) throw new McpCatalogLimitError('tools');
+              bytes += listedBytes;
+              tools.push(...listed);
+            } catch (error) {
+              if (error instanceof McpCatalogLimitError || lifecycle.aborted) throw error;
+              await this.connectionManager.close(name);
+              state = { type: "failed", name, config, error: classifyMcpFailure({
+                failureClass: "protocol",
+                detail: error instanceof Error ? error.message : String(error),
+              }).safeDetail };
+            }
           }
-        }
-        clients.push(state);
+          clients.push(state);
+        }, lifecycle);
       }
       lifecycle.throwIfAborted();
       assertAdmission(admission);

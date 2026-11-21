@@ -14,7 +14,7 @@ boot=$(cat /proc/sys/kernel/random/boot_id)
 export XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus"
 systemctl --user show-environment >/dev/null
 test "$(stat -fc '%T' /sys/fs/cgroup)" = cgroup2fs
-for utility in systemd-run systemctl base64 stat head tail mkfifo realpath bash; do command -v "$utility" >/dev/null; done
+for utility in systemd-run systemctl base64 stat head tail mkfifo realpath readlink timeout bash; do command -v "$utility" >/dev/null; done
 printf 'CHEERS_SSH_1\nroot=%s\nidentity=%s\nuid=%s\nboot=%s\nmanager=systemd-user\ncgroup=v2\n' "$(printf '%s' "$canonical" | base64 -w0)" "$directory_identity" "$uid" "$boot"
 `;
 }

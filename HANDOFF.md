@@ -109,6 +109,10 @@ This file is the curated, compact index of reusable engineering pitfalls, enviro
 - **Symptom**: SDK resource reload rejects a session after its first saved prompt.
 - **Rule**: Use the saved title and activity time when verifying reload metadata. Keep the live session binding and pin saved file versions through replacement.
 
+### Discovery Shutdown Must Match The Owner's Abort Reason
+- **Symptom**: Closing MCP misreports a cancelled handshake as a cleanup failure.
+- **Rule**: Match rejection to the captured cancellation reason. Join transport disposal and report any separate cleanup failure.
+
 ### Read-Only Inspections And Review Notes Never Grant Write Authority
 - **Symptom**: A model review, advisor note, or imported report bypasses ordinary tool preparation or approval boundaries.
 - **Root Cause**: Conflating advisory evidence with execution authority.

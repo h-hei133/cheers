@@ -8,6 +8,7 @@ import { approveOperation } from './approval.js';
 import { sshAuthority, captureOrigin, connectedAdmission, operationAdmission } from './authority.js';
 import { jobProjection, jobResult, display, pageDisplay } from './projection.js';
 import { admittedOperation, cancelLocalOperations, lifetimePreview, submitJob } from './lifetime.js';
+import { observeFile } from './file.js';
 
 export async function runSshCommand(host: SshComposition, args: string[], command: CommandContext): Promise<CommandExecutionResult> {
   const raw = command.rawCommandArgs;
@@ -20,15 +21,16 @@ export async function runSshCommand(host: SshComposition, args: string[], comman
 }
 async function control(host: SshComposition, action: string, args: readonly string[]): Promise<string> {
   if (action === 'status') return display({ profile: host.profile ? { host: host.profile.selection.host, port: host.profile.selection.port,
-    user: host.profile.selection.user, fingerprint: host.profile.fingerprint } : 'not-selected', connected: Boolean(host.service),
+    user: host.profile.selection.user, fingerprint: host.profile.fingerprint } : 'not-selected', connected: Boolean(host.client?.transport.connected),
     remote: host.jobs.read().remote, retainedJobs: host.jobs.read().jobs.length });
   if (action === 'jobs') return display(host.jobs.read().jobs.map(jobProjection), 48000);
   if (action === 'cancel-pending') { cancelLocalOperations(host);
     return 'Local SSH cancellation requested; remote termination is separate. Inspect /ssh jobs and explicitly reconcile or cancel unknown jobs.'; }
   if (action === 'profile') return selectProfile(host, args[0]!);
-  if (action === 'connect') return approveOperation(host, 'connect', 'Verify the selected remote Linux/bash workspace and native user manager. No job is submitted.', async context => ({
+  if (action === 'connect') return approveOperation(host, 'connect', 'Establish a persistent SSH connection and verify the selected Linux/bash workspace and native user manager. No job is submitted.', async context => ({
     success: true, output: await connect(host, context.abortSignal), metadata: { status: 'connected' } }), operationAdmission(host));
   if (action === 'disconnect') return disconnect(host, host.pending?.signal);
+  if (action === 'stat' || action === 'read') return observeFile(host, action, args);
   const connected = host.service;
   if (!connected) throw new Error('SSH workspace not connected.');
   const admission = connectedAdmission(host);

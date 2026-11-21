@@ -30,24 +30,28 @@ export async function selectProfile(host: SshComposition, file: string): Promise
   }, admission);
 }
 export async function connect(host: SshComposition, signal?: AbortSignal): Promise<string> {
+  if (host.closing) throw new Error('SSH binding is closing.');
   if (!host.profile) throw new Error('No SSH profile selected.');
   const admission = connectedAdmission(host); const scope = host.jobs.scope();
   const replaceAdmission = operationAdmission(host, true, true, false);
   const transport = new SshTransport(createDefaultExecutionService(), host.profile, host.context.projectRoot,
     host.manager.getSessionDirPath(scope.sessionId));
   const client = new SshClient(transport);
+  host.candidates.add(transport);
   try {
     const workspace = await admittedOperation(admission, signal, current => client.connect(scope, sshAuthority, current), host);
     if (admission()) throw new Error('SSH authority changed.');
     const prior = host.service;
     return await replaceBinding(host, signal, replaceAdmission, released => {
+      transport.checkConnection();
       const valid = operationAdmission(host, true, false, false);
       const service: JobService = new JobService(host.jobs, backend(client), () => valid() ??
         (host.client !== client || host.service !== service || !sameValue(host.jobs.read().remote, workspace) ? 'SSH connection changed.' : undefined));
       host.jobs.connect(workspace); host.client = client; host.service = service;
-      return 'SSH workspace verified and bound. Remote commands and observations each require their own approval.' + (prior ? ' ' + released : '');
+      return 'SSH workspace verified and bound to a persistent connection. Remote commands, file reads and observations each require their own approval.' + (prior ? ' ' + released : '');
     });
   } catch (error) { await transport.close().catch(() => {}); throw error; }
+  finally { host.candidates.delete(transport); }
 }
 
 export function disconnect(host: SshComposition, signal?: AbortSignal): Promise<string> {
@@ -85,7 +89,10 @@ async function replaceBinding<T>(host: SshComposition, signal: AbortSignal | und
 }
 
 export function backend(client: SshClient): RemoteJobBackend {
-  return { identity: client.transport.profile.identity, check: () => client.transport.profile.check(),
+  return { identity: client.transport.profile.identity, check: () => {
+      client.transport.profile.check();
+      client.transport.checkConnection();
+    },
     start: (job, authority: ExecutionAuthority, signal) => client.start(job, authority, signal),
     query: (job, invocation, authority: ExecutionAuthority, signal) => client.query(job, invocation, authority, signal),
     cancel: (job, invocation, authority: ExecutionAuthority, signal) => client.cancel(job, invocation, authority, signal),

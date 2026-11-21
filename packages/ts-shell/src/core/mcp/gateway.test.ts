@@ -13,6 +13,8 @@ import {
   describeMcpConnectionState,
 } from "./gateway.js";
 import type { ScopedMcpServerConfig } from "./types.js";
+import type { RuntimeConfig } from '../../config/runtimeConfig.js';
+import { loadToolCatalog } from '../tools/catalog.js';
 
 describe("core MCP gateway (W3)", () => {
   let fakeHomeDir = "";
@@ -57,6 +59,74 @@ describe("core MCP gateway (W3)", () => {
       signal: controller.signal,
     })).rejects.toMatchObject({ name: "AbortError" });
     expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('bounds background discovery and drops queued servers on cancellation', async () => {
+    const serverNames = Array.from({ length: 6 }, (_, index) => 'server' + index);
+    fs.writeFileSync(path.join(workspaceRoot, '.cheers.mcp.json'), JSON.stringify({
+      mcpServers: Object.fromEntries(serverNames.map(name => [name, { transport: 'stdio', command: 'never-spawn' }])),
+    }));
+    const connect = vi.spyOn(CoreMcpClient.prototype, 'connect').mockImplementation(async function (_admission, signal) {
+      await new Promise<never>((_, reject) => {
+        if (signal!.aborted) reject(signal!.reason);
+        else signal!.addEventListener('abort', () => reject(signal!.reason), { once: true });
+      });
+      return { type: 'connected', name: this.name, config: this.config };
+    });
+    const list = vi.spyOn(CoreMcpClient.prototype, 'listTools');
+    const gateway = new CoreMcpGateway(workspaceRoot);
+    gateways.push(gateway);
+    const controller = new AbortController();
+    expect(await gateway.availableSnapshot(undefined, controller.signal)).toEqual({
+      complete: false, snapshot: { clients: [], tools: [] },
+    });
+    await vi.waitFor(() => expect(connect).toHaveBeenCalledTimes(4));
+    controller.abort();
+    await gateway.close();
+    expect(connect.mock.instances.map(client => client.name)).toEqual(serverNames.slice(0, 4));
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it('searches and loads real MCP tools while another server is still discovering', async () => {
+    const fixture = path.resolve('src/core/mcp/fixtures/mockMcpServer.mjs');
+    const heldLog = path.join(workspaceRoot, 'held.jsonl');
+    const readyLog = path.join(workspaceRoot, 'ready.jsonl');
+    const configPath = path.join(workspaceRoot, '.cheers.mcp.json');
+    const server = (log: string, args: string[] = []) => ({ transport: 'stdio', command: process.execPath,
+      args: [fixture, '--log', log, ...args] });
+    const ready = server(readyLog);
+    fs.writeFileSync(configPath, JSON.stringify({ mcpServers: { held: server(heldLog, ['--hang-list']), ready } }));
+    const readLog = (file: string) => fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+    const gateway = new CoreMcpGateway(workspaceRoot);
+    gateways.push(gateway);
+    const runtimeConfig = { enableMcpTools: true, disabledTools: [], hiddenToolPrefixes: [] } as unknown as RuntimeConfig;
+    const catalog = await loadToolCatalog({ workspaceRoot, discover: true, runtimeConfig, sdkSkills: new Map(), mcpGateway: gateway });
+    const context = { workspaceRoot, taskId: 'background-discovery' };
+    const name = 'mcp__ready__echo_message';
+    const search = async () => JSON.parse((await catalog.discovery!.snapshot().get('tool_search')!
+      .execute({ query: 'echo message' }, context)).output!);
+    const first = await search();
+    expect(first.mcpCatalog).toBe('incomplete');
+    expect(first.matches).not.toContainEqual(expect.objectContaining({ name }));
+    await vi.waitFor(() => expect(readLog(heldLog)).toContain('"event":"tools/list"'));
+    await vi.waitFor(async () => {
+      const result = await search();
+      expect(result.mcpCatalog).toBe('incomplete');
+      expect(result.matches).toContainEqual(expect.objectContaining({ name }));
+    });
+    const load = catalog.discovery!.snapshot().get('tool_load')!;
+    expect(JSON.parse((await load.execute({ names: [name] }, context)).output!)).toMatchObject({ loaded: [name], rejected: [] });
+    await expect(catalog.discovery!.snapshot().get(name)!.execute({ message: 'fixture' }, context))
+      .resolves.toMatchObject({ success: true, output: 'echo:fixture' });
+    expect(readLog(heldLog)).not.toContain('"event":"tools/call"');
+    expect(readLog(readyLog).match(/"event":"initialize"/g)).toHaveLength(1);
+
+    fs.writeFileSync(configPath, JSON.stringify({ mcpServers: {} }));
+    await gateway.configurationChanged();
+    const removed = await search();
+    expect(removed.mcpCatalog).toBeUndefined();
+    expect(removed.matches).not.toContainEqual(expect.objectContaining({ name }));
+    expect(catalog.discovery!.snapshot().has(name)).toBe(false);
   });
 
   it("rejects a queued snapshot promptly without starting discovery after cancellation", async () => {

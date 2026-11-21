@@ -116,6 +116,25 @@ it('shares one negotiated HTTP connection for complete catalogs, content, prompt
   expect(f.calls.filter(item => item.body && JSON.parse(item.body).method === 'initialize')).toHaveLength(1);
 });
 
+it('keeps an HTTP connection discovered by an earlier run while checking the current caller', async () => {
+  const f = await fixture();
+  const gateway = createCliMcpGateway(f.root);
+  cleanups.push(() => gateway.close());
+  let retired = false;
+  const oldAdmission = () => retired ? 'Earlier run retired.' : undefined;
+  const selectRemote = (name: string) => name === 'remote';
+  expect((await gateway.availableSnapshot(oldAdmission, undefined, selectRemote)).complete).toBe(false);
+  await vi.waitFor(() => expect(gateway.peekSnapshot(selectRemote)?.tools[0]?.toolName).toBe('echo'));
+  await vi.waitFor(() => expect(f.streams.size).toBe(1));
+  retired = true;
+  await expect(gateway.invokeTool('remote', 'echo', {}, oldAdmission)).rejects.toThrow('Earlier run retired.');
+  expect(f.calls.filter(call => call.body.includes('"method":"tools/call"'))).toHaveLength(0);
+  await expect(gateway.invokeTool('remote', 'echo', {}, () => undefined))
+    .resolves.toMatchObject({ content: 'actual HTTP effect response' });
+  expect(f.calls.filter(call => call.body.includes('"method":"initialize"'))).toHaveLength(1);
+  expect(f.calls.filter(call => call.body.includes('"method":"tools/call"'))).toHaveLength(1);
+});
+
 it('requires explicit approved PKCE sign-in, stores source/issuer-bound private credentials and reuses them after restart', async () => {
   const f = await fixture(); f.requireAuth();
   expect(await f.client().connect()).toMatchObject({ type: 'needs-auth' });

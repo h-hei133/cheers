@@ -240,7 +240,15 @@ ${REPLAY_RUNTIME_SOURCE}
         throw new Error('models.generateImages requires a supported catalogue image model.');
       }
       if (!input || typeof input.prompt !== 'string') throw new Error('models.generateImages requires a text prompt.');
-      return rpc('generateImages', { model: model.id, prompt: input.prompt });
+      return rpc('generateImages', { model: model.id, prompt: input.prompt, references: input.references });
+    },
+    async classify(model, input) {
+      if (determinism) refuseEffect();
+      if (!model || !modelsCatalog.includes(model) || model.provider !== 'openai' || model.modelType !== 'classifier') {
+        throw new Error('models.classify requires a supported catalogue classification model.');
+      }
+      if (!input || typeof input !== 'object') throw new Error('models.classify requires state and named questions.');
+      return rpc('classify', { model: model.id, state: input.state, questions: input.questions, images: input.images });
     },
   });
   globalThis.exit = () => { throw new ExitSignal(); };

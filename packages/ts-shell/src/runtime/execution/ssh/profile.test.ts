@@ -16,7 +16,7 @@ it('separates remote journals with equal session, workspace and delegated SSH id
   const run = vi.fn(async () => ({ cleanup: 'complete', transport: { status: 'completed', exitCode: 0 },
     stdout: Buffer.from('CHEERS_SSH_1\nroot=L3JlbW90ZQ==\nidentity=1:2\nuid=1000\nboot=00000000-0000-0000-0000-000000000000\nmanager=systemd-user\ncgroup=v2\n') }));
   const transport = { profile: { identity: 'a'.repeat(64), fingerprint: 'SHA256:' + 'A'.repeat(43), selection: { workspace: '/remote' },
-    check: vi.fn() }, run } as unknown as SshTransport;
+    check: vi.fn() }, connected: true, open: vi.fn(), run } as unknown as SshTransport;
   const first = withProfile(a, () => new SshClient(transport)); const second = withProfile(b, () => new SshClient(transport));
   const scope = { sessionId: 'same', workspaceRoot: '/same', createdAt: '2026-10-16' };
   const authority = { mode: 'approved-for-write', source: 'tool-runtime-approval', reason: 'synthetic SSH probe' } as const;
@@ -26,4 +26,19 @@ it('separates remote journals with equal session, workspace and delegated SSH id
   run.mockClear(); fs.renameSync(a.root, `${a.root}-retired`); fs.mkdirSync(a.root);
   await expect(first.connect(scope, authority)).rejects.toThrow('changed identity');
   expect(run).not.toHaveBeenCalled();
+});
+
+it('closes the original master when the remote workspace probe cannot be verified', async () => {
+  const open = vi.fn(async () => {});
+  const close = vi.fn(async () => {});
+  const run = vi.fn(async () => ({ cleanup: 'complete', transport: { status: 'completed', exitCode: 0 },
+    stdout: Buffer.from('unverified remote workspace') }));
+  const transport = { profile: { selection: { workspace: '/remote' }, check: vi.fn() }, connected: true,
+    open, close, run } as unknown as SshTransport;
+  const client = new SshClient(transport);
+  await expect(client.connect({}, { mode: 'approved-for-write', source: 'tool-runtime-approval', reason: 'fixture' }))
+    .rejects.toMatchObject({ code: 'protocol' });
+  expect(open).toHaveBeenCalledOnce();
+  expect(run).toHaveBeenCalledOnce();
+  expect(close).toHaveBeenCalledOnce();
 });
