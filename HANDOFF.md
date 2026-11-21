@@ -102,6 +102,10 @@ This file is the curated, compact index of reusable engineering pitfalls, enviro
 
 ## 6. Extensions, SDK & Replay Discipline
 
+### Module Extensions Use The VM Emit Format
+- **Symptom**: A reviewed `.mjs` extension fails with `Unexpected token 'export'` in the compiled runtime.
+- **Rule**: Emit CommonJS using the equivalent `.js` or `.ts` compiler input name for `.mjs` or `.mts`. Preserve the original filename for the VM and clear inherited worker `execArgv`.
+
 ### Extension Lifecycle Settlement Must Fence Closing Before Retirement
 - **Symptom**: `dispose()` or `/plugin reload` lets late `sendMessage`/`append`/UI callbacks execute against a retired host or drops cleanup errors.
 - **Root Cause**: Concurrent `cancel` and `closeExtensions` race with in-flight handlers and swallow `allSettled` rejections.

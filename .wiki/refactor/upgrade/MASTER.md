@@ -2,8 +2,8 @@
 
 > **Task**: 核实研究规划，实施仍然成立的任务，并按实际生产路径验收。
 > **Started**: 2026-11-14
-> **Last Updated**: 2026-11-21
-> **Mode**: LOCAL_ONLY
+> **Last Updated**: 2026-11-22
+> **Mode**: Linux validation and GitHub CI
 
 ## Scope and authority
 
@@ -11,7 +11,7 @@
 
 只修改 Cheers；参考目录只读，先查本项目再比较相应参考决策。产品保持 TypeScript、单一执行边界、既有配置与权限契约；新模块使用本地职责名称，不引入参考项目品牌。原研究文档和不可变历史保留来源，新增实现与记录使用中性命名。
 
-此前未提交修复起点为 `acb617cb`，207 个现存变更文件、11 个删除文件；起始哈希已保存在本地证据目录。不得通过 reset 或覆盖丢弃。用户随后明确要求每批完成后本地提交，现按可验证批次提交，未授权推送或建立外部 Issue；本轮使用本地清单。
+此前未提交修复起点为 `acb617cb`，207 个现存变更文件、11 个删除文件。起始哈希已保存在本地证据目录。按验收批次提交，当前批次包含主分支推送和远端 CI。
 
 ## References
 
@@ -22,11 +22,11 @@
 
 ## Current status
 
-**Current phase** 55/62 项通过 Linux 本地功能验收，7 项开放。
-**Completed batch** 本轮关闭 E.9、F1.5、F2.6、T6.3。此前 E.4 和 T5.2 已计入轮前 51 项。按实际证据更新 [任务清单](tasks.md)。
-**Open work** C.6、E.3、E.7、F1.2、F1.4、F2.1、T5.1。T5.1 单文件迁移需要保留旧转录、字节预算和前缀身份。会话和注册表需要共同的持久提交点以及进程终止恢复证据。外部资格缺口见 [进展摘要](summary.md)。
-**Repository gate** `e5f9a28` 源码通过六项静态检查、23 个文件 331 项和 Linux 构建 `bd359e1bca57`。固定归档结构判定为 `proven`，开放义务为 0。续接顺序见 [进展摘要](summary.md#后续工作)。
-**Evidence boundary** Linux 上已通过聚焦回归、独立安装、编译入口、PTY、单文件发行和配置模型一次自行修复。提交保留在本地。
+**Current phase** 56/62 项通过 Linux 本地功能验收，6 项开放。
+**Completed batch** E.7 已通过编译版 CLI 和 SDK 验收。T5.1 已验证普通创建、分叉发布和根重绑。详见 [任务清单](tasks.md)。
+**Open work** C.6、E.3、F1.2、F1.4、F2.1、T5.1。当前会话事务沿用多文件布局。迁移单文件格式前须保留旧转录、字节预算、前缀身份和命令环境中的转录路径。外部资格缺口见 [进展摘要](summary.md)。
+**Repository gate** 本批通过六项静态检查、聚焦回归、221 项脚本测试及 Linux 构建 `a647c4d303d7`。固定归档结构判定为 `proven`，开放义务为 0。续接顺序见 [进展摘要](summary.md#后续工作)。
+**Evidence boundary** 本批原生证据来自隔离 Linux 进程和本地 stdio。配置模型和账户证据见 [进展摘要](summary.md)。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance
@@ -85,6 +85,7 @@ E.5本批实际L／额外依赖3（blocked publication独立撤权、原共享ho
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-22 | `13b40efe` 完成分叉目录发布和转录字节校验。`7cbad149` 修复两处断链，普通创建复用暂存发布，根重绑使用 v5 注册表回执。`374b21a0` 验证安装 worker 准入、实时消息渲染和精确 stdio MCP 撤权，E.7 完成，56/62。 |
 | 2026-11-21 | `e72fad7` 提交受保护恢复的注册表回执与读取快照。`e5f9a28` 提交 SDK 扩展 MCP 隔离、受控重载持久设置及网关快照归位。联合六项静态检查、23 文件 331 项、Linux 构建 `bd359e1bca57`、固定归档结构判定 `proven`。两项继续开放，55/62 已验收。 |
 | 2026-11-21 | Batch 4 完成 E.4 Codemode 确定性重放（环境/源码/输入绑定、固定时钟与种子 PRNG、有序只读目录 RPC 追踪与副作用零重派发），并修复全量同步模型目录元数据上限与 worker `execArgv` 隔离缺陷。六门、7 套件 126 项、build `d853f94c600c`、三进程编译产物重放/漂移测试、配置模型真实 `record`→`replay_id` 逐字节一致实测与 `normproof judge` `proven` 通过；51/62 完成，11 项开放。 |
 | 2026-11-21 | Batch 3 完成 T5.1 其余多文件记录事务（v3：`addTurn`/`markRunStarted`/`markTurnActive`/`markRecoveryReentry`/`saveTerminated`/`updateSessionWorkspaceBinding` 统一复用 `prompt-transaction.json`）与 T5.2 旧格式转录迁移及回退（`SessionManager.migrateTranscript`）。六门、11 套件 231 项、build `8a49bf947565`、Linux 编译产物多进程恢复/迁移验收与 `normproof judge` `proven` 通过；50/62 完成，12 项开放。 |
