@@ -1,12 +1,17 @@
 import type { Session } from "../schema/sessionRecord.js";
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
-import { projectSessionMetadata } from "../schema/sessionMetadataCodec.js";
 import { isRecord } from "../../core/values/record.js";
 import { normalizePathIdentity } from "./roots.js";
 import { projectSessionRootRebase } from "./sessionRootRebase.js";
 import type { ProjectBindingOptions } from '../store/projectBindingPolicy.js';
 import { validateWorkspaceRoots } from '../../core/workspace/roots.js';
 import type { WorkspaceRoot } from '../../core/workspace/model.js';
+import { captureActivationGuard, sameSessionActivation, SessionActivationConflict,
+  type SessionActivationGuard, type SessionActivationOptions } from '../store/activation.js';
+import type { CurrentSessionSelectionRecord } from '../store/currentSelection.js';
+import { hasPromptIntent } from '../store/prompt/intent.js';
+import type { SessionStoreAccess } from '../store/sessionStoreAccess.js';
+import { readSessionFileVersion } from '../store/version.js';
 
 type RebindOutcome = "unchanged" | "restored" | "partial" | "committed";
 type RebindStage = "prepare" | "state" | "metadata" | "lock-release" | "selection";
@@ -29,30 +34,37 @@ export interface SessionRootRebindOptions {
   readonly beforeCommit?: () => void;
   readonly binding?: Omit<ProjectBindingOptions, 'workspaceRoots'>;
   readonly workspaceRoots?: readonly WorkspaceRoot[];
+  readonly activationGuard?: SessionActivationGuard;
 }
 
 interface RebindInput extends SessionRootRebindOptions {
-  readonly session: Session;
+  readonly store: SessionStoreAccess;
+  readonly sessionId: string;
   readonly nextProjectRoot: string;
   readonly updatedAt: string;
-  readonly readSession: () => Session;
-  readonly readMetadata: () => unknown;
-  readonly writeSessionMetadata: (session: Session) => void;
-  readonly withStateLock: (sessionId: string, update: () => void) => void;
-  readonly readStateSnapshot: () => SessionStateSnapshot | undefined;
-  readonly writeStateSnapshot: (snapshot: SessionStateSnapshot) => void;
+  readonly select: (projectRoot: string, sessionId: string, options: SessionActivationOptions) => void;
 }
 
-/** Coordinate existing atomic record writers; this is not a cross-file crash transaction. */
 export function rebindSessionProjectRootContinuity(input: RebindInput): Session {
-  let rebound: Session | undefined;
+  const { store, sessionId } = input;
+  const publication: {
+    preparing?: { readonly version: string; readonly projectRoot: string };
+    saved?: { readonly projectRoot: string; readonly version: string };
+    candidate?: CurrentSessionSelectionRecord;
+  } = {};
+  let stage: RebindStage = 'prepare';
   try {
-    input.withStateLock(input.session.id, () => {
-      const current = readCurrentState(input);
-      const previousMetadata = input.readMetadata();
-      if (!isRecord(previousMetadata)) throw new Error("Session metadata is missing or invalid");
-      const latest = input.readSession();
-      validateSource(input, latest, current);
+    const session = store.load(sessionId);
+    const guard = captureActivationGuard(input.activationGuard ?? {
+      source: { projectRoot: session.projectRoot, expected: store.readCurrentSessionSelection(session.projectRoot) },
+      destination: store.readCurrentSessionSelection(input.nextProjectRoot),
+    });
+    if (!guard || guard.source.projectRoot !== normalizePathIdentity(session.projectRoot)) throw new SessionActivationConflict();
+    return store.withSessionStateLock(sessionId, () => {
+      const layout = store.stateLayout(sessionId);
+      const version = readSessionFileVersion(layout);
+      const { session: latest, state: current } = store.readSnapshot(sessionId, { readOnly: true });
+      validateSource(session, latest, current, input.nextProjectRoot);
       const projection = projectSessionRootRebase({
         workingMemory: current.workingMemory,
         previousRoot: latest.projectRoot,
@@ -84,44 +96,69 @@ export function rebindSessionProjectRootContinuity(input: RebindInput): Session 
         delete nextSession.gitRoot;
       }
       if (input.binding) Object.assign(nextSession, input.binding);
-      input.beforeCommit?.();
-      try {
-        input.writeStateSnapshot(nextState);
-      } catch (error) {
-        throw writeFailure(input, previousMetadata, current, nextSession, nextState, "state", error);
+      const assertCurrent = () => {
+        input.beforeCommit?.();
+        if (store.sessionDir(sessionId) !== layout.sessionDir || readSessionFileVersion(layout) !== version) {
+          throw new Error('The saved session changed before migration.');
+        }
+      };
+      assertCurrent();
+      stage = 'selection';
+      input.select(nextSession.projectRoot, sessionId, {
+        guard,
+        captureSelection: observed => { publication.candidate = observed; },
+        prepareMetadata: identity => {
+          assertCurrent();
+          publication.preparing = { version, projectRoot: nextSession.projectRoot };
+          const proposal = store.prepareSessionActivation(nextSession, identity, nextState);
+          return {
+            ...proposal,
+            assertCurrent: () => { assertCurrent(); proposal.assertCurrent(); },
+            finish: () => {
+              proposal.finish();
+              publication.saved = { projectRoot: nextSession.projectRoot, version: readSessionFileVersion(layout) };
+            },
+          };
+        },
+      });
+      if (!publication.candidate || !publication.saved
+        || !sameSessionActivation(store.readCurrentSessionSelection(nextSession.projectRoot), publication.candidate)) {
+        throw new SessionActivationConflict();
       }
-      try {
-        input.writeSessionMetadata(nextSession);
-      } catch (error) {
-        throw writeFailure(input, previousMetadata, current, nextSession, nextState, "metadata", error);
-      }
-      rebound = nextSession;
-    });
+      stage = 'lock-release';
+      return nextSession;
+    }, { requireExisting: true });
   } catch (error) {
-    if (error instanceof SessionRootRebindError) throw error;
-    // Lock release can throw after both record writes. Never compensate outside
-    // the lock, or describe those committed records as an unchanged session.
-    throw new SessionRootRebindError(rebound ? "committed" : "unchanged", rebound ? "lock-release" : "prepare", error);
+    const { saved, candidate, preparing } = publication;
+    const attempt = saved ?? preparing;
+    let outcome: RebindOutcome = 'unchanged';
+    if (attempt && (saved || !(error instanceof SessionActivationConflict))) {
+      outcome = 'partial';
+      try {
+        const selected = store.readCurrentSessionSelection(attempt.projectRoot);
+        const current = candidate !== undefined && sameSessionActivation(selected, candidate);
+        const layout = store.stateLayout(sessionId);
+        const version = readSessionFileVersion(layout);
+        if (saved && current && version === saved.version) outcome = 'committed';
+        if (!saved && preparing && !current && version === preparing.version
+          && !hasPromptIntent(layout)) outcome = 'unchanged';
+      } catch { /* Keep an unreadable result unverified. */ }
+    }
+    throw new SessionRootRebindError(outcome, stage, error);
   }
-  if (!rebound) throw new SessionRootRebindError("unchanged", "prepare", new Error("State lock did not run the migration"));
-  return rebound;
 }
 
-function readCurrentState(input: RebindInput): SessionStateSnapshot {
-  const state: unknown = input.readStateSnapshot();
-  if (!isRecord(state) || typeof state.status !== "string" ||
-    !["active", "interrupted", "completed", "completed_unproven", "error", "terminated"].includes(state.status) ||
-    (state.projectRoot !== undefined && (typeof state.projectRoot !== "string" || !normalizePathIdentity(state.projectRoot)))) {
+function validateSource(session: Session, latest: Session, current: SessionStateSnapshot, nextProjectRoot: string): void {
+  if (!isRecord(current) ||
+    typeof current.status !== "string" ||
+    !["active", "interrupted", "completed", "completed_unproven", "error", "terminated"].includes(current.status) ||
+    (current.projectRoot !== undefined && (typeof current.projectRoot !== "string" || !normalizePathIdentity(current.projectRoot)))) {
     throw new Error("Session state is missing or invalid");
   }
-  return state as unknown as SessionStateSnapshot;
-}
-
-function validateSource(input: RebindInput, latest: Session, current: SessionStateSnapshot): void {
-  if (!input.nextProjectRoot.trim()) throw new Error("Destination project root is empty");
-  const expectedRoot = normalizePathIdentity(input.session.projectRoot);
+  if (!nextProjectRoot.trim()) throw new Error("Destination project root is empty");
+  const expectedRoot = normalizePathIdentity(session.projectRoot);
   const latestRoot = normalizePathIdentity(latest.projectRoot);
-  if (latest.id !== input.session.id || latest.createdAt !== input.session.createdAt || !expectedRoot || expectedRoot !== latestRoot) {
+  if (latest.id !== session.id || latest.createdAt !== session.createdAt || !expectedRoot || expectedRoot !== latestRoot) {
     throw new Error("Session identity or project root changed before migration");
   }
   if (current.projectRoot !== undefined && normalizePathIdentity(current.projectRoot) !== latestRoot) {
@@ -130,54 +167,4 @@ function validateSource(input: RebindInput, latest: Session, current: SessionSta
   if (current.status === 'active' && (current.runPhase === 'prompt-persisted' || current.runPhase === 'turn-active')) {
     throw new Error('Session is busy; finish or recover the active turn before migration');
   }
-}
-
-function writeFailure(
-  input: RebindInput,
-  previousMetadata: unknown,
-  previousState: SessionStateSnapshot,
-  nextSession: Session,
-  nextState: SessionStateSnapshot,
-  stage: "state" | "metadata",
-  error: unknown,
-): SessionRootRebindError {
-  let outcome: RebindOutcome = "partial";
-  let cause = error;
-  try {
-    // A writer may replace its file before reporting failure. Read both records
-    // before deciding whether compensation would undo an already saved binding.
-    if (stage === "metadata" &&
-      sameValue(input.readMetadata(), projectSessionMetadata(nextSession)) &&
-      sameValue(input.readStateSnapshot(), nextState)) {
-      outcome = "committed";
-    } else {
-      outcome = restoreState(input, previousMetadata, previousState, nextState);
-      if (stage === "metadata" && outcome === "unchanged") outcome = "restored";
-    }
-  } catch (recoveryError) {
-    cause = new AggregateError([error, recoveryError], [error, recoveryError]
-      .map(value => value instanceof Error ? value.message : String(value)).join("; "));
-  }
-  return new SessionRootRebindError(outcome, stage, cause);
-}
-
-function restoreState(
-  input: RebindInput,
-  previousMetadata: unknown,
-  previousState: SessionStateSnapshot,
-  nextState: SessionStateSnapshot,
-): "unchanged" | "restored" | "partial" {
-  if (!sameValue(input.readMetadata(), previousMetadata)) return "partial";
-  const current = input.readStateSnapshot();
-  if (sameValue(current, previousState)) return "unchanged";
-  // Do not overwrite a foreign or unreadable state during recovery.
-  if (!sameValue(current, nextState)) return "partial";
-  input.writeStateSnapshot(previousState);
-  return sameValue(input.readStateSnapshot(), previousState) && sameValue(input.readMetadata(), previousMetadata)
-    ? "restored"
-    : "partial";
-}
-
-function sameValue(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
 }

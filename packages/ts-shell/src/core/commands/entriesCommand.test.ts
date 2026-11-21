@@ -8,7 +8,8 @@ import {
   projectSessionFileLayout,
 } from "../../session/store/sessionFileLayout.js";
 import { appendTranscriptEvent, appendSessionTurn } from "../../session/transcript/sessionTranscript.js";
-import { writeSessionMetadataRecord, writeSessionRecord } from "../../session/store/sessionStore.js";
+import { writeSessionMetadataRecord } from "../../session/store/sessionStore.js";
+import { writeSessionRecord } from "../../session/store/create.js";
 import { writeSessionState } from "../../session/store/sessionStateStore.js";
 import type { Session } from "../../session/schema/sessionRecord.js";
 import type { CommandContext } from "./types.js";

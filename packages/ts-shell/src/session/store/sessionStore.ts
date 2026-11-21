@@ -18,7 +18,7 @@ import { parseTranscript } from '../transcript/read.js';
 import { fileVersion, readSessionFileVersion } from './version.js';
 import { projectLoadedSession } from './projection.js';
 import { readSessionSnapshot, readSessionSnapshotAsync, SessionSnapshotConflict, type SessionSnapshotLimits } from './snapshot.js';
-import { activationMetadataText } from './prompt/activation.js';
+import { activationRecordText } from './prompt/activation.js';
 import { isResumeCommitted, readSessionRegistryStore } from './currentSessionRegistry.js';
 
 export { readSessionMetadataRecord } from './snapshot.js';
@@ -81,7 +81,7 @@ export function previewPendingSessionRecord(input: SessionReadInput): { snapshot
     };
     const intent = readPromptIntent(input.layout, input.sessionId);
     if (!intent || pathIdentity(input.layout.sessionDir) !== intent.directory) throw new PromptPublicationError('unknown');
-    if (intent.version === 4) {
+    if (intent.version === 4 || intent.version === 5) {
       if (!input.registryPath) throw new PromptPublicationError('unknown', 'record');
       const registryPath = input.registryPath;
       const readDecision = () => {
@@ -90,8 +90,9 @@ export function previewPendingSessionRecord(input: SessionReadInput): { snapshot
         return isResumeCommitted(registry.store, intent);
       };
       const committed = readDecision();
-      const metadata = JSON.parse(activationMetadataText(input.layout, intent, committed));
-      const state = readStateSnapshotRequired(input.layout.statePath);
+      const record = activationRecordText(input.layout, intent, committed);
+      const metadata = JSON.parse(record.metadata);
+      const state = record.state === undefined ? readStateSnapshotRequired(input.layout.statePath) : JSON.parse(record.state);
       const transcript = readTranscriptSnapshot(input.layout.transcriptPath);
       const snapshot = projectSessionRecordSnapshot(input, metadata, state, transcript);
       const assertActivation = () => {

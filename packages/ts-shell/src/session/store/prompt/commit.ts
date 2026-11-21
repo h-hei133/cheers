@@ -133,7 +133,7 @@ export function recoverSessionPrompt(layout: SessionFileLayout, sessionId: strin
     withSessionStateLock(layout, () => {
       beforeReplay?.();
       const intent = readPromptIntent(layout, sessionId);
-      if (intent?.version === 4) {
+      if (intent?.version === 4 || intent?.version === 5) {
         settleResumeReceipt(registryPath, intent, committed => finishActivationMetadata(layout, intent, committed));
       } else if (intent) finishSessionPrompt(layout, intent);
       else if (beforeReplay) throw new PromptPublicationError('unknown');

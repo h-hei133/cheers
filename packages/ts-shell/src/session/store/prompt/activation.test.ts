@@ -18,7 +18,7 @@ import { readSessionFileVersion } from '../version.js';
 import { promptIntentPath } from './intent.js';
 
 const stages = ['prepared', 'registry', 'metadata', 'cleared'] as const;
-type Stage = typeof stages[number];
+type Stage = typeof stages[number] | 'state';
 const publishedAt = '2024-02-02T01:02:03.000Z';
 let root: string;
 
@@ -37,22 +37,23 @@ afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-function interruptResume(layout: SessionFileLayout, sessionId: string, registry: string, stage: Stage) {
+function interruptResume(layout: SessionFileLayout, sessionId: string, registry: string, stage: Stage, destination?: string) {
   const [major, minor] = process.versions.node.split('.').map(Number);
   const loader = major! === 20 && minor! < 6 ? '--loader' : '--import';
   const tsx = pathToFileURL(createRequire(import.meta.url).resolve('tsx')).href;
-  const input = { layout, sessionId, registry, stage, publishedAt, version: readSessionFileVersion(layout), marker: promptIntentPath(layout) };
+  const input = { layout, sessionId, registry, stage, destination, publishedAt, version: readSessionFileVersion(layout), marker: promptIntentPath(layout) };
   const script = `
     import fs from 'node:fs';
     import { syncBuiltinESMExports } from 'node:module';
     import { SessionManager } from ${JSON.stringify(new URL('../../SessionManager.ts', import.meta.url).href)};
     const input = ${JSON.stringify(input)};
     const rename = fs.renameSync, unlink = fs.unlinkSync, sync = fs.fsyncSync;
-    const phases = new Map([[input.marker, 'prepared'], [input.registry, 'registry'], [input.layout.metadataPath, 'metadata']]);
+    const phases = new Map([[input.marker, 'prepared'], [input.registry, 'registry'], [input.layout.statePath, 'state'], [input.layout.metadataPath, 'metadata']]);
     let phase;
     fs.renameSync = (from, to) => {
       rename(from, to);
       if (to === input.marker || phase) phase = phases.get(to) ?? phase;
+      if (phase === 'state' && input.stage === 'state') process.kill(process.pid, 'SIGKILL');
     };
     fs.unlinkSync = target => {
       unlink(target);
@@ -64,7 +65,9 @@ function interruptResume(layout: SessionFileLayout, sessionId: string, registry:
     };
     syncBuiltinESMExports();
     Date.prototype.toISOString = () => input.publishedAt;
-    const result = new SessionManager().tryResume(input.sessionId, process.cwd(), {
+    const manager = new SessionManager();
+    if (input.destination) manager.rebindSessionProjectRoot(input.sessionId, input.destination);
+    const result = manager.tryResume(input.sessionId, process.cwd(), {
       mode: 'continuity-only', expectedVersion: input.version,
     });
     process.exit(result.ok ? 2 : 3);
@@ -159,3 +162,42 @@ it.skipIf(process.platform !== 'linux')('settles the committed activation throug
   expect(fs.existsSync(promptIntentPath(layout))).toBe(false);
   expect(readSessionRegistryStore(profile.currentSessionStorePath).store.resumeReceipts).toBeUndefined();
 }, 20_000);
+
+it.skipIf(process.platform !== 'linux').each(['prepared', 'registry', 'state', 'metadata', 'cleared'] as const)(
+  'reopens a root rebind after the writer dies at %s', stage => {
+    const manager = new SessionManager();
+    const destination = path.join(root, 'destination');
+    fs.mkdirSync(destination);
+    const source = manager.createNew(root);
+    const priorDestination = manager.createNew(destination);
+    const profile = createSessionStoreLayout();
+    const registryPath = profile.currentSessionStorePath;
+    const layout = locateExistingSessionLayout(profile, source.id);
+    const metadata = JSON.parse(fs.readFileSync(layout.metadataPath, 'utf8'));
+    delete metadata.projectRoot;
+    fs.writeFileSync(layout.metadataPath, JSON.stringify(metadata));
+    const transcript = fs.readFileSync(layout.transcriptPath);
+    const child = interruptResume(layout, source.id, registryPath, stage, destination);
+    expect(child.error).toBeUndefined();
+    expect(child.signal, child.stderr).toBe('SIGKILL');
+    const committed = stage !== 'prepared';
+    const rootAfter = committed ? destination : root;
+    const store = new SessionStoreAccess();
+    expect(store.readCurrentSessionSelection(destination)?.sessionId).toBe(committed ? source.id : priorDestination.id);
+    if (stage === 'registry') manager.setCurrentSessionForProject(destination, priorDestination.id);
+    if (stage === 'state') {
+      expect(JSON.parse(fs.readFileSync(layout.statePath, 'utf8')).projectRoot).toBe(destination);
+      expect(JSON.parse(fs.readFileSync(layout.metadataPath, 'utf8')).projectRoot).toBeUndefined();
+    }
+    const pointer = store.readCurrentSessionSelection(destination);
+    const preview = previewPendingSessionRecord({ layout, sessionId: source.id, cwd: root, registryPath });
+    if (stage === 'cleared') expect(preview).toBeUndefined();
+    else expect(preview?.snapshot).toMatchObject({ session: { projectRoot: rootAfter }, state: { projectRoot: rootAfter } });
+    expect(store.readSnapshot(source.id)).toMatchObject({ session: { id: source.id, projectRoot: rootAfter }, state: { projectRoot: rootAfter } });
+    expect(store.readSnapshot(source.id).session.projectRoot).toBe(rootAfter);
+    expect(store.readCurrentSessionSelection(destination)).toEqual(pointer);
+    expect(fs.existsSync(promptIntentPath(layout))).toBe(false);
+    expect(fs.readFileSync(layout.transcriptPath)).toEqual(transcript);
+    if (stage !== 'cleared') expect(readSessionRegistryStore(registryPath).store.resumeReceipts).toBeUndefined();
+  }, 20_000,
+);

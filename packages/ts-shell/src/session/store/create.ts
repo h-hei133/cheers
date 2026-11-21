@@ -20,45 +20,32 @@ export class SessionCreationUnverifiedError extends Error {
 export interface InitialSessionRecord {
   readonly state: SessionStateSnapshot;
   readonly events: readonly TranscriptEvent[];
-  readonly beforePublish: () => void;
+  readonly beforePublish?: () => void;
 }
 
 export function createSessionRecord(session: Session, store: SessionStoreLayout, initial?: InitialSessionRecord): void {
-  if (initial) return createCompleteSessionRecord(session, store, initial);
-  const layout = reserveSessionLayout(store, session.id);
-  try {
-    writeSessionFiles({ session, layout }, 'exclusive');
-  } catch (error) {
-    // Preserve the reservation so a retry cannot overwrite the uncertain record.
-    throw new SessionCreationUnverifiedError(session.id, error);
-  }
-}
-
-/** Publish a complete fork as one directory entry, before selecting it. */
-function createCompleteSessionRecord(session: Session, store: SessionStoreLayout, initial: InitialSessionRecord): void {
   const parent = sessionCreationDirectory(store);
   fs.mkdirSync(parent, { recursive: true, mode: 0o700 });
   const parentIdentity = pathIdentity(parent);
   const targetParent = pathIdentity(store.sessionsDir);
-  const stage = fs.mkdtempSync(path.join(parent, 'fork-'));
+  const dataRoot = path.dirname(store.sessionsDir);
+  const dataRootIdentity = pathIdentity(dataRoot);
+  const stage = fs.mkdtempSync(path.join(parent, 'record-'));
   const stagedIdentity = pathIdentity(stage);
   const layout = projectSessionFileLayout({ sessionsDir: parent, sessionId: path.basename(stage) });
   let moved = false;
   try {
-    try {
-      writeSessionFiles({ session, layout }, 'exclusive', initial);
-      syncStoreDirectory(stage, stagedIdentity);
-    } catch (error) {
-      throw new SessionCreationUnverifiedError(session.id, error);
-    }
+    writeSessionFiles({ session, layout }, 'exclusive', initial);
+    syncStoreDirectory(stage, stagedIdentity);
     reserveSessionLayout(store, session.id, target => {
-      initial.beforePublish();
+      initial?.beforePublish?.();
       if (pathIdentity(stage) !== stagedIdentity || pathIdentity(store.sessionsDir) !== targetParent
         || pathIdentity(parent) !== parentIdentity) throw new Error('The session publication directory changed.');
       fs.renameSync(stage, target.sessionDir);
       moved = true;
       syncStoreDirectory(store.sessionsDir, targetParent);
       syncStoreDirectory(parent, parentIdentity);
+      syncStoreDirectory(dataRoot, dataRootIdentity);
     });
   } catch (error) {
     if (moved) throw new SessionCreationUnverifiedError(session.id, error);
@@ -84,15 +71,15 @@ function writeSessionFiles({ session, layout }: SessionRecordWrite, mode: 'exclu
   if (mode === 'exclusive' || !fs.existsSync(layout.transcriptPath)) {
     const header = createTranscriptHeader({ sessionId: session.id, timestamp: session.createdAt, cwd: session.projectRoot });
     const headerLine = `${JSON.stringify(header)}\n`;
-    if (initial) {
+    if (mode === 'exclusive') {
       const fd = fs.openSync(layout.transcriptPath, 'wx');
       try {
         fs.writeFileSync(fd, headerLine, 'utf8');
-        for (const event of initial.events) fs.writeFileSync(fd, `${encodeTranscriptEvent(event)}\n`, 'utf8');
+        for (const event of initial?.events ?? []) fs.writeFileSync(fd, `${encodeTranscriptEvent(event)}\n`, 'utf8');
         fs.fsyncSync(fd);
       } finally { fs.closeSync(fd); }
     } else {
-      fs.writeFileSync(layout.transcriptPath, headerLine, { encoding: 'utf8', flag: mode === 'exclusive' ? 'wx' : 'w' });
+      fs.writeFileSync(layout.transcriptPath, headerLine, { encoding: 'utf8', flag: 'wx' });
     }
   }
   writeSessionMetadataRecord({ session, layout });

@@ -69,6 +69,7 @@ export function forkSession(input: {
     event.type === 'command-output' && event.sourceEntryId === sourceRoot ? { ...event, sourceEntryId: forkRoot } : event);
   const forked = createSessionWithId({ callbacks: {
     ...callbacks, setCurrentSessionForProject: () => {},
+    readCurrentSessionSelection: undefined,
     writeSession: (session: Session) => {
       const state = buildSessionStateSnapshot(session, undefined, { thread: copied });
       try {

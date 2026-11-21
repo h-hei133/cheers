@@ -7,7 +7,6 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../SessionManager.js';
 import { createSessionStoreLayout, projectSessionFileLayout } from './sessionFileLayout.js';
-import { SessionCreationUnverifiedError } from './create.js';
 import { SessionStoreAccess } from './sessionStoreAccess.js';
 
 const id = 'shared-session';
@@ -163,32 +162,48 @@ it('surfaces a legacy lookup error before reserving a current session', () => {
   expect(store.readCurrentSessionSelection(root)).toBeUndefined();
 });
 
-it('keeps a partial record and reports unverified creation if the state write throws', () => {
+it('keeps a failed staging write private and allows retrying the same ID', () => {
   const manager = new SessionManager();
   const store = new SessionStoreAccess();
   const layout = projectSessionFileLayout({ sessionsDir: store.sessionsDir, sessionId: id });
   const cause = new Error('storage failure fixture');
   const rename = fs.renameSync;
   const spy = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
-    if (to === layout.statePath) throw cause;
+    if (path.basename(to.toString()) === 'state.json') throw cause;
     rename(from, to);
   });
   syncBuiltinESMExports();
   try {
-    expect(() => manager.createNewWithId(id, root)).toThrow(SessionCreationUnverifiedError);
-    expect(spy).toHaveBeenCalledWith(expect.any(String), layout.statePath);
+    expect(() => manager.createNewWithId(id, root)).toThrow(cause);
   } finally {
     spy.mockRestore();
     syncBuiltinESMExports();
   }
 
-  const transcript = fs.readFileSync(layout.transcriptPath, 'utf8');
-  const metadata = fs.readFileSync(layout.metadataPath, 'utf8');
-  expect(JSON.parse(transcript)).toMatchObject({ id, cwd: root });
-  expect(JSON.parse(metadata)).toMatchObject({ id, projectRoot: root });
-  expect(fs.existsSync(layout.statePath)).toBe(false);
+  expect(fs.existsSync(layout.sessionDir)).toBe(false);
   expect(store.readCurrentSessionSelection(root)).toBeUndefined();
-  expect(() => manager.createNewWithId(id, root)).toThrow(`Session ${id} already exists`);
-  expect(fs.readFileSync(layout.transcriptPath, 'utf8')).toBe(transcript);
-  expect(fs.readFileSync(layout.metadataPath, 'utf8')).toBe(metadata);
+  expect(manager.createNewWithId(id, root).id).toBe(id);
+  expect(store.readSnapshot(id).session).toMatchObject({ id, projectRoot: root });
+  expect(store.readCurrentSessionSelection(root)?.sessionId).toBe(id);
+});
+
+it('retains a complete unselected session when another selection wins during publication', () => {
+  const manager = new SessionManager();
+  const store = new SessionStoreAccess();
+  const other = manager.createNew(root, { activate: false });
+  const target = path.join(store.sessionsDir, id);
+  const rename = fs.renameSync;
+  const spy = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+    if (to === target) manager.setCurrentSessionForProject(root, other.id);
+    rename(from, to);
+  });
+  syncBuiltinESMExports();
+  try {
+    expect(() => manager.createNewWithId(id, root)).toThrow('activation changed');
+  } finally {
+    spy.mockRestore();
+    syncBuiltinESMExports();
+  }
+  expect(store.readSnapshot(id).session).toMatchObject({ id, turns: [] });
+  expect(store.readCurrentSessionSelection(root)?.sessionId).toBe(other.id);
 });

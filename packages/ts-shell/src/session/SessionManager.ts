@@ -24,7 +24,6 @@ import {
   type SessionCreationOptions,
 } from "./store/sessionCreation.js";
 import { SessionStoreAccess } from "./store/sessionStoreAccess.js";
-import { readSessionMetadataRecord } from "./store/sessionStore.js";
 import type {
   ApprovalAuditMemoryState,
   SessionContinuitySnapshot,
@@ -32,7 +31,7 @@ import type {
 import type { WorkspaceRootMode } from "./store/projectBindingPolicy.js";
 import { applySessionWorkspaceBinding } from "./store/sessionProjectBinding.js";
 import { SessionReentrySurface } from "./recovery/reentry.js";
-import { rebindSessionProjectRootContinuity, SessionRootRebindError, type SessionRootRebindOptions } from "./continuation/sessionProjectRootRebind.js";
+import { rebindSessionProjectRootContinuity, type SessionRootRebindOptions } from "./continuation/sessionProjectRootRebind.js";
 import type { RecoverySnapshot } from "./recovery/sessionRecoverySnapshot.js";
 import {
   resumeSession,
@@ -95,6 +94,7 @@ export class SessionManager extends SessionReentrySurface {
       validateSessionId,
       createSessionId: () => this.host.store.createSessionId(),
       writeSession: (session: Session) => this.host.store.writeSession(session),
+      readCurrentSessionSelection: activate ? (projectRoot: string) => this.host.store.readCurrentSessionSelection(projectRoot) : undefined,
       setCurrentSessionForProject: (projectRoot: string, sessionId: string, options?: SessionActivationOptions) => {
         if (!activate) return;
         if (options) this.setCurrentSessionForProject(projectRoot, sessionId, options);
@@ -216,29 +216,14 @@ export class SessionManager extends SessionReentrySurface {
   rebindSessionProjectRoot(sessionId: string, nextProjectRoot: string,
     options?: SessionRootRebindOptions,
   ): Session {
-    const session = this.host.store.load(sessionId);
-    const statePath = this.host.store.statePath(session.id);
-    const rebound = rebindSessionProjectRootContinuity({
+    return rebindSessionProjectRootContinuity({
       ...options,
-      session,
+      store: this.host.store,
+      sessionId,
       nextProjectRoot,
       updatedAt: new Date().toISOString(),
-      readSession: () => this.host.store.load(session.id),
-      readMetadata: readSessionMetadataRecord.bind(undefined, this.host.store.metadataPath(session.id)),
-      writeSessionMetadata: (nextSession) =>
-        this.host.store.writeSessionMetadata(nextSession),
-      withStateLock: (targetSessionId, update) =>
-        this.host.store.withSessionStateLock(targetSessionId, update),
-      readStateSnapshot: () => this.host.store.readStateSnapshotRequired(statePath),
-      writeStateSnapshot: (snapshot) =>
-        this.host.store.writeJsonFileAtomic(statePath, snapshot),
+      select: (projectRoot, id, activation) => this.setCurrentSessionForProject(projectRoot, id, activation),
     });
-    try {
-      this.setCurrentSessionForProject(rebound.projectRoot, rebound.id);
-    } catch (error) {
-      throw new SessionRootRebindError("committed", "selection", error);
-    }
-    return rebound;
   }
 
   updateSessionWorkspaceBinding(

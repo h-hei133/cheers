@@ -27,12 +27,15 @@ export interface PromptFileChange {
   readonly after: string;
 }
 
-export interface ActivationIntent extends SessionActivationIdentity {
-  readonly version: 4;
+interface ActivationRecord extends SessionActivationIdentity {
   readonly sessionId: string;
   readonly directory: string;
   readonly metadata: PromptFileChange;
 }
+
+export type ActivationIntent = ActivationRecord & (
+  { readonly version: 4 } | { readonly version: 5; readonly state: PromptFileChange }
+);
 
 export type PromptTransactionKind = 'prompt' | 'outcome' | 'record';
 
@@ -70,11 +73,14 @@ export function readPromptIntent(layout: SessionFileLayout, sessionId: string): 
     || !isFileChange(value.metadata, MAX_METADATA_BYTES)) throw new PromptPublicationError('unknown');
   const metadata: unknown = JSON.parse(value.metadata.after);
   if (!isRecord(metadata) || metadata.id !== sessionId) throw new PromptPublicationError('unknown');
-  if (value.version === 4) {
+  if (value.version === 4 || value.version === 5) {
     if (typeof value.activationId !== 'string' || !/^[0-9a-f-]{36}$/.test(value.activationId)
       || typeof value.registryId !== 'string' || !/^[0-9a-f-]{36}$/.test(value.registryId)
       || typeof metadata.createdAt !== 'string' || typeof metadata.updatedAt !== 'string'
-      || typeof metadata.projectRoot !== 'string') throw new PromptPublicationError('unknown');
+      || typeof metadata.projectRoot !== 'string'
+      || (value.version === 5 && !isRebindState(value.state, metadata.projectRoot))) {
+      throw new PromptPublicationError('unknown', 'record');
+    }
     return value as unknown as ActivationIntent;
   }
   if ((value.version !== 1 && value.version !== 2 && value.version !== 3)
@@ -150,6 +156,9 @@ function isSettlementIntent(rows: string, metadata: Record<string, unknown>, sta
 export function encodePromptIntent(intent: PromptIntent | ActivationIntent): string {
   if (!isFileChange(intent.metadata, MAX_METADATA_BYTES)
     || (intent.version !== 4 && !isFileChange(intent.state, MAX_STATE_BYTES))) throw new PromptPublicationError('unchanged');
+  if (intent.version === 5 && !isRebindState(intent.state, JSON.parse(intent.metadata.after).projectRoot)) {
+    throw new PromptPublicationError('unchanged', 'record');
+  }
   if (intent.version === 2 && !isSettlementIntent(intent.rows, JSON.parse(intent.metadata.after), JSON.parse(intent.state.after))) {
     throw new PromptPublicationError('unchanged', 'outcome');
   }
@@ -180,4 +189,11 @@ function isDigest(value: unknown): value is string {
 
 function isFileChange(value: unknown, maxBytes: number): value is PromptFileChange {
   return isRecord(value) && isDigest(value.before) && typeof value.after === 'string' && Buffer.byteLength(value.after) <= maxBytes;
+}
+
+function isRebindState(change: unknown, projectRoot: unknown): boolean {
+  if (!isFileChange(change, MAX_STATE_BYTES)) return false;
+  const state: unknown = JSON.parse(change.after);
+  return isRecord(state) && typeof projectRoot === 'string' && state.projectRoot === projectRoot
+    && typeof state.status === 'string' && RECORD_STATUSES.has(state.status);
 }

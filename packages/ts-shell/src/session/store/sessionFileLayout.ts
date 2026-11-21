@@ -105,14 +105,14 @@ export function sessionCreationDirectory(layout: SessionStoreLayout): string {
 
 /** Serialize publication of the same ID by ordinary and staged creators. */
 export function reserveSessionLayout(layout: SessionStoreLayout, sessionId: string,
-  publish?: (target: SessionFileLayout) => void): SessionFileLayout {
+  publish: (target: SessionFileLayout) => void): void {
   const id = validateSessionId(sessionId);
   assertSessionStoreProfile(layout, layout.sessionsDir);
   const reserved = projectSessionFileLayout({ sessionsDir: layout.sessionsDir, sessionId: id });
   if (id === '.' || id === '..') throw new Error(`Session ${id} already exists`);
   const lock = path.join(sessionCreationDirectory(layout), 'locks', id);
   assertSessionStoreProfile(layout, lock);
-  return withFileLock(lock, () => {
+  withFileLock(lock, () => {
     for (const sessionsDir of layout.sessionsSearchDirs) {
       const candidate = projectSessionFileLayout({ sessionsDir, sessionId: id });
       assertSessionStoreProfile(layout, candidate.sessionDir);
@@ -126,13 +126,11 @@ export function reserveSessionLayout(layout: SessionStoreLayout, sessionId: stri
     }
     for (const target of Object.values(reserved)) assertSessionStoreProfile(layout, target);
     try {
-      if (publish) publish(reserved);
-      else fs.mkdirSync(reserved.sessionDir);
+      publish(reserved);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error(`Session ${id} already exists`);
       throw error;
     }
-    return reserved;
   }, { recovery: 'local-dead' });
 }
 

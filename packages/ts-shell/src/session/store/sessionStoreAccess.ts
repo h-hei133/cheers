@@ -106,8 +106,8 @@ export class SessionStoreAccess extends SessionStorePaths {
     });
   }
 
-  prepareSessionActivation(session: Session, identity: SessionActivationIdentity) {
-    return prepareSessionActivationRecord(session, locateExistingSessionLayout(this.storeLayout, session.id), identity);
+  prepareSessionActivation(session: Session, identity: SessionActivationIdentity, state?: SessionStateSnapshot) {
+    return prepareSessionActivationRecord(session, locateExistingSessionLayout(this.storeLayout, session.id), identity, state);
   }
 
   writeSessionState(

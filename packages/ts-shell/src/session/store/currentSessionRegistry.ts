@@ -322,14 +322,17 @@ export function setCurrentSessionSelection(input: {
       writeSessionRegistryStore({ storePath: input.storePath, store: withoutResumeReceipt(committed, candidate.sessionId) });
       syncStoreDirectory(parent, identity);
     } else if (guard || input.publishMetadata) {
+      const parent = dirname(input.storePath), identity = pathIdentity(parent);
       let publishMetadata = input.publishMetadata;
       writeTextFileAtomic(input.storePath, JSON.stringify(store, null, 2), undefined, {
         beforeRename: () => {
+          if (pathIdentity(parent) !== identity) throw new Error('Current session registry directory changed.');
           assertActivationGuard(guard, read, normalizedProjectRoot);
           publishMetadata?.();
           publishMetadata = undefined;
         },
       });
+      syncStoreDirectory(parent, identity);
     } else writeSessionRegistryStore({ storePath: input.storePath, store });
   }, { recovery: 'local-dead', onReleaseError: input.onReleaseError });
 }

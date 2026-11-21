@@ -1,6 +1,7 @@
 import { projectSessionBinding, type ProjectBindingOptions } from "./projectBindingPolicy.js";
 import type { Session } from "../schema/sessionRecord.js";
 import { captureActivationGuard, type SessionActivationGuard, type SessionActivationOptions } from './activation.js';
+import type { CurrentSessionSelectionRecord } from './currentSelection.js';
 
 export interface SessionCreationOptions extends ProjectBindingOptions {
   /** A title to start with, for a session that is born carrying another's. */
@@ -15,6 +16,7 @@ interface SessionCreationCallbacks {
   readonly validateSessionId: (sessionId: string) => string;
   readonly createSessionId: () => string;
   readonly writeSession: (session: Session) => void;
+  readonly readCurrentSessionSelection?: (projectRoot: string) => CurrentSessionSelectionRecord | undefined;
   readonly setCurrentSessionForProject: (
     projectRoot: string,
     sessionId: string,
@@ -60,7 +62,9 @@ function createBoundSession(input: {
   readonly projectRoot: string;
   readonly options?: SessionCreationOptions;
 }): Session {
-  const guard = captureActivationGuard(input.options?.activationGuard);
+  const expected = input.options?.activationGuard ? undefined : input.callbacks.readCurrentSessionSelection?.(input.projectRoot);
+  const guard = captureActivationGuard(input.options?.activationGuard ?? (input.callbacks.readCurrentSessionSelection
+    ? { source: { projectRoot: input.projectRoot, expected }, destination: expected } : undefined));
   const now = input.callbacks.now();
   const binding = projectSessionBinding({
     projectRoot: input.projectRoot,

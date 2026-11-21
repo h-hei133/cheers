@@ -65,13 +65,15 @@ it('rejects a non-user entry before creation and keeps a failed copy outside the
     rename(from, to);
   });
   syncBuiltinESMExports();
-  expect(() => manager.fork(source.id, root, { sessionId: 'sess_partial_fork' })).toThrow(SessionForkError);
+  expect(() => manager.fork(source.id, root, { sessionId: 'sess_partial_fork' })).toThrow('state write failed');
   expect(manager.sessionExists('sess_partial_fork')).toBe(false);
   expect(manager.listSessions()).toHaveLength(count);
   expect(manager.getCurrentSessionForProject(root)?.id).toBe(source.id);
 });
 
-it.skipIf(process.platform !== 'linux').each(['before', 'after'] as const)('exposes only whole records when a fork process dies %s publication', stage => {
+it.skipIf(process.platform !== 'linux').each([
+  ['before', 'fork'], ['after', 'fork'], ['before', 'create'], ['after', 'create'],
+] as const)('exposes only whole records after process exit %s publication (%s)', (stage, kind) => {
   const manager = new SessionManager(), store = new SessionStoreAccess();
   const source = manager.createNew(root);
   manager.addTurn(source.id, { role: 'user', content: 'copied question' });
@@ -91,7 +93,10 @@ it.skipIf(process.platform !== 'linux').each(['before', 'after'] as const)('expo
       if (to === ${JSON.stringify(target)}) process.kill(process.pid, 'SIGKILL');
     };
     syncBuiltinESMExports();
-    new SessionManager().fork(${JSON.stringify(source.id)}, process.cwd(), { sessionId: ${JSON.stringify(targetId)} });
+    const manager = new SessionManager();
+    ${kind === 'fork'
+      ? `manager.fork(${JSON.stringify(source.id)}, process.cwd(), { sessionId: ${JSON.stringify(targetId)} });`
+      : `manager.createNewWithId(${JSON.stringify(targetId)}, process.cwd());`}
   `], { cwd: root, encoding: 'utf8', timeout: 10_000, maxBuffer: 65_536 });
   expect(child.error).toBeUndefined();
   expect(child.signal, child.stderr).toBe('SIGKILL');
@@ -100,14 +105,16 @@ it.skipIf(process.platform !== 'linux').each(['before', 'after'] as const)('expo
     stage === 'before' ? [source.id] : expect.arrayContaining([source.id, targetId]));
   if (stage === 'after') {
     expect(store.readSnapshot(targetId)).toMatchObject({
-      session: { parentSession: source.id, turns: [{ role: 'user', content: 'copied question' }] },
-      state: { thread: { activeLeafId: expect.any(String) } },
+      session: kind === 'fork' ? { parentSession: source.id, turns: [{ role: 'user', content: 'copied question' }] }
+        : { id: targetId, turns: [] },
+      ...(kind === 'fork' ? { state: { thread: { activeLeafId: expect.any(String) } } } : {}),
     });
   }
   expect(manager.readCurrentSessionSelection(root)?.sessionId).toBe(source.id);
   if (stage === 'before') {
-    expect(manager.fork(source.id, root, { sessionId: targetId, activate: false }).turns)
-      .toMatchObject([{ role: 'user', content: 'copied question' }]);
+    const saved = kind === 'fork' ? manager.fork(source.id, root, { sessionId: targetId, activate: false })
+      : manager.createNewWithId(targetId, root, { activate: false });
+    expect(saved.turns).toMatchObject(kind === 'fork' ? [{ role: 'user', content: 'copied question' }] : []);
     expect(manager.readCurrentSessionSelection(root)?.sessionId).toBe(source.id);
   }
 }, 15_000);

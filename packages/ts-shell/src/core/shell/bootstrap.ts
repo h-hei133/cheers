@@ -387,9 +387,8 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
       });
     }
 
-    const source = staged ? captureStartupSource(manager, input.requestedSessionId) : undefined;
-    const resumedSession = source?.session ?? requireResume(manager.tryResume(input.requestedSessionId, undefined,
-      { mode: 'continuity-only' }), input.requestedSessionId);
+    const source = captureStartupSource(manager, input.requestedSessionId);
+    const resumedSession = source.session;
     const sessionProjectRoot = resumedSession.projectRoot || requestedProjectRoot;
     const rootsEqual = areProjectRootsEqual(
       requestedProjectRoot,
@@ -401,19 +400,18 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
     );
 
     if (input.allowSessionRootMigration && !rootsEqual) {
-      let roots: readonly WorkspaceRoot[] | undefined;
-      let beforeCommit: (() => void) | undefined;
-      if (source) {
-        roots = source.session.workspaceRoots?.filter(root => normalizePathIdentity(root.path) !== normalizePathIdentity(requestedProjectRoot));
-        if (roots?.length) validateWorkspaceRoots(requestedProjectRoot, roots);
-        yield captureStartupBinding(manager, resumedSession.id, requestedProjectRoot, roots, source.assertCurrent);
-        const version = source.settle();
-        beforeCommit = () => source.assertVersion(version);
-      }
+      const roots = source.session.workspaceRoots?.filter(root => normalizePathIdentity(root.path) !== normalizePathIdentity(requestedProjectRoot));
+      if (roots?.length) validateWorkspaceRoots(requestedProjectRoot, roots);
+      const activationGuard = {
+        source: { projectRoot: sessionProjectRoot, expected: manager.readCurrentSessionSelection(sessionProjectRoot) },
+        destination: manager.readCurrentSessionSelection(requestedProjectRoot),
+      };
+      if (staged) yield captureStartupBinding(manager, resumedSession.id, requestedProjectRoot, roots, source.assertCurrent);
+      const version = source.settle();
       const reboundSession = input.sessionManager.rebindSessionProjectRoot(
         resumedSession.id,
         requestedProjectRoot,
-        beforeCommit ? { beforeCommit, workspaceRoots: roots } : undefined,
+        { beforeCommit: () => source.assertVersion(version), binding: createOptions, workspaceRoots: roots, activationGuard },
       );
       emitLifecycleMessage(
         `Resumed session ${reboundSession.id} with migrated project root ${sessionProjectRoot} -> ${requestedProjectRoot}`,
@@ -422,11 +420,11 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
     }
 
     if (rootsCompatible) {
-      if (source) {
+      if (staged) {
         yield captureStartupBinding(manager, resumedSession.id, sessionProjectRoot, resumedSession.workspaceRoots, source.assertCurrent);
       }
-      const session = source ? requireResume(manager.tryResume(resumedSession.id, undefined,
-        { mode: 'continuity-only', expectedVersion: source.settle() }), resumedSession.id) : resumedSession;
+      const session = requireResume(manager.tryResume(resumedSession.id, undefined,
+        { mode: 'continuity-only', expectedVersion: source.settle() }), resumedSession.id);
       emitLifecycleMessage(`Resumed session ${session.id}`);
       return session;
     }
