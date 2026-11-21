@@ -13,7 +13,7 @@ import { details, exact, registryBytes, search } from './registry/client.js';
 import { validateArchive, FILE_BYTES } from './archive/validation.js';
 import { extractArchive } from './archive/storage.js';
 import { ExtensionStore, readState, versionPath } from './store/state.js';
-import { installOperation, removeOperation, rollbackOperation } from './lifecycle/install.js';
+import { prepareInstallPlan, removeOperation, rollbackOperation } from './lifecycle/install.js';
 import { activationOperation, migrationOperation, rootSignature } from './lifecycle/grants.js';
 import { ExtensionService } from './service.js';
 import { marketplaceCommand } from './command/marketplace.js';
@@ -128,6 +128,11 @@ function newService(store?: ExtensionStore, sessionId = 'test', check = () => {}
 }
 function holdResponse(selected: string): Promise<void> { holdPath = selected; return new Promise(resolve => { onHeld = resolve; }); }
 function resumeResponses(): void { holdPath = undefined; for (const { response, body } of held.splice(0)) response.end(body); }
+async function installOperation(host: ExtensionService, selector: string, replacing?: string) {
+  const plan = await prepareInstallPlan(host, selector, replacing);
+  expect(plan.acquisition).toBeUndefined();
+  return plan.complete();
+}
 async function install(pinned = '1.0.0'): Promise<void> { await service.approve(await installOperation(service, `fixture:sample@${pinned}`)); }
 async function grant(value: string): Promise<void> { await service.approve(activationOperation(service, workspace, 'grant', 'sample', value), 'extension_grant'); }
 async function enable(): Promise<void> { await service.approve(activationOperation(service, workspace, 'enable', 'sample'), 'extension_grant'); }
@@ -199,15 +204,21 @@ describe('signed marketplace protocol and bounded archive ownership', () => {
 describe('exact npm package installation', () => {
   it('publishes the approved scoped archive and enables or rolls back retained versions offline', async () => {
     const first = await npmArchive();
-    const pending = await installOperation(service, first.selector);
-    expect(pending.preview).toContain('Npm package @scope/sample@2.0.0');
-    expect(pending.preview).toContain(`Manifest ${canonical(manifest('2.0.0'))}`);
+    const plan = await prepareInstallPlan(service, first.selector);
+    expect(plan.acquisition?.preview).toContain('Npm package @scope/sample@2.0.0');
+    expect(plan.acquisition?.preview).toContain(`Registry ${base}`);
+    expect(requests).toEqual([]);
     expect(approvals).toEqual([]);
+    expect((await service.approveResult(plan.acquisition!)).isError).toBe(false);
+    const pending = plan.complete();
+    expect(pending.preview).toContain(`Manifest ${canonical(manifest('2.0.0'))}`);
+    expect(pending.preview).toContain(`SHA256 ${digest(first.bytes)}`);
+    expect(approvals).toEqual(['extension_manage']);
     expect(fs.existsSync(path.join(root, 'owned'))).toBe(false);
     bodies.set(first.metadata.dist.tarball, Buffer.from('changed after review'));
     expect(await service.approve(pending)).toContain('durability: confirmed');
     expect(requests).toEqual(['/registry/@scope%2Fsample/2.0.0', '/registry/@scope/sample/-/sample-2.0.0.tgz']);
-    expect(approvals).toEqual(['extension_manage']);
+    expect(approvals).toEqual(['extension_manage', 'extension_manage']);
 
     const installed = service.store.read().packages[0]!;
     expect(installed).toMatchObject({ active: { origin: 'npm', source: 'npm', registry: base, packageName: '@scope/sample',
@@ -234,6 +245,7 @@ describe('exact npm package installation', () => {
     allow = false;
     expect((await pluginCommand(['install', fixture.selector], service)).output).toMatch(/refused/i);
     expect(approvals).toEqual(['extension_manage']);
+    expect(requests).toEqual([]);
     expect(service.store.read().packages).toEqual([]);
     expect(fs.existsSync(path.join(root, 'owned'))).toBe(false);
     allow = true;
@@ -256,7 +268,7 @@ describe('exact npm package installation', () => {
   });
 
   it.each(['metadata identity', 'cross-origin archive', 'metadata redirect', 'archive redirect', 'integrity'] as const)(
-    'refuses npm %s before approval and publication', async failure => {
+    'refuses npm %s before publication review', async failure => {
       const fixture = await npmArchive();
       const { metadata, metadataUrl } = fixture;
       const tarball = metadata.dist.tarball;
@@ -279,7 +291,7 @@ describe('exact npm package installation', () => {
       expect(result.output).toContain(error);
       expect(requests).toEqual(failure === 'archive redirect' || failure === 'integrity'
         ? [new URL(metadataUrl).pathname, new URL(tarball).pathname] : [new URL(metadataUrl).pathname]);
-      expect(approvals).toEqual([]);
+      expect(approvals).toEqual(['extension_manage']);
       expect(service.store.read().packages).toEqual([]);
       expect(fs.existsSync(path.join(root, 'owned'))).toBe(false);
     },
@@ -293,7 +305,7 @@ describe('exact npm package installation', () => {
   ] as const)('rejects an npm archive with a mismatched %s', async (_kind, options, error) => {
     const fixture = await npmArchive('2.0.0', options);
     expect((await pluginCommand(['install', fixture.selector], service)).output).toContain(error);
-    expect(approvals).toEqual([]);
+    expect(approvals).toEqual(['extension_manage']);
     expect(service.store.read().packages).toEqual([]);
     expect(fs.existsSync(path.join(root, 'owned'))).toBe(false);
   });
@@ -303,12 +315,16 @@ describe('exact Git commit installation', () => {
   it('publishes the approved archive and recovers the exact retained commit offline', async () => {
     const repository = gitPackage();
     const first = gitArchive(repository, 'first snapshot');
-    const operation = await installOperation(service, first.selector.replace('#', '.git#'));
-    expect(operation.preview).toContain('Git repository https://github.com/owner/archive-repo');
-    expect(operation.preview).toContain(`Commit ${first.commit}`);
+    const plan = await prepareInstallPlan(service, first.selector.replace('#', '.git#'));
+    expect(plan.acquisition?.preview).toContain('Git repository https://github.com/owner/archive-repo');
+    expect(plan.acquisition?.preview).toContain(`Commit ${first.commit}`);
+    expect(requests).toEqual([]);
+    expect(approvals).toEqual([]);
+    expect((await service.approveResult(plan.acquisition!)).isError).toBe(false);
+    const operation = plan.complete();
     expect(operation.preview).toContain(`SHA256 ${digest(first.bytes)}`);
     expect(operation.preview).toContain(`Manifest ${canonical(manifest('2.0.0'))}`);
-    expect(approvals).toEqual([]);
+    expect(approvals).toEqual(['extension_manage']);
     expect(fs.existsSync(path.join(root, 'owned'))).toBe(false);
 
     bodies.set(first.url, Buffer.from('changed after review'));
@@ -343,6 +359,7 @@ describe('exact Git commit installation', () => {
     allow = false;
     expect((await pluginCommand(['install', fixture.selector], service)).output).toMatch(/refused/i);
     expect(approvals).toEqual(['extension_manage']);
+    expect(requests).toEqual([]);
     expect(service.store.read().packages).toEqual([]);
     expect(fs.existsSync(path.join(root, 'owned'))).toBe(false);
 
@@ -350,7 +367,7 @@ describe('exact Git commit installation', () => {
     changeSources(current => [...current, { ...current[0]!, name: 'git' }]);
     expect((await pluginCommand(['install', 'git:sample@1.0.0'], service)).output).toContain('durability: confirmed');
     expect(service.store.read().packages[0]!.active).toMatchObject({ source: 'git', trustFingerprint: selectedSource('git').trust!.fingerprint });
-    expect(requests).toEqual([new URL(fixture.url).pathname, '/registry/v1/packages/sample', '/registry/archives/1.0.0.tgz']);
+    expect(requests).toEqual(['/registry/v1/packages/sample', '/registry/archives/1.0.0.tgz']);
   });
 
   it.each([
@@ -366,7 +383,7 @@ describe('exact Git commit installation', () => {
     expect(approvals).toEqual([]);
   });
 
-  it.each(['commit', 'directory', 'manifest', 'redirect'] as const)('rejects invalid Git archive %s before approval', async failure => {
+  it.each(['commit', 'directory', 'manifest', 'redirect'] as const)('rejects invalid Git archive %s before publication review', async failure => {
     const fixture = gitArchive(gitPackage(), 'fixture', {
       ...(failure === 'directory' ? { envelope: 'different' } : {}),
       ...(failure === 'manifest' ? { version: 'latest' } : {}),
@@ -380,7 +397,7 @@ describe('exact Git commit installation', () => {
       manifest: 'exact extension version', redirect: 'redirect refused' };
     expect((await pluginCommand(['install', selector], service)).output).toContain(errors[failure]);
     expect(requests).toEqual([new URL(url).pathname]);
-    expect(approvals).toEqual([]);
+    expect(approvals).toEqual(['extension_manage']);
     expect(service.store.read().packages).toEqual([]);
     expect(fs.existsSync(path.join(root, 'owned'))).toBe(false);
   });
@@ -389,17 +406,72 @@ describe('exact Git commit installation', () => {
     const fixture = gitArchive(gitPackage(), 'interrupted snapshot');
     const controller = new AbortController();
     const received = holdResponse(new URL(fixture.url).pathname);
-    const pending = installOperation(service, fixture.selector, undefined, controller.signal);
+    const pending = pluginCommand(['install', fixture.selector], service, { signal: controller.signal });
     await received;
     controller.abort();
-    await expect(pending).rejects.toThrow(/abort|cancel/i);
-    expect(approvals).toEqual([]);
+    expect((await pending).installConfirmed).toBe(false);
+    expect(approvals).toEqual(['extension_manage']);
     expect(service.store.read().packages).toEqual([]);
     expect(fs.existsSync(path.join(root, 'owned'))).toBe(false);
   });
 });
 
 describe('guarded lifecycle and ordinary approval', () => {
+  it('refuses publication when lifecycle admission changes during the approved archive download', async () => {
+    const gate = service.options.gate;
+    let current = true;
+    vi.spyOn(service.options, 'gate').mockImplementation(tool => ({ ...gate(tool),
+      admission: () => current ? undefined : 'Extension installation authority changed.' }));
+    const downloaded = holdResponse('/registry/archives/1.0.0.tgz');
+    const pending = pluginCommand(['install', 'fixture:sample@1.0.0'], service);
+    await downloaded;
+    current = false;
+    resumeResponses();
+    expect((await pending).installConfirmed).toBe(false);
+    expect(approvals).toEqual(['extension_manage']);
+    expect(service.store.read().packages).toEqual([]);
+    expect(fs.existsSync(path.join(root, 'owned'))).toBe(false);
+  });
+
+  it.each(['npm', 'git'] as const)('keeps %s acquisition and publication approvals separate in the standalone command', async source => {
+    const fixture = source === 'npm' ? await npmArchive() : gitArchive(gitPackage(), 'fixture snapshot');
+    const gate = service.options.gate;
+    const observations: { requests: number; owned: boolean }[] = [];
+    const handler = vi.fn<NonNullable<ReturnType<typeof gate>['escalationPromptHandler']>>().mockImplementation(async () => {
+      observations.push({ requests: requests.length, owned: fs.existsSync(path.join(root, 'owned')) });
+      return { decision: observations.length === 1 ? 'allow-once' : 'deny' };
+    });
+    vi.spyOn(service.options, 'gate').mockImplementation(tool => ({ ...gate(tool), escalationPromptHandler: handler }));
+    const result = await pluginCommand(['install', fixture.selector], service, { explicitApproval: true });
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(observations).toEqual([{ requests: 0, owned: false }, { requests: source === 'npm' ? 2 : 1, owned: false }]);
+    const [download, publication] = handler.mock.calls.map(([prompt]) => prompt.context);
+    expect(download?.preview).toContain('Download and validate');
+    expect(publication?.preview).toContain(`SHA256 ${digest(fixture.bytes)}`);
+    expect(publication?.preview).toContain(`Manifest ${canonical(manifest('2.0.0'))}`);
+    expect(handler.mock.calls.every(([prompt]) => prompt.context.explicitApproval === true
+      && !prompt.options.some(option => option.value === 'allow-always'))).toBe(true);
+    expect(result.installConfirmed).toBe(false);
+    expect(service.store.read().packages).toEqual([]);
+    expect(fs.existsSync(path.join(root, 'owned'))).toBe(false);
+  });
+
+  it('refuses changing the archive endpoint after the download preview', async () => {
+    const fixture = gitArchive(gitPackage(), 'fixture snapshot');
+    const gate = service.options.gate;
+    const handler = vi.fn<NonNullable<ReturnType<typeof gate>['escalationPromptHandler']>>().mockImplementation(async () => {
+      Object.defineProperty(service, 'gitArchiveBase', { value: `${base}/changed` });
+      return { decision: 'allow-once' };
+    });
+    vi.spyOn(service.options, 'gate').mockImplementation(tool => ({ ...gate(tool), escalationPromptHandler: handler }));
+    const result = await pluginCommand(['install', fixture.selector], service);
+    expect(result.output).toContain('Approved Git archive endpoint changed');
+    expect(result.installConfirmed).toBe(false);
+    expect(handler).toHaveBeenCalledOnce();
+    expect(requests).toEqual([]);
+    expect(fs.existsSync(path.join(root, 'owned'))).toBe(false);
+  });
+
   it.each(['allow-always', 'allow-once'] as const)('requires the standalone installation to receive one-time approval (%s)', async decision => {
     localPackage('package');
     const gate = service.options.gate;
@@ -836,6 +908,21 @@ describe('bound extension management views', () => {
     expect(service.store.read().packages[0]!.activation[workspace]!.enabled).toBe(false);
     expect(approvals).toEqual(['extension_grant']);
     expect(await prepared.apply()).toContain('consumed'); expect(approvals).toHaveLength(1);
+  });
+
+  it('keeps the manager preview read-only and publishes npm bytes after both approvals', async () => {
+    const fixture = await npmArchive();
+    const view = manager();
+    const current = snapshot(view);
+    const prepared = await view.prepare(current.version, { action: current.install.id, input: fixture.selector });
+    expect(prepared.preview.join('\n')).toContain('Download and validate');
+    expect(requests).toEqual([]);
+    expect(approvals).toEqual([]);
+    expect(await prepared.apply()).toContain('durability: confirmed');
+    expect(approvals).toEqual(['extension_manage', 'extension_manage']);
+    expect(await prepared.apply()).toContain('consumed');
+    expect(requests).toEqual([new URL(fixture.metadataUrl).pathname, new URL(fixture.metadata.dist.tarball).pathname]);
+    expect(service.store.read().packages[0]?.active.digest).toBe(digest(fixture.bytes));
   });
 
   it('preserves ordinary denial and refuses unknown publication without replay', async () => {

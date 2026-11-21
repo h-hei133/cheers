@@ -219,7 +219,7 @@ function bootstrapResources(input: CreateCliBootstrapRuntimeContextInput) {
       if (input.options.scopedModels?.length) runtimeContext.scopedModels = input.options.scopedModels;
       if (input.options.extensionPaths?.length) runtimeContext.cliExtensionPaths = input.options.extensionPaths;
       runtimeContext.workspaceAdmission = () => sessionWorkspaceAdmission(sessionManager, runtimeContext.session);
-      const mcpGateway = createCliMcpGateway(() => runtimeContext.cwd, () => configurationAdmission(runtimeContext));
+      const mcpGateway = createCliMcpGateway(() => runtimeContext.cwd, () => configurationAdmission(runtimeContext), () => runtimeContext.session.id);
 
       return {
         ...input.rootContext,

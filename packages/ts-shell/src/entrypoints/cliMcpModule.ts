@@ -15,13 +15,16 @@ import type { McpContentRequest } from "../core/mcp/content/types.js";
 import { classifyUnknownMcpFailure } from "../core/mcp/errorTaxonomy.js";
 import { authorizationForMcp } from '../cli/mcp/auth/service.js';
 import type { Admission } from '../core/network/admission.js';
+import { sessionMcpDefinitions } from '../core/catalog/mcp.js';
 
 export type CliMcpAction = "status" | "tools" | "doctor" | "refresh" | "test" | "content" | "notifications" | "cancel";
 
 export type CliMcpGateway = Pick<CoreMcpGateway, "snapshot" | "refresh"> & Partial<Pick<CoreMcpGateway, "close" | "syncWorkspace" | "peekSnapshot" | "subscribe" | "content" | "notifications" | "cancelContent">>;
 
-export function createCliMcpGateway(cwd: string | (() => string), admissionForOperation?: () => () => string | undefined): CoreMcpGateway {
-  return new CoreMcpGateway(cwd, admissionForOperation, authorizationForMcp);
+export function createCliMcpGateway(cwd: string | (() => string), admissionForOperation?: () => Admission,
+  session?: () => string): CoreMcpGateway {
+  return new CoreMcpGateway(cwd, admissionForOperation, authorizationForMcp, undefined,
+    session ? sessionMcpDefinitions(session) : undefined);
 }
 
 export async function runCliMcpCommand(input: {

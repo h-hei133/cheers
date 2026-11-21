@@ -3,8 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CoreMcpGateway } from "../core/mcp/gateway.js";
-import { createAgentSession, DefaultResourceLoader, getRuntimeConfig, type ExtensionAPI, type ExtensionThinkingUpdate, type QueryEvent } from "../index.js";
+import { createAgentSession, DefaultResourceLoader, getRuntimeConfig, type ExtensionAPI, type ExtensionModelUpdate, type ExtensionThinkingUpdate, type QueryEvent } from "../index.js";
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../session/model/state.js';
+import { sessionMcpDefinitions } from '../core/catalog/mcp.js';
+import { renderCustomMessage } from '../core/catalog/renderers.js';
 
 const tempDirs: string[] = [];
 const originalHome = process.env.HOME;
@@ -109,6 +111,93 @@ describe("DefaultResourceLoader", () => {
 });
 
 describe("createAgentSession & AgentSession", () => {
+  it('publishes session registrations through the public resource loader and withdraws them on disposal', async () => {
+    const { work } = makeEnv();
+    const resourceLoader = new DefaultResourceLoader({ cwd: work, noContextFiles: true, extensionFactories: [api => {
+      api.registerProvider('example-relay', {
+        runtime: 'openai', baseUrl: 'http://127.0.0.1:9080/v1', models: [{ id: 'custom-model', contextWindow: 2048 }],
+      });
+      api.registerMcpServer('example-mcp', { url: 'http://127.0.0.1:9080/mcp', enabled: false });
+      api.registerMessageRenderer('example-note', message => `Note: ${message.content}`);
+    }] });
+    await resourceLoader.reload();
+    const { session } = await createAgentSession({ cwd: work, resourceLoader });
+    const definitions = sessionMcpDefinitions(() => session.sessionId);
+    const message = { role: 'custom', customType: 'example-note', content: 'original', display: true } as const;
+    try {
+      expect(session.getModelCatalog().physical.find(provider => provider.id === 'example-relay')).toMatchObject({
+        runtime: 'openai', models: [{ id: 'custom-model', contextWindow: 2048 }],
+      });
+      expect(definitions.read(work)['example-mcp']).toMatchObject({ enabled: false, transport: 'http', extensionOwner: expect.any(String) });
+      expect(renderCustomMessage(work, session.sessionId, message)).toBe('Note: original');
+    } finally { await session.dispose(); }
+    expect(definitions.read(work)).toEqual({});
+    expect(renderCustomMessage(work, session.sessionId, message)).toBeUndefined();
+  });
+
+  it('changes the logical model through an idle extension callback without acquiring provider authority', async () => {
+    const { work } = makeEnv();
+    const route = vi.fn(() => ({ provider: 'openai', modelId: 'physical' }));
+    let apiRef: ExtensionAPI | undefined;
+    let receipt: ExtensionModelUpdate | undefined;
+    const resourceLoader = new DefaultResourceLoader({ cwd: work, noContextFiles: true, extensionFactories: [api => {
+      apiRef = api;
+      api.registerVirtualModel({ provider: 'adaptive', id: 'first', name: 'First', route });
+      api.registerVirtualModel({ provider: 'adaptive', id: 'second', name: 'Second', route });
+      api.on('session_start', async () => { receipt = await api.setModel('adaptive/second'); });
+    }] });
+    await resourceLoader.reload();
+    const { session } = await createAgentSession({ cwd: work, resourceLoader, provider: 'google', model: 'adaptive/first' });
+    try {
+      expect(receipt).toEqual({ status: 'applied', model: 'adaptive/second' });
+      expect(readSessionModel(session.sessionId)).toMatchObject({ provider: 'google', virtualModel: { provider: 'adaptive', model: 'second' } });
+      expect(route).not.toHaveBeenCalled();
+      await expect(apiRef!.setModel('adaptive/first')).rejects.toThrow('callback');
+    } finally { await session.dispose(); }
+    await expect(apiRef!.setModel('adaptive/first')).rejects.toThrow(/retired/);
+  });
+
+  it('narrows the ordinary request tool pool and releases the selection on reload', async () => {
+    const { work } = makeEnv();
+    let current!: ExtensionAPI;
+    let original!: ExtensionAPI;
+    const resourceLoader = new DefaultResourceLoader({ cwd: work, noContextFiles: true, extensionFactories: [api => {
+      current = api;
+      if (original) return;
+      original = api;
+      api.on('session_start', async () => {
+        const selection = ['read', 'write'];
+        await api.setActiveTools(selection);
+        selection[0] = 'grep';
+      });
+      api.registerCommand({ name: 'update-tools', kind: 'local', summary: 'Update tools', group: 'session', execute: async () => {
+        await api.setActiveTools([]);
+        return { kind: 'local', output: 'changed' };
+      } });
+    }] });
+    await resourceLoader.reload();
+    const { session, extensionsResult } = await createAgentSession({ cwd: work, resourceLoader,
+      tools: ['read', 'grep'], runtimeConfigOverrides: { toolDiscovery: 'full' } });
+    try {
+      expect(await current.getActiveTools()).toEqual(['read']);
+      const command = extensionsResult.extensions[0]!.extension.commands[0]!;
+      await session.sessionRuntime.commands.run(async () => {
+        await expect(command.execute([], { cwd: work, sessionId: session.sessionId })).rejects.toThrow('Finish the current session operation');
+      });
+      await session.prompt('first request');
+      await session.waitForIdle();
+      const selected = session.runtimeContext.promptIdentity?.schemaDigest;
+      expect(selected).toMatch(/^[a-f\d]{64}$/);
+      const result = await session.reload();
+      expect(result, 'reason' in result ? result.reason : undefined).toMatchObject({ status: 'reloaded' });
+      await expect(original.setActiveTools([])).rejects.toThrow(/retired/);
+      expect(await current.getActiveTools()).toEqual(expect.arrayContaining(['read', 'grep']));
+      await session.prompt('second request');
+      expect(session.runtimeContext.promptIdentity?.schemaDigest).toMatch(/^[a-f\d]{64}$/);
+      expect(session.runtimeContext.promptIdentity?.schemaDigest).not.toBe(selected);
+    } finally { await session.dispose(); }
+  });
+
   it('saves virtual effort from an admitted SDK callback and refuses busy or retired invocations', async () => {
     const { work } = makeEnv();
     const route = vi.fn(() => ({ provider: 'openai', modelId: 'physical' }));

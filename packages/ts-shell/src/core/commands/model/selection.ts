@@ -6,7 +6,7 @@ import { ConfigWriteError } from '../../../config/outcome.js';
 import { inspectConfigConstraints } from '../../../config/constraints.js';
 import { sameValue } from '../../../config/values.js';
 import { projectModelSelection, projectSessionModel } from '../../../session/model/projection.js';
-import type { SessionModelPolicy, SessionModelTarget } from '../../../session/model/contract.js';
+import type { SessionExtensionProvider, SessionModelPolicy, SessionModelTarget } from '../../../session/model/contract.js';
 import { readSessionModelEdit, writeSessionModel, type SessionModelEdit, type SessionModelReceipt } from '../../../session/model/state.js';
 import { SessionModelWriteError } from '../../../session/model/outcome.js';
 import { defaultHookDispatcher } from '../../hooks/hookDispatcher.js';
@@ -29,6 +29,7 @@ import { readLogicalModel } from '../../../session/model/logical.js';
 import { sessionVirtualModels } from '../../catalog/models.js';
 import { parseModelSelection } from '../../models/virtual/selection.js';
 import { setVirtualModel } from './virtual.js';
+import { EXTENSION_MODEL_PREFIX, extensionModelReference, sessionProviderScope, sessionProviders } from '../../catalog/providers.js';
 
 interface ExactSelection { readonly target: SessionModelTarget; readonly baseline?: SessionModelEdit; readonly roles?: SessionModelPolicy;
   readonly resolution?: string }
@@ -89,10 +90,19 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   // known provider is read as one.
   const separator = target?.indexOf("/") ?? -1;
   const prefix = separator > 0 ? target!.slice(0, separator) : undefined;
-  const namedProvider = !exact && prefix && loadCatalog().some((entry) => entry.id === prefix) ? prefix : undefined;
-  let model: string | undefined = namedProvider ? target!.slice(separator + 1) : target;
+  const physical = loadCatalog();
+  const namedProvider = !exact && prefix ? physical.find(entry => entry.id === prefix) : undefined;
+  const reference = exact ? undefined : extensionModelReference(target);
+  const registration = reference && context.sessionId ? sessionProviders(context.cwd, context.sessionId).find(entry => entry.id === reference.id) : undefined;
+  if (!exact && target?.startsWith(EXTENSION_MODEL_PREFIX) && (!reference || !registration?.baseUrl)) {
+    return 'Model switch blocked: the extension model registration is unavailable.';
+  }
+  const savedExtension = !target && context.sessionId ? readSessionModelEdit(context.sessionId).selection?.extensionProvider : undefined;
+  const extension: SessionExtensionProvider | undefined = registration?.baseUrl ? { id: registration.id, baseUrl: registration.baseUrl } : savedExtension;
+  if (extension && global) return 'Global model save refused: extension models belong to the current session.';
+  let model: string | undefined = reference?.model ?? (namedProvider ? target!.slice(separator + 1) : target);
   if (namedProvider && !model) {
-    return `\`${namedProvider}\` has no models listed. Name one: /model use ${namedProvider}/<model>.`;
+    return `\`${namedProvider.id}\` has no models listed. Name one: /model use ${namedProvider.id}/<model>.`;
   }
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   const config = edit.values;
@@ -101,7 +111,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   const projected = projectSessionModel(loaded, context.sessionId);
   const effective = context.readConfiguration?.().config ?? context.runtimeConfig ?? projected;
   const actual = modelRequest(context, effective);
-  const catalog = loadCatalog();
+  const catalog = physical;
   const providerSlot = exact ? exact.target.connectionId === undefined
     : !projected.activeProviderConnectionId && !actual.credential?.connectionId;
   if (!exact && (actual.blocked || (!actual.credential && (!providerSlot || !providerBindingAvailable(catalog, actual))))) {
@@ -136,9 +146,17 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   }
   const selectedRequest = request ?? actual;
   const baseUrl = providerCredentialBaseUrl(catalog, selectedRequest);
-  if (catalogProvider(catalog, provider, baseUrl).ambiguous) return 'Model switch blocked: multiple catalogue entries claim this endpoint.';
-  const capability = effortCapability(catalog, provider, model, thinkingEffort, baseUrl);
-  const candidate = catalogModel(catalog, provider, model, catalogBaseUrl(catalog, provider, baseUrl));
+  const scopeRequest = { ...selectedRequest, model };
+  const extensionScope = extension && context.sessionId ? sessionProviderScope(context.cwd, context.sessionId, catalog, scopeRequest, extension) : undefined;
+  const extensionRefusal = extensionScope?.admission?.();
+  if (extensionRefusal) return `Model switch blocked: ${extensionRefusal}`;
+  if (namedProvider && namedProvider.id !== namedProvider.runtime && catalogProvider(catalog, provider, baseUrl).entry?.id !== namedProvider.id) {
+    return `Model switch blocked: the ${namedProvider.id} alias does not match the configured endpoint.`;
+  }
+  const modelCatalog = extensionScope?.catalog ?? catalog;
+  if (catalogProvider(modelCatalog, provider, baseUrl).ambiguous) return 'Model switch blocked: multiple catalogue entries claim this endpoint.';
+  const capability = effortCapability(modelCatalog, provider, model, thinkingEffort, baseUrl);
+  const candidate = catalogModel(modelCatalog, provider, model, catalogBaseUrl(modelCatalog, provider, baseUrl));
   const endpoint = providerCredentialEndpoint(catalog, selectedRequest, baseUrl);
   if (capability === 'unsupported') return 'Model switch blocked: this model does not support the selected reasoning effort. Choose another level or --effort auto.';
   // Publication reloads this cap; startup overrides currently declare no output limit.
@@ -146,7 +164,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   if (budgetFailure) return `Model switch blocked: ${budgetFailure}`;
   const capabilityNotice = !candidate ? 'Model catalogue entry is unavailable; capability is unverified. Use /model refresh or /model config. Remote availability is not verified.'
     : capability === 'unverified' ? 'Effort capability is unverified in the model catalogue. Use /model refresh or /model config to update metadata; remote availability is not verified.' : undefined;
-  const constraints = inspectConfigConstraints(loaded, { provider, model, thinkingEffort, baseUrl, credential: selectedRequest.credential }, catalog);
+  const constraints = inspectConfigConstraints(loaded, { provider, model, thinkingEffort, baseUrl, credential: selectedRequest.credential }, modelCatalog);
   if (constraints.errors.length) return `Model switch blocked: ${constraints.errors.join(' ')}`;
   if (!providerSlot && !activeId) {
     return "No active connection. Run /connect login ... first.";
@@ -171,11 +189,11 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   // Switching model and switching provider are different acts with different
   // consequences — the second needs a credential — so a target naming a provider
   // that is not the active one is refused rather than half-applied.
-  if (namedProvider && namedProvider !== provider) {
+  if (namedProvider && namedProvider.runtime !== provider) {
     return [
-      `\`${model}\` belongs to \`${namedProvider}\`, and the active provider is \`${provider}\`.`,
+      `\`${model}\` belongs to \`${namedProvider.id}\`, and the active provider is \`${provider}\`.`,
       "",
-      `Connect that provider first: /connect login ${namedProvider} --api-key <key>`,
+      `Connect that provider first: /connect login ${namedProvider.runtime} --api-key <key>`,
       "Then switch to it with /connect use <connection-id>.",
     ].join("\n");
   }
@@ -211,9 +229,11 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   // or a different active connection. Unrelated field edits remain independent.
   const beforeCommit = (): boolean => {
     const currentCatalog = loadCatalog();
-    if (context.admission?.() || catalogProvider(currentCatalog, provider, baseUrl).ambiguous
-      || !sameValue(catalogProvider(currentCatalog, provider, baseUrl), catalogProvider(catalog, provider, baseUrl))
-      || !sameValue(catalogModel(currentCatalog, provider, model, catalogBaseUrl(currentCatalog, provider, baseUrl)), candidate)) return false;
+    const currentScope = extension && context.sessionId ? sessionProviderScope(context.cwd, context.sessionId, currentCatalog, scopeRequest, extension) : undefined;
+    const currentModels = currentScope?.catalog ?? currentCatalog;
+    if (context.admission?.() || extensionScope?.admission?.() || currentScope?.admission?.()
+      || !sameValue(catalogProvider(currentModels, provider, baseUrl), catalogProvider(modelCatalog, provider, baseUrl))
+      || !sameValue(catalogModel(currentModels, provider, model, catalogBaseUrl(currentModels, provider, baseUrl)), candidate)) return false;
     const currentConfig = readFreshConfiguration(context);
     if (global && providerSlot && !providerDefaultWritable(currentConfig, provider)) return false;
     // A provider-slot choice is a statement about the request that slot serves.
@@ -235,7 +255,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
       || providerCredentialEndpoint(currentCatalog, selectedRequest, baseUrl) !== endpoint || !currentConfig.configValidation.valid
       || !sameValue([currentConfig.maxOutputTokens, currentConfig.contextWindow, currentConfig.reserveTokens, currentConfig.modelTokenBudgets, currentConfig.retryBaseDelayMs, currentConfig.retryMaxDelayMs],
         [loaded.maxOutputTokens, loaded.contextWindow, loaded.reserveTokens, loaded.modelTokenBudgets, loaded.retryBaseDelayMs, loaded.retryMaxDelayMs])) return false;
-    if (inspectConfigConstraints(currentConfig, { provider, model, thinkingEffort, baseUrl, credential: selectedRequest.credential }, currentCatalog).errors.length) return false;
+    if (inspectConfigConstraints(currentConfig, { provider, model, thinkingEffort, baseUrl, credential: selectedRequest.credential }, currentModels).errors.length) return false;
     const latest = readRuntimeConfigEditAt(edit.path).values;
     return latest.activeProviderConnectionId === config.activeProviderConnectionId && latest.provider === config.provider
       && sameValue(latest.providerConnections?.find(item => item.id.trim() === activeId), config.providerConnections?.find(item => item.id.trim() === activeId))
@@ -271,6 +291,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
           ...(exact || inferredConnection || sessionEdit?.selection?.connectionScope === 'session' ? { connectionScope: 'session' as const } : {}) }),
         provider,
         model,
+        ...(extension ? { extensionProvider: extension } : {}),
         thinkingEffort,
         // Presets are session-owned named roles, not the active model. Preserve
         // them when switching the active target; a switch must not silently

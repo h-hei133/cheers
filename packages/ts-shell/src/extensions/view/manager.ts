@@ -1,12 +1,12 @@
 import type { ExtensionService } from '../service.js';
 import { rootSignature } from '../lifecycle/grants.js';
 import { activationOperation } from '../lifecycle/grants.js';
-import { installOperation, removeOperation, rollbackOperation, type Operation } from '../lifecycle/install.js';
+import { prepareInstallPlan, removeOperation, rollbackOperation, type Operation } from '../lifecycle/install.js';
 import { readSources, sourceFile } from '../registry/sources.js';
 import { observeDirectory } from '../../core/state/watch.js';
 import { freezeDeep } from '../../core/values/freeze.js';
 import type { ExtensionSource } from '../model.js';
-import type { ExtensionInspection, ExtensionManager, ExtensionPreparation, ExtensionSelection } from './model.js';
+import type { ExtensionInspection, ExtensionManager, ExtensionPreparation } from './model.js';
 import { installTarget, packageActions } from './actions.js';
 import { inspectionVersion, packageKey, projectExtensions } from './projection.js';
 import { safeLines } from './text.js';
@@ -62,31 +62,38 @@ export function extensionManager(service: ExtensionService, admission: () => str
     const targets = selection.item === undefined ? [installTarget] : record ? packageActions(record, service.root, value.workspace) : [];
     const target = targets.find(entry => entry.view.id === selection.action);
     if (!target || Boolean(target.view.input) !== (selection.input !== undefined)) throw new Error('Select one offered extension action.');
-    const operation = await prepareOperation(service, target.args, selection, signal);
+    const [action, name] = target.args;
+    const installation = action === 'install' || action === 'update'
+      ? await prepareInstallPlan(service, selection.input!, action === 'update' ? name : undefined, signal) : undefined;
+    const operation = installation ? installation.acquisition ?? installation.complete() : prepareOperation(service, target.args);
     signal.throwIfAborted(); check(version);
     let used = false;
     const prepared: ExtensionPreparation = { title: target.view.label, preview: safeLines(operation.preview), apply: async () => {
       if (used) return 'Extension confirmation has already been consumed.';
       used = true;
       return run(async signal => {
-        signal.throwIfAborted(); check(version);
-        const guarded: Operation = { preview: operation.preview, apply: async context => {
-          signal.throwIfAborted(); check(version);
-          return operation.apply(context);
-        } };
-        const selected = ['enable', 'disable', 'grant', 'revoke'].includes(target.args[0]!) ? 'extension_grant' : 'extension_manage';
-        return safeLines(await service.approve(guarded, selected, signal)).join('\n');
+        const ensureCurrent = () => { signal.throwIfAborted(); check(version); };
+        ensureCurrent();
+        const guarded = (prepared: Operation): Operation => ({ ...prepared, apply: async context => {
+          ensureCurrent();
+          return prepared.apply(context);
+        } });
+        if (installation?.acquisition) {
+          const acquired = await service.approveResult(guarded(installation.acquisition), 'extension_manage', signal);
+          if (acquired.isError) return safeLines(acquired.output).join('\n');
+          ensureCurrent();
+          return safeLines(await service.approve(guarded(installation.complete()), 'extension_manage', signal)).join('\n');
+        }
+        const selected = ['enable', 'disable', 'grant', 'revoke'].includes(action!) ? 'extension_grant' : 'extension_manage';
+        return safeLines(await service.approve(guarded(operation), selected, signal)).join('\n');
       });
     } };
     return prepared;
   }) };
 }
 
-async function prepareOperation(service: ExtensionService, args: readonly string[], selection: ExtensionSelection, signal: AbortSignal): Promise<Operation> {
+function prepareOperation(service: ExtensionService, args: readonly string[]): Operation {
   const [action, name, input] = args;
-  if (action === 'install' || action === 'update') {
-    return installOperation(service, selection.input!, action === 'update' ? name : undefined, signal);
-  }
   if (action === 'uninstall') return removeOperation(service, name!);
   if (action === 'rollback') return rollbackOperation(service, name!, input!);
   return activationOperation(service, service.root, action as 'enable' | 'disable' | 'grant' | 'revoke', name!, input);

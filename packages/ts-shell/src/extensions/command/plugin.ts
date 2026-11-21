@@ -1,4 +1,4 @@
-import { installOperation, removeOperation, rollbackOperation } from '../lifecycle/install.js';
+import { prepareInstallPlan, removeOperation, rollbackOperation } from '../lifecycle/install.js';
 import { activationOperation, migrationOperation, registrationOperation } from '../lifecycle/grants.js';
 import type { ExtensionService } from '../service.js';
 import type { LocalCommandResult } from '../../core/commands/types.js';
@@ -10,6 +10,10 @@ import { verifyPathContainment } from '../../core/security/pathJail.js';
 import { isRecord } from '../../core/values/record.js';
 
 export interface PluginCommandResult extends LocalCommandResult { readonly installConfirmed?: boolean }
+
+export function isExtensionControl(text: string): boolean {
+  return /^\/(?:plugin|plugins|extensions)(?:\s+(?:cancel|list|details|disable|revoke|reload)(?:\s|$)|\s*$)|^\/reload-plugins(?:\s|$)/i.test(text.trim());
+}
 
 export async function pluginCommand(args: string[], service: ExtensionService,
   options: { readonly signal?: AbortSignal; readonly explicitApproval?: boolean } = {}): Promise<PluginCommandResult> {
@@ -34,14 +38,18 @@ export async function pluginCommand(args: string[], service: ExtensionService,
       return { kind: 'local', output: JSON.stringify(discovered, null, 2) };
     }
     if (rest.length) throw new Error('Too many plugin arguments.');
-    if (action === 'install' && target && !input) {
-      const result = await service.approveResult(await installOperation(service, target, undefined, options.signal), 'extension_manage', options.signal, options.explicitApproval);
+    if (target && (action === 'install' && !input || action === 'update' && input)) {
+      const plan = await prepareInstallPlan(service, action === 'update' ? input! : target, action === 'update' ? target : undefined, options.signal);
+      if (plan.acquisition) {
+        const acquisition = await service.approveResult(plan.acquisition, 'extension_manage', options.signal);
+        if (acquisition.isError) return { kind: 'local', output: acquisition.output, ...(action === 'install' ? { installConfirmed: false } : {}) };
+      }
+      const result = await service.approveResult(plan.complete(), 'extension_manage', options.signal, options.explicitApproval);
       const effect = result.metadata?.effect;
       const installConfirmed = !result.isError && isRecord(effect) && effect.effect === 'published' && effect.durability === 'confirmed';
-      return { kind: 'local', output: result.output, installConfirmed };
+      return { kind: 'local', output: result.output, ...(action === 'install' ? { installConfirmed } : {}) };
     }
     if (action === 'add' && target && !input) return { kind: 'local', output: await service.approve(registrationOperation(service, target)) };
-    if (action === 'update' && target && input) return { kind: 'local', output: await service.approve(await installOperation(service, input, target)) };
     if (action === 'rollback' && target && input) return { kind: 'local', output: await service.approve(rollbackOperation(service, target, input)) };
     if (['uninstall', 'remove', 'rm'].includes(action) && target && !input) return { kind: 'local', output: await service.approve(removeOperation(service, target)) };
     if (['enable', 'disable', 'grant', 'revoke'].includes(action) && target && (!input || ['grant', 'revoke'].includes(action))) return { kind: 'local', output: await service.approve(activationOperation(service, service.root, action as 'enable' | 'disable' | 'grant' | 'revoke', target, input), 'extension_grant') };

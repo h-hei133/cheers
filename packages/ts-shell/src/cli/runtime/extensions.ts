@@ -24,6 +24,7 @@ import { ExtensionShortcuts } from './extensions/shortcuts.js';
 import type { CliExtensionArguments } from '../options/extensions.js';
 import { loadExtensionFiles, type PreparedExtensionFiles } from './extensions/files.js';
 export { bindExtensionUiFor, extensionHostFor } from './extensions/host.js';
+export { isExtensionControl } from '../../extensions/command/plugin.js';
 
 interface ExtensionRuntime {
   readonly service: () => ExtensionService; readonly ready: () => Promise<void>; readonly close: () => Promise<void>; readonly cancel: () => Promise<readonly string[]>; readonly run: ExtensionRun;
@@ -214,6 +215,9 @@ async function registerCliExtensions(
         commands: loaded.commands,
         tools: guardedTools,
         virtualModels: loaded.virtualModels,
+        messageRenderers: loaded.messageRenderers,
+        mcpServers: loaded.mcpServers,
+        providers: loaded.providers,
         signal: loaded.signal,
         skills: () => [],
         ...(onEvent ? { onEvent } : {}),
@@ -295,4 +299,3 @@ export function extensionManagerFor(context: ShellRuntimeContext): ExtensionMana
     return extensionManager(service, admission, runtime.run);
   } catch { return undefined; }
 }
-export function isExtensionControl(text: string): boolean { return /^\/(?:plugin|plugins|extensions)(?:\s+(?:cancel|list|details|disable|revoke|reload)(?:\s|$)|\s*$)|^\/reload-plugins(?:\s|$)/i.test(text.trim()); }

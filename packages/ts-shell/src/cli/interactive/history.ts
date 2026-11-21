@@ -9,6 +9,9 @@ import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { Transcript } from "../../presentation/tui/transcript/container.js";
 import { startNewSession } from "../runtime/session.js";
 import type { SessionReport } from '../../session/reports/model.js';
+import type { CustomAgentMessage } from '../../core/agent/custom.js';
+import { renderCustomMessage } from '../../core/catalog/renderers.js';
+import { dialogText } from './extensions/limits.js';
 
 /**
  * Putting a session's conversation back on screen.
@@ -33,8 +36,10 @@ export interface RestoredHistory {
 }
 
 /** Blocks for a session's conversation, oldest first, bounded. */
-export function restoreConversation(turns: readonly SessionMessage[], reports: readonly SessionReport[] = [], collapseThinking = true): RestoredHistory {
+export function restoreConversation(turns: readonly SessionMessage[], reports: readonly SessionReport[] = [], collapseThinking = true,
+  renderCustom?: (message: CustomAgentMessage) => string | undefined): RestoredHistory {
   const blocks: Block[] = [];
+  const customBlocks = new Map<number, CustomAgentMessage>();
   const reportGroups = groupReports(turns, reports);
   blocks.push(...(reportGroups.get(undefined) ?? []));
   const toolBlocksById = new Map<string, Block>();
@@ -43,6 +48,10 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
     if (turn.role === 'custom') {
       if (turn.display) {
         const images = imagesOf(turn.content);
+        if (renderCustom) {
+          customBlocks.set(blocks.length, turn);
+          if (customBlocks.size > MAX_RESTORED) customBlocks.delete(customBlocks.keys().next().value!);
+        }
         blocks.push({ ...textBlock('notice', messageToText(turn.content)), ...(images.length ? { images } : {}) });
       }
     } else if (turn.role === "user") {
@@ -126,8 +135,15 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
     }
   }
 
-  const kept = blocks.slice(Math.max(0, blocks.length - MAX_RESTORED));
-  return { blocks: kept, earlier: blocks.slice(0, blocks.length - kept.length), omitted: blocks.length - kept.length };
+  const omitted = Math.max(0, blocks.length - MAX_RESTORED);
+  if (renderCustom) {
+    for (const [index, message] of customBlocks) {
+      if (index < omitted) continue;
+      const text = renderCustom(message);
+      if (text !== undefined) blocks[index]!.text = dialogText(text, 32 * 1024);
+    }
+  }
+  return { blocks: blocks.slice(omitted), earlier: blocks.slice(0, omitted), omitted };
 }
 export interface HistoryTarget {
   readonly transcript: Transcript;
@@ -172,7 +188,9 @@ export function appendConversation(target: Pick<HistoryTarget, 'transcript' | 'e
   // rewind all correct: they establish a session by calling this, and a session
   // that is being shown is a session whose checklist has just been restored.
   replayTodosFromMessages(session.id, session.turns);
-  const restored = restoreConversation(session.turns, session.reports, target.context?.runtimeConfig.collapseThinking ?? true);
+  const root = target.context?.cwd;
+  const restored = restoreConversation(session.turns, session.reports, target.context?.runtimeConfig.collapseThinking ?? true,
+    root ? message => renderCustomMessage(root, session.id, message) : undefined);
   const notice = restored.omitted > 0
     ? textBlock("notice", `${restored.omitted} earlier messages are not shown.`)
     : undefined;

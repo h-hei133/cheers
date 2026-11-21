@@ -15,7 +15,7 @@ import { SubmissionQueue } from '../../interactive/inputQueue.js';
 import { attachSubmissionQueue } from '../inputQueue.js';
 import { routeSlashCommand } from '../../../core/commands/slashRouter.js';
 import {bindSessionSurface} from '../session/surface.js';
-import {bindExtensionUiFor, extensionHostFor, installExtensionHost} from './host.js';
+import {bindExtensionUiFor, extensionHostFor, installExtensionHost, sessionToolConfig} from './host.js';
 import {captureExtensionRuntimeFor, closeExtensionsFor, extensionCommandFor, installExtensionRuntime, startExtensionsFor} from '../extensions.js';
 import { scanCliArgs } from '../../options/argv.js';
 import { cliExtensionArguments, type CliExtensionArguments } from '../../options/extensions.js';
@@ -180,6 +180,18 @@ it('keeps startup messages in the original queue until the reload command settle
   cleanups.push(attachSubmissionQueue(runtime,queue,async text => {expect(runtime.commands.current).toBeUndefined(); prompts.push(text);},() => !runtime.commands.current));
   const result=await reload(); await new Promise(resolve => setImmediate(resolve));
   expect(result.output).toContain('reloaded'); expect(prompts).toEqual(['Reload startup message']); expect(runtime.executePrompt).not.toHaveBeenCalled();
+});
+
+it('applies the successor tool selection during startup inside the reload command', async () => {
+  const file = path.join(root, 'tools.ts'); context.cliExtensionPaths = [file];
+  fs.writeFileSync(file, `export default api => api.on('session_start', async event => {
+    await api.setActiveTools(event.reason === 'reload' ? ['write'] : ['read']);
+  });`);
+  install(); await startExtensionsFor(context);
+  expect(sessionToolConfig(context, context.runtimeConfig).config.allowedTools).toEqual(['read']);
+  const result = await reload();
+  expect(result.output).toContain('reloaded');
+  expect(sessionToolConfig(context, context.runtimeConfig).config.allowedTools).toEqual(['write']);
 });
 
 it('retains explicit input but removes startup entries when reload is cancelled during new startup', async () => {

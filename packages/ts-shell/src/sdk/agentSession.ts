@@ -367,7 +367,7 @@ export async function createAgentSession(
   }
 
   const ownsMcpGateway = options.mcpGateway === undefined;
-  const mcpGateway = options.mcpGateway ?? createCliMcpGateway(() => runtimeContext.cwd);
+  const mcpGateway = options.mcpGateway ?? createCliMcpGateway(() => runtimeContext.cwd, () => configurationAdmission(runtimeContext), () => runtimeContext.session.id);
   const cleanups: Array<() => void> = [];
 
   let sessionRuntime: ShellSessionRuntime | undefined;

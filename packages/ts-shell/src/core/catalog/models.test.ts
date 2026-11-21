@@ -1,8 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { catalogContributions, registerCatalogContribution, type CatalogContribution } from './contributions.js';
 import { VirtualModelRegistry, type VirtualModelDefinition } from '../models/virtualModels.js';
-import type { CatalogProvider } from '../models/catalog.js';
+import { catalogModel, type CatalogProvider } from '../models/catalog.js';
+import type { ProviderCredentialResolution } from '../auth/credential.js';
 import { sessionModelCatalog } from './models.js';
+import { sessionProviderScope } from './providers.js';
 
 const cleanups: Array<() => void> = [];
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
@@ -11,6 +13,35 @@ const definition = (route = () => ({ provider: 'openai', modelId: 'physical' }))
 function contribution(sessionId: string, virtualModels = [definition()], signal?: AbortSignal): CatalogContribution {
   return { root: '/catalog-fixture', sessionId, commands: [], tools: [], skills: () => [], virtualModels, signal };
 }
+
+it('applies extension model metadata only to the exact authorized endpoint and generation', () => {
+  const root = '/catalog-fixture';
+  const sessionId = 'relay';
+  const baseUrl = 'http://127.0.0.1:9080/v1';
+  const physical: readonly CatalogProvider[] = [{
+    id: 'openai', label: 'OpenAI', runtime: 'openai', endpoint: 'openai-responses', auth: 'api-key', models: [{ id: 'existing' }],
+  }];
+  const relay: CatalogProvider = { id: 'example-relay', label: 'Example', runtime: 'openai', auth: 'api-key', baseUrl,
+    models: [{ id: 'custom-model', contextWindow: 2048 }] };
+  const controller = new AbortController();
+  const entry = { ...contribution(sessionId, [], controller.signal), providers: [relay] };
+  cleanups.push(registerCatalogContribution(entry, physical));
+  const resolution: ProviderCredentialResolution = { provider: 'openai', baseUrl: `${baseUrl}/`, model: 'custom-model',
+    expectedEnvVarName: 'OPENAI_API_KEY', credential: { source: 'connection', connectionId: 'local', provider: 'openai',
+      authMode: 'api-key', apiKey: 'synthetic-key', envVarName: 'OPENAI_API_KEY' } };
+  const scope = sessionProviderScope(root, sessionId, physical, resolution);
+  expect(scope.catalog.find(provider => provider.id === relay.id)?.endpoint).toBe('openai-responses');
+  expect(catalogModel(scope.catalog, resolution.provider, resolution.model, baseUrl)?.contextWindow).toBe(2048);
+  expect(catalogModel(scope.catalog, resolution.provider, 'existing', baseUrl)).toEqual({ id: 'existing' });
+  expect(sessionProviderScope(root, sessionId, physical, { ...resolution, credential: undefined }).catalog).toBe(physical);
+  expect(sessionProviderScope(root, sessionId, physical, { ...resolution, baseUrl: 'http://127.0.0.1:9999/v1' }).catalog).toBe(physical);
+  expect(sessionProviderScope(root, 'foreign', physical, resolution).catalog).toBe(physical);
+  expect(scope.admission?.()).toBeUndefined();
+  controller.abort();
+  cleanups.push(registerCatalogContribution({ ...entry, signal: undefined }, physical));
+  expect(scope.admission?.()).toMatch(/registration changed/);
+  expect(sessionProviderScope(root, sessionId, physical, resolution).admission?.()).toBeUndefined();
+});
 
 it('isolates virtual definitions by session and rejects duplicate logical identities', () => {
   cleanups.push(registerCatalogContribution(contribution('first')));

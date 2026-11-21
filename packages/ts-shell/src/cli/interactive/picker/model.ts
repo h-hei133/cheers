@@ -16,7 +16,7 @@ import { decodeSessionModel } from "../../../session/model/state.js";
 import type { SessionModelRole, SessionModelTarget } from "../../../session/model/contract.js";
 import { exactTargetMatches, scopedModelTarget, targetResolutionIdentity } from "../../../core/commands/model/target.js";
 import { captureModelChoice } from "../../../core/commands/model/choice.js";
-import { setReviewedModelTarget } from "../../../core/commands/model/selection.js";
+import { setModel, setReviewedModelTarget } from "../../../core/commands/model/selection.js";
 import { captureThinkingPreference } from "../../../core/models/preference.js";
 import { sameValue } from "../../../config/values.js";
 import { connectionDraft, connectionEndpoint } from './connections.js';
@@ -37,6 +37,7 @@ import { ModelFocus } from './model/focus.js';
 import { ModelActionOwner, modelActionAdmission, modelBrowserOwned } from './model/owner.js';
 import { providerBindingAvailable, providerScopeSelected } from '../../../core/auth/binding.js';
 import { sessionVirtualModels, sessionModelCatalog } from '../../../core/catalog/models.js';
+import { EXTENSION_MODEL_PREFIX, sessionProviderScope } from '../../../core/catalog/providers.js';
 import { setVirtualModel } from '../../../core/commands/model/virtual.js';
 import { virtualModelEffortPicker } from './model/virtual.js';
 
@@ -177,7 +178,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             const alias = provider.id === provider.runtime ? catalog.find(candidate => candidate.runtime === provider.runtime
               && candidate.id !== provider.runtime && candidate.baseUrl !== undefined && modelAddress !== undefined
               && candidate.baseUrl.replace(/\/+$/, '') === modelAddress.replace(/\/+$/, '')) : undefined;
-            const selected = Boolean(!logical && exact && !ambiguous && !alias && activeReady
+            const selected = Boolean(!logical && !selection?.extensionProvider && exact && !ambiguous && !alias && activeReady
               && connection?.connectionId === active.credential?.connectionId && provider.runtime === active.provider && model.id === active.model
               && resolution?.baseUrl === active.baseUrl && sameValue(resolution?.credential, active.credential));
             const reason = namedConnectionRequired ? 'named connection required'
@@ -269,6 +270,32 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       const readyCategories = new Set(rows.filter(row => !row.disabled).map(row => groups.get(row.id)?.category));
       const categories = [...orderModelCatalog(catalog, rows, groups, readyCategories)];
       if (!assigning && context.sessionId) {
+        const scope = sessionProviderScope(context.cwd, context.sessionId, catalog, active);
+        const registration = scope.registration;
+        if (registration && choice?.baseline) {
+          const captured = choice;
+          categories.push({ id: registration.id, label: registration.label });
+          for (const model of registration.models) {
+            const id = `${EXTENSION_MODEL_PREFIX}${registration.id}/${model.id}`;
+            const selected = selection?.extensionProvider?.id === registration.id && selection.extensionProvider.baseUrl === registration.baseUrl
+              && selection.model === model.id && active.model === model.id;
+            const unsupported = effortCapability(scope.catalog, active.provider, model.id, thinkingEffort, activeAddress) === 'unsupported';
+            groups.set(id, { category: registration.id });
+            rows.push({ id, label: model.id, detail: registration.label, note: selected ? 'active' : unsupported ? 'reasoning effort unsupported' : 'ready' });
+            const admission = (stillOwned: () => boolean) => modelActionAdmission(captured.admission, stillOwned) ?? scope.admission?.();
+            actions.set(id, async stillOwned => admission(stillOwned) ?? setModel([id], { ...context, admission: () => admission(stillOwned) }, false,
+              unsupported ? null : thinkingEffort));
+            details.set(id, [...modelDetails(registration), ...modelMetadataDetails(scope.catalog, registration, model.id, activeAddress)]);
+          }
+        }
+        if (selection?.extensionProvider && !rows.some(row => row.id.startsWith(EXTENSION_MODEL_PREFIX) && row.note === 'active')) {
+          const { id: provider } = selection.extensionProvider;
+          const id = `${EXTENSION_MODEL_PREFIX}${provider}/${selection.model}`;
+          groups.set(id, { category: provider });
+          if (!categories.some(category => category.id === provider)) categories.push({ id: provider, label: provider });
+          rows.unshift({ id, label: selection.model ?? provider, detail: provider, note: 'active · unavailable', disabled: true, focusable: true });
+          details.set(id, ['The selected extension model is unavailable. Reload its extension or choose another model.']);
+        }
         const virtualCatalog = sessionModelCatalog(context.cwd, context.sessionId, catalog).virtual;
         const definitions = sessionVirtualModels(context.cwd, context.sessionId);
         for (const model of virtualCatalog) {
@@ -314,7 +341,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       const currentConnection = active.credential && !active.blocked ? active.credential.connectionId
         : active.selection?.connectionId ?? (active.selection?.credentialScope !== 'provider'
           ? config.sessionConnection?.id ?? config.activeProviderConnectionId : undefined);
-      if (selectionAvailable && !logical && currentModel && !rows.some(row => row.note === 'active')) {
+      if (selectionAvailable && !logical && !selection?.extensionProvider && currentModel && !rows.some(row => row.note === 'active')) {
         const id = 'model:current';
         groups.set(id, { category: currentProvider });
         const reportAddress = activeReady ? activeAddress : active.baseUrl;

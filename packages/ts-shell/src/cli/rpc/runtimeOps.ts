@@ -25,6 +25,7 @@ import { openSettings } from "../interactive/settings.js";
 import { navigateSession } from "../runtime/navigation.js";
 import { readLogicalModel } from '../../session/model/logical.js';
 import { sessionModelCatalog } from '../../core/catalog/models.js';
+import { EXTENSION_MODEL_PREFIX, sessionProviderScope } from '../../core/catalog/providers.js';
 import { sameValue } from '../../config/values.js';
 import type { RpcSettingResult } from './protocol.js';
 
@@ -133,14 +134,17 @@ export async function readRpcEntries(runtimeContext: ShellRuntimeContext, since?
 }
 
 export function listRpcModels(runtimeContext?: ShellRuntimeContext): readonly Record<string, unknown>[] {
-  const catalog = runtimeContext ? sessionModelCatalog(runtimeContext.cwd, runtimeContext.session.id, runtimeContext.configuration.current.catalog)
-    : { physical: loadCatalog(), virtual: [] };
-  return [...catalog.physical.flatMap(provider => provider.models.map(model => ({
+  const physical = runtimeContext?.configuration.current.catalog ?? loadCatalog();
+  const virtual = runtimeContext ? sessionModelCatalog(runtimeContext.cwd, runtimeContext.session.id, physical).virtual : [];
+  const registration = runtimeContext && sessionProviderScope(runtimeContext.cwd, runtimeContext.session.id, physical,
+    modelRequest(buildRpcCommandContext(runtimeContext), runtimeContext.configuration.current.config)).registration;
+  const providers = registration ? [...physical, { ...registration, id: `${EXTENSION_MODEL_PREFIX}${registration.id}` }] : physical;
+  return [...providers.flatMap(provider => provider.models.map(model => ({
     provider: provider.id,
     id: model.id,
     contextWindow: model.contextWindow,
     maxTokens: model.maxTokens,
-  }))), ...catalog.virtual.map(model => ({ provider: model.provider, id: model.id, virtual: true,
+  }))), ...virtual.map(model => ({ provider: model.provider, id: model.id, virtual: true,
     contextWindow: model.contextWindow, maxTokens: model.maxTokens }))];
 }
 

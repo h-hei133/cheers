@@ -30,6 +30,11 @@ import {
 export { describeMcpConnectionState, McpGatewayBlockedError, type McpGatewayBlockerKind } from "./status.js";
 import { McpGatewayBlockedError, unavailableServer, unknownServer } from "./status.js";
 
+export interface McpDefinitionSource {
+  read(workspaceRoot: string): Record<string, ScopedMcpServerConfig>;
+  subscribe(changed: () => void): () => void;
+}
+
 export class CoreMcpGateway {
   private workspaceRoot: string;
   private readonly connectionManager: CoreMcpConnectionManager;
@@ -38,12 +43,16 @@ export class CoreMcpGateway {
   private closed = false;
   private closing?: Promise<void>;
   private readonly contentLifetime = new McpContentLifetime();
+  private readonly unsubscribeDefinitions?: () => void;
 
   constructor(private readonly root: string | (() => string), private readonly admissionForOperation?: () => Admission,
     authorizationFor?: (name: string, config: ScopedMcpServerConfig) => McpHttpAuthorization | undefined,
-    private readonly snapshotTimeoutMs = MCP_CATALOG_TIMEOUT_MS) {
+    private readonly snapshotTimeoutMs = MCP_CATALOG_TIMEOUT_MS, private readonly definitions?: McpDefinitionSource) {
     this.workspaceRoot = typeof root === "string" ? root : root();
     this.connectionManager = new CoreMcpConnectionManager(authorizationFor);
+    this.unsubscribeDefinitions = definitions?.subscribe(() => {
+      if (!this.closed) void this.configurationChanged().catch(() => {});
+    });
   }
 
   subscribe(changed: () => void): () => void {
@@ -51,7 +60,14 @@ export class CoreMcpGateway {
   }
 
   loadConfigs(): Record<string, ScopedMcpServerConfig> {
-    return loadMcpConfigs(this.workspaceRoot, !projectTrust.isProjectUntrusted(this.workspaceRoot));
+    const trusted = !projectTrust.isProjectUntrusted(this.workspaceRoot);
+    const configs = loadMcpConfigs(this.workspaceRoot, trusted);
+    if (trusted && this.definitions) {
+      for (const [name, config] of Object.entries(this.definitions.read(this.workspaceRoot))) {
+        if (!Object.hasOwn(configs, name)) configs[name] = config;
+      }
+    }
+    return configs;
   }
 
   snapshot(admission = this.admissionForOperation?.(), signal?: AbortSignal, filter?: McpServerFilter): Promise<McpClientSnapshot> {
@@ -185,10 +201,12 @@ export class CoreMcpGateway {
   }
 
   close(): Promise<void> {
+    if (this.closing) return this.closing;
     this.closed = true;
+    this.unsubscribeDefinitions?.();
     for (const cancel of this.pending) cancel();
     this.contentLifetime.cancel();
-    return this.closing ??= Promise.all([this.connectionManager.shutdown(), this.queue]).then(() => {});
+    return this.closing = Promise.all([this.connectionManager.shutdown(), this.queue]).then(() => {});
   }
 
   private run<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {

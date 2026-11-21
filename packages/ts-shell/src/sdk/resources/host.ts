@@ -11,12 +11,22 @@ export function resourceHost(generation: ResourceGeneration): ExtensionHostBridg
   return {
     get ui() { return currentHost()?.ui; },
     getActiveTools: () => currentHost()?.getActiveTools?.() ?? [],
+    setActiveTools: (names, owner, signal) => {
+      const host = currentHost();
+      if (!host?.setActiveTools) throw new Error('Session tool selection is unavailable from this host.');
+      host.setActiveTools(names, owner, signal);
+    },
     getAllTools: () => currentHost()?.getAllTools?.() ?? [],
     getCommands: () => currentHost()?.getCommands?.() ?? [],
     setThinkingLevel: (level, signal) => {
       const host = currentHost();
       if (!host?.setThinkingLevel) throw new ExtensionThinkingError('Session thinking level is unavailable from this host.');
       return host.setThinkingLevel(level, signal);
+    },
+    setModel: (model, signal) => {
+      const host = currentHost();
+      if (!host?.setModel) throw new ExtensionThinkingError('Session model selection is unavailable from this host.');
+      return host.setModel(model, signal);
     },
     sendMessage: message => {
       const host = currentHost();

@@ -7,7 +7,7 @@ import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/
 import { createSubagentRunner } from '../../turn/subagent.js';
 import { createProviderStep, delegatedSteps, providerToolsAvailable, type ProviderStepHost } from './step.js';
 import { declareEndpoint, endpointShape } from '../../provider/endpoints/index.js';
-import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
 import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
 import { writeGoal, readGoalEdit } from '../../planning/goal/store.js';
 import { goalRequestPolicy } from '../../planning/goal/budget.js';
@@ -25,6 +25,10 @@ import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../..
 import { writeCatalogCache } from '../../core/models/catalogStore.js';
 import { projectSessionModel } from '../../session/model/projection.js';
 import { preparePromptRequest } from '../../core/prompts/request.js';
+import { registerCatalogContribution } from '../../core/catalog/contributions.js';
+import { currentSessionProviderScope, sessionProviderScope } from '../../core/catalog/providers.js';
+import { createAgentSession, DefaultResourceLoader } from '../../index.js';
+import { refreshShellRuntimeConfig } from '../../core/shell/runtimeContext.js';
 
 const servers: http.Server[] = [];
 afterEach(async () => {
@@ -34,8 +38,10 @@ afterEach(async () => {
 
 async function wire(setup: ReturnType<typeof createAdvisorHarness>, status = 200, ordinary = false, held = false) {
   const received: Record<string, unknown>[] = [];
+  const targets: { path: string | undefined; credentialMatched: boolean }[] = [];
   let onChild!: () => void; const childReceived = new Promise<void>(resolve => { onChild = resolve; });
   const server = http.createServer(async (request, response) => {
+    targets.push({ path: request.url, credentialMatched: request.headers.authorization === 'Bearer synthetic-wire-only' });
     const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
     const body = JSON.parse(Buffer.concat(chunks).toString('utf8')); received.push(body);
     if (body.model === 'review-model') { onChild(); if (held) return; }
@@ -49,7 +55,7 @@ async function wire(setup: ReturnType<typeof createAdvisorHarness>, status = 200
   servers.push(server); await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('Missing local server address');
   const baseUrl = `http://127.0.0.1:${address.port}/v1`; const endpoint = 'advisor-wire-test';
-  declareEndpoint(endpoint, { ...endpointShape('openai-compatible'), requestBound: value => {
+  declareEndpoint(endpoint, { ...endpointShape('openai-compatible'), modelsPath: undefined, requestBound: value => {
     const body = JSON.parse(value.body); return { inputTokens: Buffer.byteLength(value.body), outputTokens: body.max_tokens ?? body.max_completion_tokens,
       source: 'isolated-test-protocol', version: '1' };
   } });
@@ -67,7 +73,7 @@ async function wire(setup: ReturnType<typeof createAdvisorHarness>, status = 200
   const runner = createSubagentRunner({ step: main, stepForModel: delegatedSteps(request, new Map(), {}), defaultMaxSteps: 1,
     retry: { enabled: config.retryEnabled, maxRetries: config.retryMaxRetries } }, new Map(), {
     sessionId: setup.session.id, workspaceRoot: setup.root, agentMode: 'build', permissionScope: 'ask', hooks: new HookDispatcher(), emit: () => {} });
-  return { received, request, main, runner, childReceived };
+  return { received, targets, request, main, runner, childReceived };
 }
 
 function ordinaryTurn(setup: ReturnType<typeof createAdvisorHarness>, server: Awaited<ReturnType<typeof wire>>) {
@@ -123,6 +129,92 @@ it('forwards configured tool-text retention through the provider host to the out
   expect(retained.find(message => message.role === 'tool')?.content).toBe(resultText);
   expect(pruned.find(message => message.role === 'tool')?.content).not.toContain('RETAIN_THIS_OLD_TOOL_MIDDLE');
   expect(pruned.find(message => message.role === 'tool')?.content).toContain('characters from older tool output');
+});
+
+it('uses registered endpoint metadata in the outbound request while retaining its configured protocol and credential', async () => {
+  const setup = createAdvisorHarness(false, false);
+  const server = await wire(setup);
+  const { providerCatalog, providerCredentialResolution } = server.request;
+  const unregister = registerCatalogContribution({ root: setup.root, sessionId: setup.session.id, commands: [], tools: [], skills: () => [],
+    providers: [{ id: 'extension-relay', label: 'Extension relay', runtime: 'openai', auth: 'api-key',
+      baseUrl: providerCredentialResolution.baseUrl!, models: [{ id: 'primary-model', toolCalling: false }] }] }, providerCatalog);
+  try {
+    const { catalog, admission } = sessionProviderScope(setup.root, setup.session.id, providerCatalog!, providerCredentialResolution);
+    const tools = new Map([['task', createTaskToolDefinition()]]);
+    const messages = [{ role: 'user' as const, content: 'Inspect the extension provider request' }];
+    const control = createProviderStep(server.request, tools, {});
+    const registered = createProviderStep({ ...server.request, providerCatalog: catalog, admission }, tools, {});
+    expect(await control(messages, setup.signal, {}, { allowTools: true })).toMatchObject({ stopReason: 'stop' });
+    expect(await registered(messages, setup.signal, {}, { allowTools: true })).toMatchObject({ stopReason: 'stop' });
+    expect(server.received[0]?.tools).toHaveLength(1);
+    expect(server.received[1]?.tools).toBeUndefined();
+    expect(server.targets).toEqual(Array.from({ length: 2 }, () => ({ path: '/v1/chat/completions', credentialMatched: true })));
+    unregister();
+    expect(admission?.()).toMatch(/registration changed/);
+    await registered(messages, setup.signal, {}, { allowTools: true }).catch(() => undefined);
+    expect(server.received).toHaveLength(2);
+  } finally { unregister(); }
+});
+
+it('selects an extension model in the SDK and picker and refuses delivery after its registration retires', async () => {
+  const setup = createAdvisorHarness(false, false);
+  vi.stubEnv('OPENAI_API_KEY', undefined);
+  const server = await wire(setup);
+  const baseUrl = server.request.providerCredentialResolution.baseUrl!;
+  writeUserRuntimeConfigFile({ provider: 'openai', activeProviderConnectionId: 'extension-wire', maxOutputTokens: 10, reserveTokens: 0, enableMcpTools: false, providerConnections: [{
+    id: 'extension-wire', provider: 'openai', model: 'primary-model', baseUrl, authType: 'api-key', apiKey: 'synthetic-wire-only', status: 'connected',
+    createdAt: '2026-01-01', updatedAt: '2026-01-01',
+  }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+  const physical = [{ ...server.request.providerCatalog![0]!, id: 'configured-relay', baseUrl }];
+  writeCatalogCache(physical);
+  vi.stubEnv('CHEERS_PROVIDER_MODE', 'real');
+  let generation = 0;
+  let startup: unknown;
+  const loader = new DefaultResourceLoader({ cwd: setup.root, noContextFiles: true, noSkills: true, extensionFactories: [extension => {
+    extension.registerVirtualModel({ provider: 'adaptive', id: 'automatic', name: 'Automatic',
+      route: () => ({ provider: 'openai', modelId: 'primary-model' }) });
+    if (++generation !== 1) return;
+    extension.registerProvider('registered-relay', { runtime: 'openai', baseUrl, models: [
+      { id: 'custom-one', maxTokens: 10, contextWindow: 10_000, toolCalling: false },
+      { id: 'custom-two', maxTokens: 10, contextWindow: 10_000, toolCalling: false },
+    ] });
+    extension.on('session_start', async () => { startup = await extension.setModel('extension:registered-relay/custom-one'); });
+  }] });
+  await loader.reload();
+  const { session } = await createAgentSession({ cwd: setup.root, resourceLoader: loader, noTools: 'all' });
+  try {
+    expect(startup).toEqual({ status: 'applied', model: 'extension:registered-relay/custom-one' });
+    expect(readSessionModel(session.sessionId)).toMatchObject({ provider: 'openai', connectionId: 'extension-wire', model: 'custom-one',
+      extensionProvider: { id: 'registered-relay', baseUrl } });
+    const context = session.runtimeContext;
+    const admitted = (model: string) => {
+      const resolution = context.resolveConfigTarget!(context.runtimeConfig, session.sessionId);
+      expect(resolution).toMatchObject({ model, provider: 'openai', credential: { source: 'connection', connectionId: 'extension-wire' } });
+      const scope = currentSessionProviderScope(context.cwd, session.sessionId, context.configuration.current.catalog, resolution);
+      expect(scope.admission?.(), `Expected ${model} to have an active extension provider`).toBeUndefined();
+    };
+    admitted('custom-one');
+    await expect(session.prompt('First extension request')).resolves.toContain('INDEPENDENT_ADVISOR_FINDING');
+    const openPicker = () => modelPicker({ cwd: setup.root, projectRoot: context.projectRoot, sessionId: session.sessionId, runtimeConfig: context.runtimeConfig,
+      readConfiguration: () => context.configuration.current, resolveConfigTarget: context.resolveConfigTarget,
+      refreshRuntimeConfig: mode => refreshShellRuntimeConfig(context, mode) });
+    const picker = openPicker();
+    await picker.load();
+    expect((await picker.apply(['extension:registered-relay/custom-two']))?.note).toContain('Model switched to custom-two');
+    admitted('custom-two');
+    await expect(session.prompt('Second extension request')).resolves.toContain('INDEPENDENT_ADVISOR_FINDING');
+    expect(server.received.map(body => body.model)).toEqual(['custom-one', 'custom-two']);
+    expect(server.targets).toEqual(Array.from({ length: 2 }, () => ({ path: '/v1/chat/completions', credentialMatched: true })));
+    expect((await session.reload()).status).toBe('reloaded');
+    await expect(session.prompt('Retired model')).rejects.toThrow(/selected extension model or configured endpoint is unavailable/i);
+    expect(server.received).toHaveLength(2);
+    const recovery = openPicker();
+    await recovery.load();
+    expect((await recovery.apply([`virtual:${JSON.stringify(['adaptive', 'automatic'])}`]))?.note).toContain('Model switched to adaptive/automatic');
+    const selected = readSessionModel(session.sessionId);
+    expect(selected).toMatchObject({ provider: 'openai', connectionId: 'extension-wire', virtualModel: { provider: 'adaptive', model: 'automatic' } });
+    expect(selected).not.toHaveProperty('extensionProvider');
+  } finally { await session.dispose(); }
 });
 
 it('uses the host plan mode for a foreground model that cannot call tools', async () => {

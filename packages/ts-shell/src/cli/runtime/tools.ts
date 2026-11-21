@@ -1,4 +1,5 @@
 import { CoreMcpGateway } from "../../core/mcp/gateway.js";
+import { sessionMcpDefinitions } from '../../core/catalog/mcp.js';
 import { loadToolCatalog, type ToolCatalogInput } from "../../core/tools/catalog.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { CommandContext } from "../../core/commands/types.js";
@@ -28,7 +29,8 @@ export function toolPoolFor(
     assertAdmission(admission);
     const workspaceRoot = context.projectRoot ?? context.cwd;
     const director = directorInspectionFor(context);
-    const owned = !supplied && context.runtimeConfig.enableMcpTools ? new CoreMcpGateway(workspaceRoot, undefined, authorizationForMcp) : undefined;
+    const owned = !supplied && context.runtimeConfig.enableMcpTools
+      ? new CoreMcpGateway(workspaceRoot, undefined, authorizationForMcp, undefined, sessionMcpDefinitions(() => context.session.id)) : undefined;
     try {
       return (await loadToolCatalog({ workspaceRoot, sessionId: context.session.id, runtimeConfig: director?.config ?? context.runtimeConfig, admission, signal,
         builtinTools: browserTools(),

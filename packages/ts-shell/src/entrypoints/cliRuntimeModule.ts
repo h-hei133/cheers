@@ -293,7 +293,8 @@ export async function runNonInteractivePrompt(options: {
     }
 
     if (resolved.slashResult.action === "show-mcp") {
-      const gateway = options.mcpGateway ?? createCliMcpGateway(options.runtimeContext.cwd);
+      const gateway = options.mcpGateway ?? createCliMcpGateway(options.runtimeContext.cwd,
+        () => configurationAdmission(options.runtimeContext), () => options.runtimeContext.session.id);
       try {
         await runCliMcpCommand({
           renderer: options.renderer,

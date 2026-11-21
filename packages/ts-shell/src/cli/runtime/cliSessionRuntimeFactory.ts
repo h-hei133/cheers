@@ -1,6 +1,8 @@
 import { createCompactionProviders, type ProviderRenewal } from '../provider/compaction.js';
 import { readLogicalModel } from '../../session/model/logical.js';
 import { sessionVirtualRegistry } from '../../core/catalog/models.js';
+import { currentSessionProviderScope } from '../../core/catalog/providers.js';
+import { sessionToolConfig } from './extensions/host.js';
 import { createProviderResources } from '../provider/resources.js';
 import { assertAdmission, type Admission } from '../../core/network/admission.js';
 import { providerFetchForEndpoint } from '../../provider/request/fetch.js';
@@ -151,10 +153,12 @@ export function createCliSessionRuntime(input: {
     compactHistory: (sessionId, signal, instructions) => providerResources.withConnections(() => {
       signal.throwIfAborted();
       const operation = configurationOperation(input.runtimeContext);
-      const config = operation.config; const catalog = operation.publication.catalog;
+      const config = operation.config;
+      const selection = sessionToolConfig(input.runtimeContext, config);
       const workspaceRoot = input.runtimeContext.projectRoot;
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
-      const admission = operation.admission;
+      const { catalog, admission: providerAdmission } = currentSessionProviderScope(input.runtimeContext.cwd, sessionId, operation.publication.catalog, resolved);
+      const admission = () => operation.admission() ?? providerAdmission?.() ?? selection.admission();
       const virtualModel = readLogicalModel(sessionId);
       const virtualModels = virtualModel ? sessionVirtualRegistry(input.runtimeContext.cwd, sessionId) : undefined;
       const main = virtualModel ? Promise.resolve({} as ProviderRenewal) : config.sessionModelRoles?.summary
@@ -180,7 +184,7 @@ export function createCliSessionRuntime(input: {
           virtualModel, virtualModels,
           ...captureThinkingPreference(workspaceRoot, resolved.thinkingEffort),
           agentMode: sessionRuntime.getAgentMode() };
-        const preparedPrompt = await preparePromptRequest({ ...host, signal, mcpGateway: input.mcpGateway,
+        const preparedPrompt = await preparePromptRequest({ ...host, runtimeConfig: selection.config, signal, mcpGateway: input.mcpGateway,
           toolsAvailable: providerToolsAvailable(host, catalog), featureTools: foregroundTools(input.runtimeContext),
           ...(input.runtimeContext.skillOptions ? { skillOptions: input.runtimeContext.skillOptions } : {}),
           ...(input.runtimeContext.systemPrompt !== undefined ? { systemPrompt: input.runtimeContext.systemPrompt } : {}),
@@ -223,11 +227,12 @@ export function createCliSessionRuntime(input: {
       const connectionSignal = currentProviderConnections()?.signal;
       const signal = navigationSignal && connectionSignal ? AbortSignal.any([navigationSignal, connectionSignal]) : navigationSignal ?? connectionSignal;
       const operation = configurationOperation(input.runtimeContext);
-      const config = operation.config; const catalog = operation.publication.catalog;
+      const config = operation.config;
       const usageFor = sessionUsageRecorder(input.runtimeContext.session.id);
       const requestPolicy = goalPolicyFor(input.runtimeContext, input.sessionManager);
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
-      const admission = operation.admission;
+      const { catalog, admission: providerAdmission } = currentSessionProviderScope(input.runtimeContext.cwd, input.runtimeContext.session.id, operation.publication.catalog, resolved);
+      const admission = () => operation.admission() ?? providerAdmission?.();
       const virtualModel = readLogicalModel(input.runtimeContext.session.id);
       const role = captureSummaryRole({ config, catalog, workspaceRoot: input.runtimeContext.projectRoot, admission,
         sessionId: input.runtimeContext.session.id, onCredentialPersisted: providers.publication });
@@ -274,12 +279,12 @@ export function createCliSessionRuntime(input: {
       const operation = configurationOperation(input.runtimeContext);
       const publication = operation.publication;
       const config = operation.config;
-      const catalog = publication.catalog;
       const backgroundSignal = input.runtimeContext.configuration.backgroundSignal;
-      const parentAdmission = collaborationAdmissionFor(input.runtimeContext, operation.admission);
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;
+      const { catalog, admission: providerAdmission } = currentSessionProviderScope(input.runtimeContext.cwd, sessionId, publication.catalog, resolvedCredential);
+      const parentAdmission = collaborationAdmissionFor(input.runtimeContext, () => operation.admission() ?? providerAdmission?.());
       const virtualModel = readLogicalModel(sessionId);
       const director = directorRunFor(input.runtimeContext, input.sessionManager, parentAdmission);
       const handoff = handoffRunFor(input.runtimeContext, input.sessionManager, sessionRuntime, resolvedCredential, signal,
@@ -390,6 +395,7 @@ export function createCliSessionRuntime(input: {
         },
         prepareProviderResources,
         prepareExtensions: () => waitForExtensionsFor(input.runtimeContext),
+        ...(!forcedTool ? { prepareToolSelection: () => sessionToolConfig(input.runtimeContext, director?.config(config) ?? config) } : {}),
         admission,
         onCredentialPersisted: providers.publication,
         providerCredentialResolution: resolvedCredential,

@@ -1,5 +1,9 @@
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { createStateChanges } from '../state/changes.js';
+import { captureMessageRenderer, MAX_MESSAGE_RENDERERS, type RegisteredMessageRenderer } from '../../extensions/runtime/renderer.js';
+import { captureExtensionMcpServer, MAX_EXTENSION_MCP_SERVERS, type RegisteredMcpServer } from '../../extensions/runtime/mcp.js';
+import { captureExtensionProvider, EXTENSION_MODEL_PREFIX, MAX_EXTENSION_PROVIDERS } from '../../extensions/runtime/provider.js';
 import { commandInvocations } from '../commands/invocation.js';
 import type { CommandDefinition } from '../commands/types.js';
 import type { Skill } from '../skills/skillLoader.js';
@@ -26,6 +30,9 @@ export interface CatalogContribution {
   readonly skills: (signal?: AbortSignal, discovery?: SkillDiscovery) => readonly Skill[] | Promise<readonly Skill[]>;
   readonly onEvent?: (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => Promise<unknown>;
   readonly virtualModels?: readonly CapturedVirtualModelDefinition[];
+  readonly messageRenderers?: readonly RegisteredMessageRenderer[];
+  readonly mcpServers?: readonly RegisteredMcpServer[];
+  readonly providers?: readonly CatalogProvider[];
   /** The generation that owns these callbacks, independent of an individual request. */
   readonly signal?: AbortSignal;
 }
@@ -42,15 +49,52 @@ export function registerCatalogContribution(entry: CatalogContribution, physical
   const eventLifetime = new AbortController();
   const admission = () => { if (!active) throw new Error('Catalog contribution is retired.'); assertSignal?.(); };
   const virtualModels = captureVirtualDefinitions(entry.virtualModels ?? [], admission);
+  const providers = Object.freeze((entry.providers ?? []).map(({ id, label, runtime, baseUrl, models }) =>
+    captureExtensionProvider(id, { label, runtime, baseUrl, models })));
+  const activeProviders = catalogContributions(entry.root, entry.sessionId).flatMap(value => value.providers ?? []);
+  if (providers.length + activeProviders.length > MAX_EXTENSION_PROVIDERS) throw new Error('Extension provider registration limit exceeded.');
+  const registeredProviders = [...activeProviders, ...providers];
+  if (new Set(registeredProviders.map(value => value.id)).size !== registeredProviders.length
+    || new Set(registeredProviders.map(value => JSON.stringify([value.runtime, value.baseUrl]))).size !== registeredProviders.length
+    || providers.some(provider => physicalCatalog.some(existing => existing.id === provider.id))) {
+    throw new Error('Extension provider registration collision.');
+  }
+  const mcpServers = Object.freeze((entry.mcpServers ?? []).map(({ name, config }) => {
+    const definition = captureExtensionMcpServer(name, { url: config.url, enabled: config.enabled });
+    return Object.freeze({ name: definition.name, config: Object.freeze({ ...definition.config, extensionOwner: randomUUID() }) });
+  }));
+  const activeServers = catalogContributions(entry.root, entry.sessionId).flatMap(value => value.mcpServers ?? []);
+  if (activeServers.length + mcpServers.length > MAX_EXTENSION_MCP_SERVERS) throw new Error('Extension MCP server registration limit exceeded.');
+  if (new Set([...activeServers, ...mcpServers].map(server => server.name)).size !== activeServers.length + mcpServers.length) {
+    throw new Error('Extension MCP server registration collision.');
+  }
+  const activeRenderers = catalogContributions(entry.root, entry.sessionId).flatMap(value => value.messageRenderers ?? []);
+  const messageRenderers = Object.freeze((entry.messageRenderers ?? []).map(renderer => {
+    const definition = captureMessageRenderer(renderer.customType, renderer.render);
+    return Object.freeze({ customType: definition.customType, render: (message: Parameters<typeof definition.render>[0]) => {
+      admission();
+      const result = definition.render(message);
+      admission();
+      return result;
+    } });
+  }));
+  if (messageRenderers.length + activeRenderers.length > MAX_MESSAGE_RENDERERS) throw new Error('Message renderer registration limit exceeded.');
+  if (new Set([...activeRenderers, ...messageRenderers].map(value => value.customType)).size !== activeRenderers.length + messageRenderers.length) {
+    throw new Error('Message renderer registration collision.');
+  }
   const existing = catalogContributions(entry.root, entry.sessionId).flatMap(value => value.commands).flatMap(commandInvocations).map(value => value.name);
   const invocations = entry.commands.flatMap(commandInvocations).map(value => value.name);
   if (new Set(invocations).size !== invocations.length || invocations.some(value => existing.includes(value))) throw new Error('Dynamic command registration collision.');
   const toolNames = entry.tools.map(tool => tool.name); const existingTools = catalogContributions(entry.root, entry.sessionId).flatMap(value => value.tools).map(tool => tool.name);
   if (new Set(toolNames).size !== toolNames.length || toolNames.some(value => existingTools.includes(value))) throw new Error('Dynamic tool registration collision.');
-  if (virtualModels.some(model => physicalCatalog.some(provider => provider.id === model.provider && provider.models.some(value => value.id === model.id)))) {
+  const priorVirtualModels = catalogContributions(entry.root, entry.sessionId).flatMap(value => value.virtualModels ?? []);
+  const allProviders = [...physicalCatalog, ...registeredProviders];
+  if ([...priorVirtualModels, ...virtualModels].some(model => allProviders.some(provider =>
+    (provider.id === model.provider || registeredProviders.includes(provider) && `${EXTENSION_MODEL_PREFIX}${provider.id}` === model.provider)
+      && provider.models.some(value => value.id === model.id)))) {
     throw new Error('Virtual model registration collides with a physical model.');
   }
-  const currentModels = catalogContributions(entry.root, entry.sessionId).flatMap(value => value.virtualModels ?? []);
+  const currentModels = priorVirtualModels;
   if (virtualModels.length + currentModels.length > MAX_VIRTUAL_MODELS) throw new Error('Virtual model registration limit exceeded.');
   const identities = new Set(currentModels.map(model => JSON.stringify([model.provider, model.id])));
   for (const model of virtualModels) {
@@ -78,7 +122,7 @@ export function registerCatalogContribution(entry: CatalogContribution, physical
     admission(); assertCurrentSignal();
     return result;
   }, { admission });
-  const captured = Object.freeze({ ...entry, root: path.resolve(entry.root), virtualModels, ...(onEvent ? { onEvent } : {}) });
+  const captured = Object.freeze({ ...entry, root: path.resolve(entry.root), virtualModels, messageRenderers, mcpServers, providers, ...(onEvent ? { onEvent } : {}) });
   const retire = () => {
     if (!active) return;
     active = false;

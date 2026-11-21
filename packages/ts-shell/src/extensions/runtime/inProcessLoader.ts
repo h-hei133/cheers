@@ -15,7 +15,11 @@ import type { VersionRecord } from '../model.js'
 import { EXTENSION_WORKER_SOURCE } from './workerSource.js'
 import { ExtensionInitialization, type ExtensionInitializationOptions } from './initialization.js'
 import { resolveUiHost, type ExtensionUiHost, type ExtensionUiApi } from './ui.js'
-import { currentExtensionInvocation, runExtensionInvocation } from './context.js'
+import { currentExtensionInvocation, renderExtensionMessage, runExtensionInvocation } from './context.js'
+import { captureMessageRenderer, createMessageRendererBridge, invokeMessageRenderer, MAX_MESSAGE_RENDERERS, type ExtensionMessageRenderer, type RegisteredMessageRenderer } from './renderer.js'
+import { captureExtensionMcpServer, MAX_EXTENSION_MCP_SERVERS, type ExtensionMcpServer, type RegisteredMcpServer } from './mcp.js'
+import { captureExtensionProvider, MAX_EXTENSION_PROVIDERS, type ExtensionProvider } from './provider.js'
+import type { CatalogProvider } from '../../core/models/catalog.js'
 import { captureVirtualDefinition, MAX_VIRTUAL_MODELS } from '../../core/models/virtual/capture.js'
 import type { ModelRouteInput, CapturedVirtualModelDefinition, VirtualModelDefinition } from '../../core/models/virtual/contract.js'
 import { createVirtualBridge } from './virtual.js'
@@ -33,7 +37,8 @@ import { callbackCancellation, captureCallbackResult, createCallbackResultCaptur
 import { captureShortcut, MAX_SHORTCUTS, type ExtensionShortcut } from './shortcut.js'
 import { captureFlag, type ExtensionFlag, type WorkerFlag } from './flag.js'
 import { isThinkingPreference, type ThinkingPreference } from '../../core/models/effort.js'
-import { createThinkingBridge, ExtensionThinkingError, type ExtensionThinkingUpdate } from './model.js'
+import { createModelBridge, createThinkingBridge, ExtensionThinkingError, isExtensionModel, type ExtensionModelUpdate, type ExtensionThinkingUpdate } from './model.js'
+import { captureToolSelection, createToolSelectionBridge } from './tools.js'
 export type { ExtensionThinkingUpdate } from './model.js'
 export type { ExtensionFlag } from './flag.js'
 export type { ExtensionShortcut } from './shortcut.js'
@@ -43,9 +48,11 @@ export type { ExtensionToolResult, ExtensionToolResultEvent } from '../events/mo
 export interface ExtensionHostBridge {
   readonly ui?: ExtensionUiHost
   readonly getActiveTools?: () => readonly string[]
+  readonly setActiveTools?: (names: readonly string[], owner: AbortSignal, signal: AbortSignal) => void
   readonly getAllTools?: () => readonly string[]
   readonly getCommands?: () => readonly string[]
   readonly setThinkingLevel?: (level: ThinkingPreference, signal: AbortSignal) => Promise<ExtensionThinkingUpdate>
+  readonly setModel?: (model: string, signal: AbortSignal) => Promise<ExtensionModelUpdate>
   readonly sendMessage?: (message: unknown) => Promise<void> | void
   readonly appendEntry?: (customType: string, data: unknown) => Promise<void> | void
 }
@@ -64,6 +71,10 @@ export interface ExtensionAPI {
   registerTool(tool: ToolDefinition): void
   registerCommand(command: CommandDefinition): void
   registerVirtualModel<TState = unknown>(model: VirtualModelDefinition<TState>): void
+  /** Render a visible custom message as plain text. Returning undefined keeps the original text. */
+  registerMessageRenderer(customType: string, render: ExtensionMessageRenderer): void
+  registerMcpServer(name: string, config: ExtensionMcpServer): void
+  registerProvider(name: string, config: ExtensionProvider): void
   registerShortcut(shortcut: ExtensionShortcut): void
   registerFlag(flag: ExtensionFlag): void
   getFlag(name: string): string | boolean | undefined
@@ -76,10 +87,14 @@ export interface ExtensionAPI {
   on(event: string, handler: (payload: unknown) => unknown | Promise<unknown>): void
   readWorkspaceFile(relativePath: string): string | Promise<string>
   getActiveTools(): Promise<readonly string[]>
+  /** Select the configured tools to offer on subsequent ordinary prompts. */
+  setActiveTools(names: readonly string[]): Promise<void>
   getAllTools(): Promise<readonly string[]>
   getCommands(): Promise<readonly string[]>
   /** Save the current session's reasoning effort from an idle callback. Null selects automatic effort. */
   setThinkingLevel(level: ThinkingPreference): Promise<ExtensionThinkingUpdate>
+  /** Save a model selection using the active session's currently authorized provider. */
+  setModel(model: string): Promise<ExtensionModelUpdate>
   sendMessage(message: unknown): Promise<void>
   appendEntry(customType: string, data: unknown): Promise<void>
 }
@@ -88,6 +103,9 @@ export interface LoadedInProcessExtension {
   readonly tools: readonly ToolDefinition[]
   readonly commands: readonly CommandDefinition[]
   readonly virtualModels?: readonly CapturedVirtualModelDefinition[]
+  readonly messageRenderers?: readonly RegisteredMessageRenderer[]
+  readonly mcpServers?: readonly RegisteredMcpServer[]
+  readonly providers?: readonly CatalogProvider[]
   readonly signal?: AbortSignal
   readonly shortcuts: readonly ExtensionShortcut[]
   readonly flags: readonly ExtensionFlag[]
@@ -222,6 +240,7 @@ function createExtensionApiCollector(options: {
   readonly host?: ExtensionHostBridge
   readonly initialization?: ExtensionInitialization
   readonly invokeVirtual?: (callback: VirtualModelDefinition['route'], request: ModelRouteInput) => ReturnType<VirtualModelDefinition['route']>
+  readonly invokeRenderer?: ReturnType<typeof createMessageRendererBridge>
   readonly captureCallback?: typeof captureCallbackResult
   readonly flagValue?: (flag: ExtensionFlag) => string | boolean | undefined
 }) {
@@ -233,6 +252,9 @@ function createExtensionApiCollector(options: {
   const tools: ToolDefinition[] = []
   const commands: CommandDefinition[] = []
   const virtualModels: CapturedVirtualModelDefinition[] = []
+  const messageRenderers = new Map<string, RegisteredMessageRenderer>()
+  const mcpServers = new Map<string, RegisteredMcpServer>()
+  const providers = new Map<string, CatalogProvider>()
   const shortcuts: ExtensionShortcut[] = []
   const flags: ExtensionFlag[] = []
   const flagValues = new Map<string, string | boolean | undefined>()
@@ -285,6 +307,29 @@ function createExtensionApiCollector(options: {
           () => capture(run, () => undefined, { check: active, cancellation: callbackCancellation(signal) })).then(() => undefined)
       } } : {}) }))
     }, collecting),
+    registerMessageRenderer: nullProtoFn((customType: string, renderer: ExtensionMessageRenderer) => {
+      if (messageRenderers.size >= MAX_MESSAGE_RENDERERS) throw new Error('Message renderer registration limit exceeded.')
+      const definition = captureMessageRenderer(customType, renderer)
+      if (messageRenderers.has(definition.customType)) throw new Error('Message renderer registration collision.')
+      messageRenderers.set(definition.customType, Object.freeze({ customType: definition.customType, render: (message: Parameters<ExtensionMessageRenderer>[0]) => {
+        active()
+        const result = renderExtensionMessage(() => invokeMessageRenderer(definition.render, message, options.invokeRenderer))
+        active()
+        return result
+      } }))
+    }, collecting),
+    registerMcpServer: nullProtoFn((name: string, config: ExtensionMcpServer) => {
+      if (mcpServers.size >= MAX_EXTENSION_MCP_SERVERS) throw new Error('Extension MCP server registration limit exceeded.')
+      const definition = captureExtensionMcpServer(name, config)
+      if (mcpServers.has(definition.name)) throw new Error('Extension MCP server registration collision.')
+      mcpServers.set(definition.name, definition)
+    }, collecting),
+    registerProvider: nullProtoFn((name: string, config: ExtensionProvider) => {
+      if (providers.size >= MAX_EXTENSION_PROVIDERS) throw new Error('Extension provider registration limit exceeded.')
+      const definition = captureExtensionProvider(name, config)
+      if (providers.has(definition.id)) throw new Error('Extension provider registration collision.')
+      providers.set(definition.id, definition)
+    }, collecting),
     registerFlag: nullProtoFn((flag: ExtensionFlag) => {
       if (flags.length >= 128) throw new Error('Flag registration limit exceeded.')
       const declared = captureFlag(flag)
@@ -317,6 +362,14 @@ function createExtensionApiCollector(options: {
     }, collecting),
     readWorkspaceFile: nullProtoFn(safeRead),
     getActiveTools: nullProtoFn(async () => options.host?.getActiveTools?.() ?? [], active),
+    setActiveTools: nullProtoFn(async (names: readonly string[]) => {
+      active()
+      const invocation = currentExtensionInvocation()
+      if (!invocation || !options.host?.setActiveTools) throw new Error('Session tool selection is unavailable from this host or callback.')
+      const signal = invocationSignal(invocation.signal)
+      signal.throwIfAborted()
+      options.host.setActiveTools(captureToolSelection(names), initialization.signal, signal)
+    }),
     getAllTools: nullProtoFn(async () => options.host?.getAllTools?.() ?? [], active),
     getCommands: nullProtoFn(async () => options.host?.getCommands?.() ?? [], active),
     setThinkingLevel: nullProtoFn(async (level: ThinkingPreference) => {
@@ -329,6 +382,15 @@ function createExtensionApiCollector(options: {
       signal.throwIfAborted()
       return await options.host.setThinkingLevel(level, signal)
     }),
+    setModel: nullProtoFn(async (model: string) => {
+      active()
+      if (!isExtensionModel(model)) throw new ExtensionThinkingError('Invalid extension model.')
+      const invocation = currentExtensionInvocation()
+      if (!invocation || !options.host?.setModel) throw new ExtensionThinkingError('Session model selection is unavailable from this host or callback.')
+      const signal = invocationSignal(invocation.signal)
+      signal.throwIfAborted()
+      return await options.host.setModel(model, signal)
+    }),
     sendMessage: nullProtoFn(async (msg: unknown) => { currentExtensionInvocation()?.signal.throwIfAborted(); if (!options.host?.sendMessage) throw new Error('Extension message host is unavailable.'); await options.host.sendMessage(msg) }, active),
     appendEntry: nullProtoFn(async (customType: string, data: unknown) => { currentExtensionInvocation()?.signal.throwIfAborted(); if (!options.host?.appendEntry) throw new Error('Extension entry storage is unavailable.'); await options.host.appendEntry(customType, data) }, active),
   }))
@@ -340,6 +402,9 @@ function createExtensionApiCollector(options: {
       tools: Object.freeze([...tools]),
       commands: Object.freeze([...commands]),
       virtualModels: Object.freeze([...virtualModels]),
+      messageRenderers: Object.freeze([...messageRenderers.values()]),
+      mcpServers: Object.freeze([...mcpServers.values()]),
+      providers: Object.freeze([...providers.values()]),
       signal: initialization.signal,
       shortcuts: Object.freeze([...shortcuts]),
       flags: Object.freeze([...flags]),
@@ -374,9 +439,11 @@ export async function runExtensionFactory(options: ExtensionInitializationOption
 function beginExtensionLoad(options: ExtensionLoadOptions) {
   const initialization = new ExtensionInitialization(options)
   let virtualBridge: ReturnType<typeof createVirtualBridge>
+  let rendererBridge: ReturnType<typeof createMessageRendererBridge>
   let inputCapture: typeof captureCallbackResult
   const collector = createExtensionApiCollector({ ...options, initialization,
     invokeVirtual: (callback, request) => virtualBridge.invoke(callback, request),
+    invokeRenderer: (callback, json) => rendererBridge(callback, json),
     captureCallback: (operation, capture, options) => inputCapture(operation, capture, options),
   })
   try {
@@ -399,8 +466,11 @@ function beginExtensionLoad(options: ExtensionLoadOptions) {
     const callbackPromise = new vm.Script('Promise').runInContext(sandbox) as PromiseConstructor
     inputCapture = createCallbackResultCapture(nodeTypes.isProxy, nodeTypes.isPromise, Promise, callbackPromise)
     virtualBridge = createVirtualBridge(sandbox, collector.ui)
+    rendererBridge = createMessageRendererBridge(sandbox)
     sandbox.api = Object.freeze(Object.assign(Object.create(null) as ExtensionAPI, collector.api, {
       ui: virtualBridge.ui, setThinkingLevel: createThinkingBridge(sandbox, collector.api.setThinkingLevel),
+      setModel: createModelBridge(sandbox, collector.api.setModel),
+      setActiveTools: createToolSelectionBridge(sandbox, collector.api.setActiveTools),
     }))
     // Start the exported factory inside the same bounded VM evaluation as its module.
     const startFactory = '\n; ((factory) => typeof factory === "function" ? factory(api) : undefined)' +

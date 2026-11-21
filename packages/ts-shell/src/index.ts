@@ -74,6 +74,10 @@ export {
   type ResourceReloadOptions,
 } from "./sdk/resourceLoader.js";
 export type { ExtensionUiHost, ExtensionUiDialogOptions, ExtensionUiApi, ExtensionUiRequestOptions } from './extensions/runtime/ui.js';
+export type { ExtensionMessageRenderer } from './extensions/runtime/renderer.js';
+export type { ExtensionMcpServer } from './extensions/runtime/mcp.js';
+export type { ExtensionProvider, ExtensionProviderModel } from './extensions/runtime/provider.js';
+export type { ExtensionModelUpdate } from './extensions/runtime/model.js';
 export type { ModelRoute, ModelRouteInput, ModelRouteRequest, ModelRouteReason, ModelRouteSignal, ModelRouteTarget, ModelRouteFailure, CapturedVirtualModelDefinition, VirtualModelDefinition, VirtualModelMetadata } from './core/models/virtual/contract.js';
 export {
   runExtensionFactory,

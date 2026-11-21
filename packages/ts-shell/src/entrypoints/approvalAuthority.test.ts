@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Interface } from 'node:readline';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ApprovalTrustPolicy } from '../core/shell/approvalTrustPolicy.js';
 import { StreamingRenderer } from '../presentation/terminal/streaming.js';
@@ -69,6 +70,29 @@ it.each(['deny', 'allow-once', 'allow-always'] as const)('preserves explicit CLI
     defaultOption: 'deny', options: [], context: { toolName: 'bash', operation: 'execute', target: 'explicit-command' } });
   expect(response.decision).toBe(decision);
   expect(policy.listGrants(root)).toHaveLength(decision === 'allow-always' ? 1 : 0);
+});
+
+it('presents the reviewed execution before taking a one-time terminal decision', async () => {
+  const policy = new ApprovalTrustPolicy(path.join(root, 'policy.json'));
+  const renderer = new StreamingRenderer();
+  const lines: string[] = [];
+  renderer.setSink({ line: line => lines.push(line), chunk() {} });
+  const hash = 'ab'.repeat(32);
+  let shown: string[] = [];
+  const question = vi.fn((_prompt: string, answer: (value: string) => void) => {
+    shown = [...lines];
+    answer('y');
+  });
+  const readline = { question, once() {}, off() {} } as unknown as Interface;
+  const handler = createCliEscalationPromptHandler(renderer, readline, () => 'compact', policy, () => root);
+  const result = await handler({ id: 'install', title: 'Install', message: 'Review package', severity: 'high',
+    recommendedAction: 'deny', defaultOption: 'deny', options: [{ value: 'allow-once', label: 'Allow once' }],
+    context: { toolName: 'extension_manage', operation: 'execute', target: 'fixture', explicitApproval: true, previewKind: 'execution',
+      preview: `Install sample@1.0.0\nSHA256 ${hash}\nManifest {"name":"sample"}\nAuthorization: Bearer fixture-only-secret` } });
+  expect(question).toHaveBeenCalledOnce();
+  expect(shown).toEqual(expect.arrayContaining(['Install sample@1.0.0', `SHA256 ${hash}`, 'Manifest {"name":"sample"}']));
+  expect(shown.join('\n')).not.toContain('fixture-only-secret');
+  expect(result.decision).toBe('allow-once');
 });
 
 const legacyCases = [true, false].flatMap(interactive => [true, false].flatMap(executableNow =>

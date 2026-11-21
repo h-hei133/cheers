@@ -105,6 +105,10 @@ This file is the curated, compact index of reusable engineering pitfalls, enviro
 - **Root Cause**: Concurrent `cancel` and `closeExtensions` race with in-flight handlers and swallow `allSettled` rejections.
 - **Rule**: Close new host operations synchronously first, await active run settlement, dispatch `shutdown` to the original audience, then retire the generation while surfacing the first cleanup error.
 
+### SDK Reload Validates Saved Presentation Fields
+- **Symptom**: SDK resource reload rejects a session after its first saved prompt.
+- **Rule**: Use the saved title and activity time when verifying reload metadata. Keep the live session binding and pin saved file versions through replacement.
+
 ### Read-Only Inspections And Review Notes Never Grant Write Authority
 - **Symptom**: A model review, advisor note, or imported report bypasses ordinary tool preparation or approval boundaries.
 - **Root Cause**: Conflating advisory evidence with execution authority.

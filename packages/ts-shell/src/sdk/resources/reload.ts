@@ -12,6 +12,7 @@ import {registerSdkExtensions} from './catalog.js';
 import {applySdkResources} from './projection.js';
 import {captureSessionTransition} from '../../session/store/transition.js';
 import {createSessionStoreLayout, locateExistingSessionLayout} from '../../session/store/sessionFileLayout.js';
+import {readSessionMetadataRecord} from '../../session/store/sessionStore.js';
 import {SessionStoreAccess} from '../../session/store/sessionStoreAccess.js';
 import {sameValue} from '../../config/values.js';
 import {captureDiagnostics, resourceReport} from './snapshot.js';
@@ -83,7 +84,12 @@ export class SessionResources {
     if (this.closed || typeof loader.captureReload !== 'function' || !lease || !owner || !host) throw new Error('Resource reload is unavailable for this loader.');
     const configured = configurationAdmission(context);
     const layout = locateExistingSessionLayout(createSessionStoreLayout(), session.id);
-    const saved = captureSessionTransition(layout)(session), store = new SessionStoreAccess(), selection = store.readCurrentSessionSelection(root);
+    const transition = captureSessionTransition(layout);
+    // A prompt can publish a title and activity time without replacing the SDK's session object.
+    const metadata = readSessionMetadataRecord(layout.metadataPath);
+    if (!metadata) throw new Error('SDK saved session metadata is unavailable.');
+    const saved = transition({...session, title:metadata.title, updatedAt:metadata.updatedAt});
+    const store = new SessionStoreAccess(), selection = store.readCurrentSessionSelection(root);
     let receipt: ResourceReloadReceipt | undefined, successorHost: typeof host | undefined;
     let expectedRevision = revision, intentionallyRetired = false, retired = false;
     const sourceCheck = () => {

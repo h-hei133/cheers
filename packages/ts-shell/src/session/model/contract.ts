@@ -35,6 +35,12 @@ export interface SessionVirtualModelSelection {
   readonly thinkingEffort?: ThinkingPreference;
 }
 
+/** The serving credential remains in the normal named connection or provider slot. */
+export interface SessionExtensionProvider {
+  readonly id: string;
+  readonly baseUrl: string;
+}
+
 /** Physical authority remains present even when a logical choice has no physical default. */
 type SessionModelAuthority = Omit<ProviderModelTarget, 'model'> | (Omit<SessionModelRole, 'model'> & {
   readonly connectionScope?: 'session';
@@ -54,4 +60,5 @@ export type SessionModelSelection = SessionModelAuthority & (
   readonly skillful?: boolean;
   /** Session-only context window selection from the provider/model catalog. */
   readonly contextWindow?: number;
+  readonly extensionProvider?: SessionExtensionProvider;
 }

@@ -10,13 +10,16 @@ import { assertInventory, extractArchive } from '../archive/storage.js';
 import { captureLocalPackage, isLocalPackage, localPackagePath } from '../archive/local.js';
 import type { ExtensionInventory } from '../archive/inventory.js';
 import { assertStorageIdentity, assertStoragePath, packageRoot, storageIdentity, versionPath, type ExtensionStore } from '../store/state.js';
-import type { EffectOutcome, ExtensionState, PackageRecord, VersionRecord, VersionSource } from '../model.js';
+import type { EffectOutcome, ExtensionSource, ExtensionState, PackageRecord, VersionRecord, VersionSource } from '../model.js';
 import type { ToolExecutionContext } from '../../tools/types.js';
 
 export interface LifecycleHost { readonly store: ExtensionStore; readonly check: () => void; readonly offline: () => boolean;
   readonly invalidate: (except?: AbortSignal) => Promise<void>; readonly request: <T>(action: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal) => Promise<T>;
   readonly root?: string; readonly assertSourceAccess?: (target: string) => void; readonly npmRegistry?: string; readonly gitArchiveBase?: string }
-export interface Operation { readonly preview: string; readonly apply: (context: ToolExecutionContext) => Promise<EffectOutcome> }
+export interface Operation { readonly preview: string; readonly explicitApproval?: true;
+  readonly apply: (context: ToolExecutionContext) => Promise<EffectOutcome | AcquisitionResult> }
+interface AcquisitionResult { readonly acquisition: 'verified' | 'failed'; readonly detail: string }
+export interface InstallPlan { readonly acquisition?: Operation; complete(): Operation }
 type InstallVersion = VersionSource & Pick<VersionRecord, 'manifest' | 'digest'>;
 type RegistrySpec = { kind: 'registry'; source: string; name: string; version: string };
 type InstallSpec = RegistrySpec | { kind: 'local'; directory: string } | ({ kind: 'git' } & GitRelease);
@@ -38,9 +41,58 @@ export function parseSpec(input: string): InstallSpec {
 export function assertPackage(record: PackageRecord, store: ExtensionStore): void {
   for (const selected of [record.active, ...record.history]) assertInventory(versionPath(selected, store.file), selected);
 }
-export async function installOperation(host: LifecycleHost, input: string, replacing?: string, signal?: AbortSignal): Promise<Operation> {
+export async function prepareInstallPlan(host: LifecycleHost, input: string, replacing?: string, signal?: AbortSignal): Promise<InstallPlan> {
   host.check();
-  const source = await installSource(host, parseSpec(input), replacing, signal);
+  signal?.throwIfAborted();
+  const spec = parseSpec(input);
+  const remote = remotePackage(host, spec);
+  if (!remote) {
+    if (spec.kind === 'git') throw new Error('Git extension source is unavailable.');
+    if (spec.kind === 'registry') assertReplacementName(replacing, spec.name);
+    const source = await (spec.kind === 'local' ? localSource(host, spec.directory, signal) : registrySource(host, spec, signal));
+    return { complete: () => packageOperation(host, source, replacing) };
+  }
+  let source: InstallSource | undefined;
+  let started = false;
+  const acquisition: Operation = {
+    preview: `Download and validate this extension for review.\n${remote.description}\nPublication requires separate approval of the downloaded SHA256 and manifest.`,
+    explicitApproval: true,
+    apply: async context => {
+      if (started) throw new Error('Extension source acquisition has already been consumed.');
+      started = true;
+      const requestSignal = context.abortSignal ?? signal;
+      try {
+        const check = () => {
+          requestSignal?.throwIfAborted(); host.check(); remote.check();
+          const blocked = context.admission?.(); if (blocked) throw new Error(blocked);
+        };
+        check();
+        const acquired = await remote.load(check, requestSignal);
+        check();
+        assertReplacementName(replacing, acquired.version.manifest.name);
+        source = acquired;
+        const { name, version } = acquired.version.manifest;
+        return { acquisition: 'verified', detail: `Downloaded and verified ${name}@${version} for publication review.` };
+      } catch (error) {
+        return { acquisition: 'failed', detail: requestSignal?.aborted ? 'Package download cancelled.'
+          : error instanceof Error ? error.message : 'Package download could not be verified.' };
+      }
+    },
+  };
+  let completed = false;
+  return {
+    acquisition,
+    complete: () => {
+      if (completed) throw new Error('Extension installation plan has already been consumed.');
+      completed = true;
+      if (!source) throw new Error('Approve and verify the exact package source before reviewing publication.');
+      host.check(); source.check();
+      return packageOperation(host, source, replacing);
+    },
+  };
+}
+
+function packageOperation(host: LifecycleHost, source: InstallSource, replacing?: string): Operation {
   host.check(); source.check();
   const approved = source.version;
   const { name, version } = approved.manifest;
@@ -58,8 +110,16 @@ export async function installOperation(host: LifecycleHost, input: string, repla
   const description = old ? `Replace ${name}@${old.active.manifest.version} with ${name}@${version}` : `Install ${name}@${version}`;
   const receipt = { effect: 'published' as const, detail: `${name}@${version} package files published; activation and grants cleared.` };
   return { preview: `${description}\n${source.preview}\nSHA256 ${approved.digest}\nManifest ${canonical(approved.manifest)}\nNo lifecycle scripts run. Activation and capability grants start empty.`,
+    ...(approved.origin === 'npm' || approved.origin === 'git' ? { explicitApproval: true } : {}),
     apply: async context => {
-      const check = () => { context.abortSignal?.throwIfAborted(); host.check(); source.check(); assertStorageIdentity(storage); };
+      const check = () => {
+        context.abortSignal?.throwIfAborted();
+        host.check();
+        const blocked = context.admission?.();
+        if (blocked) throw new Error(blocked);
+        source.check();
+        assertStorageIdentity(storage);
+      };
       check();
       const files = await source.load(context.abortSignal);
       check(); files.check?.();
@@ -104,14 +164,23 @@ function assertReplacementName(replacing: string | undefined, requested: string)
   if (replacing && replacing !== requested) throw new Error('Update package must match the selected package.');
 }
 
-function installSource(host: LifecycleHost, spec: InstallSpec, replacing?: string, signal?: AbortSignal): Promise<InstallSource> {
-  if (spec.kind === 'local') return localSource(host, spec.directory, signal);
-  if (spec.kind === 'git') return gitSource(host, spec, signal);
-  if (spec.source === 'npm' && (!/^[a-z][a-z0-9_-]{0,63}$/.test(spec.name) || !readSources().some(source => source.name === 'npm'))) {
-    return npmSource(host, spec, signal);
+function remotePackage(host: LifecycleHost, spec: InstallSpec): { description: string; check(): void; load(admission: () => void, signal?: AbortSignal): Promise<InstallSource> } | undefined {
+  if (spec.kind === 'git') {
+    const target = gitArchiveTarget(spec, host.gitArchiveBase);
+    const check = () => {
+      if (gitArchiveTarget(spec, host.gitArchiveBase).url !== target.url) throw new Error('Approved Git archive endpoint changed.');
+    };
+    return { description: `Git repository ${spec.repository}\nCommit ${spec.commit}\nArchive ${target.url}`, check,
+      load: (_admission, signal) => gitSource(host, spec, target, check, signal) };
   }
-  assertReplacementName(replacing, spec.name);
-  return registrySource(host, spec, signal);
+  if (spec.kind !== 'registry' || spec.source !== 'npm'
+    || (/^[a-z][a-z0-9_-]{0,63}$/.test(spec.name) && readSources().some(source => source.name === 'npm'))) return undefined;
+  const registry = npmRegistry(host.npmRegistry);
+  const check = () => {
+    if (npmRegistry(host.npmRegistry).url !== registry.url) throw new Error('Approved npm registry changed.');
+  };
+  return { description: `Npm package ${spec.name}@${spec.version}\nRegistry ${registry.url}`, check,
+    load: (admission, signal) => npmSource(host, spec, registry, check, admission, signal) };
 }
 
 function archiveFiles(archive: ValidatedArchive): ExtensionInventory & { readonly stage: (target: string) => void } {
@@ -129,37 +198,24 @@ async function registrySource(host: LifecycleHost, spec: RegistrySpec, signal?: 
     } };
 }
 
-async function npmSource(host: LifecycleHost, spec: RegistrySpec, signal?: AbortSignal): Promise<InstallSource> {
-  const registry = npmRegistry(host.npmRegistry);
-  return host.request<InstallSource>(async signal => {
-    const release = await exactNpm(registry, spec.name, spec.version, signal, host.offline());
-    const bytes = await registryBytes(registry, release.url, ARCHIVE_BYTES, signal, host.offline());
-    const { archive, manifest, digest } = await validateNpmArchive(bytes, release);
-    const selected: InstallVersion = { origin: 'npm', source: 'npm', registry: registry.url, packageName: release.packageName,
-      integrity: release.integrity, url: release.url, manifest, digest };
-    return { version: selected, preview: `Npm package ${release.packageName}@${release.version}\nRegistry ${registry.url}\nIntegrity ${release.integrity}`,
-      check: () => {
-        if (npmRegistry(host.npmRegistry).url !== registry.url) throw new Error('Approved npm registry changed.');
-      }, load: async () => archiveFiles(archive) };
-  }, signal);
+async function npmSource(host: LifecycleHost, spec: RegistrySpec, registry: ExtensionSource, check: () => void, admission: () => void, signal?: AbortSignal): Promise<InstallSource> {
+  const release = await exactNpm(registry, spec.name, spec.version, signal, host.offline());
+  admission();
+  const bytes = await registryBytes(registry, release.url, ARCHIVE_BYTES, signal, host.offline());
+  const { archive, manifest, digest } = await validateNpmArchive(bytes, release);
+  const selected: InstallVersion = { origin: 'npm', source: 'npm', registry: registry.url, packageName: release.packageName,
+    integrity: release.integrity, url: release.url, manifest, digest };
+  return { version: selected, preview: `Npm package ${release.packageName}@${release.version}\nRegistry ${registry.url}\nIntegrity ${release.integrity}`,
+    check, load: async () => archiveFiles(archive) };
 }
 
-async function gitSource(host: LifecycleHost, release: GitRelease, signal?: AbortSignal): Promise<InstallSource> {
-  const target = gitArchiveTarget(release, host.gitArchiveBase);
-  return host.request<InstallSource>(async signal => {
-    const bytes = await registryBytes(target.source, target.url, ARCHIVE_BYTES, signal, host.offline());
-    const { archive, manifest, digest } = await validateGitArchive(bytes, release);
-    const selected: InstallVersion = { origin: 'git', source: 'git', repository: release.repository,
-      commit: release.commit, url: target.url, manifest, digest };
-    return {
-      version: selected,
-      preview: `Git repository ${release.repository}\nCommit ${release.commit}\nArchive ${target.url}`,
-      check: () => {
-        if (gitArchiveTarget(release, host.gitArchiveBase).url !== target.url) throw new Error('Approved Git archive endpoint changed.');
-      },
-      load: async () => archiveFiles(archive),
-    };
-  }, signal);
+async function gitSource(host: LifecycleHost, release: GitRelease, target: ReturnType<typeof gitArchiveTarget>, check: () => void, signal?: AbortSignal): Promise<InstallSource> {
+  const bytes = await registryBytes(target.source, target.url, ARCHIVE_BYTES, signal, host.offline());
+  const { archive, manifest, digest } = await validateGitArchive(bytes, release);
+  const selected: InstallVersion = { origin: 'git', source: 'git', repository: release.repository,
+    commit: release.commit, url: target.url, manifest, digest };
+  return { version: selected, preview: `Git repository ${release.repository}\nCommit ${release.commit}\nArchive ${target.url}`,
+    check, load: async () => archiveFiles(archive) };
 }
 
 async function localSource(host: LifecycleHost, input: string, signal?: AbortSignal): Promise<InstallSource> {

@@ -1,4 +1,6 @@
 import type { Interface as ReadlineInterface } from "node:readline";
+import { stripVTControlCharacters } from 'node:util';
+import { redactReportText } from '../core/security/redaction.js';
 import { ApprovalTrustPolicy, type ApprovalEvaluation } from "../core/shell/approvalTrustPolicy.js";
 import { applyInteractiveApprovalDecisionWiring } from "../core/shell/interactiveApprovalWiring.js";
 import { buildScope } from '../core/shell/approval/store.js';
@@ -295,6 +297,10 @@ export function createCliEscalationPromptHandler(
 
     if (!promptInteractiveApproval) {
       renderApprovalRequiredSurface(renderer, { prompt, includeRisk: true });
+      if (!isNonInteractive && prompt.context.explicitApproval && prompt.context.previewKind === 'execution' && prompt.context.preview) {
+        const preview = redactReportText(stripVTControlCharacters(prompt.context.preview), 48_000, { preserveLines: true, ellipsis: true });
+        for (const line of preview.split('\n')) renderer.renderLine(line);
+      }
       for (const line of callerScope || isMcp ? [] : trustPolicy.explain(
         evaluation,
         projectRoot,

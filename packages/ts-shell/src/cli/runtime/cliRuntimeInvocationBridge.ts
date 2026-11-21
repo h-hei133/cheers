@@ -35,6 +35,7 @@ export function streamCliRuntimePrompt(input: {
   readonly onCredentialPersisted?: CliRuntimeInvocationInput['onCredentialPersisted'];
   readonly prepareProviderResources?: CliRuntimeInvocationInput['prepareProviderResources'];
   readonly prepareExtensions?: () => Promise<void>;
+  readonly prepareToolSelection?: () => { readonly config: RuntimeConfig; readonly admission: NonNullable<CliRuntimeInvocationInput['admission']> };
   readonly prompt: string;
   readonly onPromptIdentity?: CliRuntimeInvocationInput['onPromptIdentity'];
   readonly readPromptIdentity?: CliRuntimeInvocationInput['readPromptIdentity'];
@@ -78,7 +79,7 @@ export function streamCliRuntimePrompt(input: {
   // an event iterator should not have to know that. The events the caller
   // reads start after the snapshot either way, so the promise is folded in
   // here rather than pushed into every caller's signature.
-  const start = () => runCliRuntimeInvocation({
+  const start = (selected = input.prepareToolSelection?.()) => runCliRuntimeInvocation({
     inputAdmission:input.inputAdmission,
     effectiveInput:input.effectiveInput,
     virtualModel: input.virtualModel,
@@ -95,7 +96,7 @@ export function streamCliRuntimePrompt(input: {
     checkpoint: input.checkpoint,
     checkpointError: input.checkpointError,
     correlationId: input.correlationId,
-    admission: input.admission,
+    admission: selected ? () => input.admission?.() ?? selected.admission() : input.admission,
     onCredentialPersisted: input.onCredentialPersisted,
     prepareProviderResources: input.prepareProviderResources,
     mcpGateway: input.mcpGateway,
@@ -120,7 +121,7 @@ export function streamCliRuntimePrompt(input: {
     ...(input.onTurnMessage ? { onTurnMessage: input.onTurnMessage } : {}),
     ...(input.compaction ? { compaction: input.compaction } : {}),
     providerModeEnv: input.providerRuntimeBridge.providerModeEnv(),
-    ...(input.runtimeConfig ? { runtimeConfig: input.runtimeConfig } : {}),
+    runtimeConfig: selected?.config ?? input.runtimeConfig,
     ...(input.providerCatalog ? { providerCatalog: input.providerCatalog } : {}),
     ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
     ...(input.forcedTool ? { forcedTool: input.forcedTool } : {}),

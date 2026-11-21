@@ -5,6 +5,8 @@ import { configurationOperation } from '../../../core/shell/scope.js';
 import { readPromptPreview } from '../../../session/context/preview.js';
 import { resolveSkillCatalog } from '../../../core/skills/skillCatalog.js';
 import { catalogContributions } from '../../../core/catalog/contributions.js';
+import { currentSessionProviderScope } from '../../../core/catalog/providers.js';
+import { sessionToolConfig } from '../extensions/host.js';
 import { promptTokens } from '../../../core/prompts/tokens.js';
 import { needsComposition } from '../../../core/commands/composition.js';
 import { compositionPlan } from '../../../core/commands/composition/plan.js';
@@ -100,8 +102,10 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     throw new Error('Command request preparation is pending.');
   }
   const forcedTool = context.peekForcedTool?.();
-  const mcpFilter = defersMcpDiscovery({ discover: config.toolDiscovery !== 'full', runtimeConfig: config, forcedTool })
-    ? false : mcpCatalogFilter(config, forcedTool);
+  const selection = forcedTool ? undefined : sessionToolConfig(context, config);
+  const toolConfig = selection?.config ?? config;
+  const mcpFilter = defersMcpDiscovery({ discover: toolConfig.toolDiscovery !== 'full', runtimeConfig: toolConfig, forcedTool })
+    ? false : mcpCatalogFilter(toolConfig, forcedTool);
   const snapshot = mcpFilter === false ? undefined : gateway.peekSnapshot?.(mcpFilter);
   if (mcpFilter !== false && (!snapshot || snapshot.clients.some(client => client.type !== 'connected'))) {
     throw new Error('MCP catalogue is not ready for a complete estimate.');
@@ -142,7 +146,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const ordinaryFeatures = foregroundTools(context);
   const features = research ? foregroundTools(context, researchPreviewTools(research.run)) : ordinaryFeatures;
   const featureIdentity = JSON.stringify(toolSchemas(new Map(ordinaryFeatures.map(tool => [tool.name, tool]))));
-  const prepared = await preparePromptRequest({ workspaceRoot: cwd, sessionId: expected.id, runtimeConfig: config, agentMode: review ? 'plan' : agentMode,
+  const prepared = await preparePromptRequest({ workspaceRoot: cwd, sessionId: expected.id, runtimeConfig: toolConfig, agentMode: review ? 'plan' : agentMode,
     catalogContent: { skills: skills.skills, tools: contributions.flatMap(entry => entry.tools), ...(snapshot ? { mcpTools: snapshot.tools } : {}) },
     ...(snapshot ? { mcpGateway: { snapshot: async () => snapshot } } : {}),
     builtinTools: browserTools(),
@@ -151,9 +155,12 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const resolution = context.resolveConfigTarget?.(config, expected.id)
     ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: expected.id } });
   if (!resolution?.model || resolution.blocked) throw new Error('Model request identity is unavailable.');
-  const base = providerCredentialBaseUrl(publication.catalog, resolution);
+  const { catalog, admission: providerAdmission } = currentSessionProviderScope(cwd, expected.id, publication.catalog, resolution);
+  const providerRefusal = providerAdmission?.();
+  if (providerRefusal) throw new Error(providerRefusal);
+  const base = providerCredentialBaseUrl(catalog, resolution);
   if (!base) throw new Error('Model request destination is unavailable.');
-  const endpoint = providerCredentialEndpoint(publication.catalog, resolution, base) ?? DEFAULT_ENDPOINT_KIND;
+  const endpoint = providerCredentialEndpoint(catalog, resolution, base) ?? DEFAULT_ENDPOINT_KIND;
   const protocol = endpointShape(endpoint);
   const messages = [...selectModelContext(session.session), ...(currentHistory ? [] : [openingMessage({ workspaceRoot: cwd,
     workspaceRoots: expected.workspaceRoots, permissionScope, goalObjective, continuityContext: session.continuityContextFor(effectivePrompt),
@@ -168,10 +175,10 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   // endpoint two catalogue entries claim, and an ambiguous address also makes
   // the shape fall back to a capable default, so estimating here would describe
   // a request the run will never build.
-  if (catalogProvider(publication.catalog, resolution.provider, base).ambiguous) {
+  if (catalogProvider(catalog, resolution.provider, base).ambiguous) {
     throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before sending.');
   }
-  const shape = resolveRequestShape(publication.catalog, resolution.provider, resolution.model, preference.thinkingEffort ?? undefined, base, endpoint);
+  const shape = resolveRequestShape(catalog, resolution.provider, resolution.model, preference.thinkingEffort ?? undefined, base, endpoint);
   if (!shape.toolCalling && hasToolHistory(messages)) throw new Error(TOOL_HISTORY_UNSUPPORTED_MESSAGE);
   const schemas = shape.toolCalling ? toolSchemas(prepared.currentTools()) : [];
   // The turn owner counts the first step before dispatch; a one-step run is closing.
@@ -183,7 +190,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const assembledIdentity = requestIdentity(overhead);
   const configuredOutput = configuredOutputLimit(config, endpoint);
   const serviceTier = configuredServiceTier(config, resolution);
-  if (serviceTier && serviceTierCapability(publication.catalog, resolution.provider, resolution.model, serviceTier, base, endpoint) !== 'supported') {
+  if (serviceTier && serviceTierCapability(catalog, resolution.provider, resolution.model, serviceTier, base, endpoint) !== 'supported') {
     throw new Error('Configured service tier is unavailable.');
   }
   const output = protocol.outputControl === 'provider' ? undefined : shape.maxOutputCeiling;
@@ -217,7 +224,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   });
   const endpointId = captureUsageAttribution({ provider: resolution.provider, model: resolution.model, baseUrl: base }).endpointId;
   const counted = estimateWirePromptDetails(body, protocol.contextFields,
-    catalogModel(publication.catalog, resolution.provider, resolution.model, base)?.tokenizer);
+    catalogModel(catalog, resolution.provider, resolution.model, base)?.tokenizer);
   const usage = getSessionUsage(expected.id);
   const count = usage.lastPromptMessageCount;
   const prefixIdentity = measuredProjectionPrefix(messages, projection, usage, shape.assistantAfterToolResult, config.pruneToolText);
@@ -241,7 +248,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
         || JSON.stringify(toolSchemas(new Map(foregroundTools(context).map(tool => [tool.name, tool])))) !== featureIdentity) {
         throw new Error('Request tool schemas changed.');
       }
-      if (admission() || context.configuration.current !== publication || context.session !== expected || context.cwd !== cwd
+      if (admission() || selection?.admission() || providerAdmission?.() || context.configuration.current !== publication || context.session !== expected || context.cwd !== cwd
         || !injected.isCurrent() || context.peekForcedTool?.() !== forcedTool
         || JSON.stringify([context.contextAttachments, context.transientContextAttachments]) !== entryIdentity
         || catalogContributions(cwd, expected.id).some((entry, index) => entry !== contributions[index])

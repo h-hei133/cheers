@@ -12,6 +12,10 @@ export function currentExtensionInvocation(): ExtensionInvocation | undefined {
   return invocations.getStore();
 }
 
+export function renderExtensionMessage<T>(operation: () => T): T {
+  return invocations.run({ ui: undefined, signal: AbortSignal.abort() }, operation);
+}
+
 /** Async callbacks retain the UI and cancellation owner that admitted the call. */
 export async function runExtensionInvocation<T>(
   ui: ExtensionUiHost | undefined,

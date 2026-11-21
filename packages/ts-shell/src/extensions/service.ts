@@ -9,13 +9,14 @@ import type { ExtensionHostBridge, InProcessExtensionInvoke } from './runtime/in
 import { runPreparedTool } from '../turn/invoke.js';
 import type { ToolGateOptions } from '../turn/tools.js';
 import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '../tools/types.js';
-import type { PackageRecord, EffectOutcome } from './model.js';
+import type { PackageRecord } from './model.js';
 import type { Operation, LifecycleHost } from './lifecycle/install.js';
 import type { DenyRule } from '../core/shell/approval/deny.js';
 import { observeDirectory } from '../core/state/watch.js';
 import { sourceFile } from './registry/sources.js';
 import { ExtensionCalls } from './runtime/calls.js';
 import { evaluateToolPermissionScope } from '../core/query/toolPolicy.js';
+import { redactReportText } from '../core/security/redaction.js';
 import { captureInputHookResult, captureInputResult, InputRefusal } from './events/input.js';
 import { captureToolResult } from './events/result.js';
 import { captureMessageResult } from './events/message.js';
@@ -181,8 +182,9 @@ export class ExtensionService implements LifecycleHost {
     return (await this.approveResult(operation, selected, signal)).output;
   }
   async approveResult(operation: Operation, selected: 'extension_manage' | 'extension_grant' = 'extension_manage', signal?: AbortSignal,
-    explicitApproval = false): ReturnType<typeof runPreparedTool> {
+    forceExplicitApproval = false): ReturnType<typeof runPreparedTool> {
     this.check(); return this.calls.run(async signal => {
+    const explicitApproval = forceExplicitApproval || operation.explicitApproval === true;
     const gate = this.options.gate(selected); const admission = () => { if (signal.aborted) return 'Extension operation cancelled.'; try { this.check(); return gate.admission?.(); } catch { return 'Extension lifecycle authority changed.'; } };
     const handler = gate.escalationPromptHandler;
     let reviewed = !explicitApproval;
@@ -198,7 +200,9 @@ export class ExtensionService implements LifecycleHost {
         execute: async context => {
           this.check();
           if (!reviewed) throw new Error('Installation requires explicit one-time approval.');
-          const effect: EffectOutcome = await operation.apply(context);
+          const effect = await operation.apply(context);
+          if ('acquisition' in effect) return { success: effect.acquisition === 'verified',
+            output: redactReportText(effect.detail, 4000), metadata: { acquisition: effect.acquisition } };
           // Cleanup can become uncertain after a confirmed registry publication.
           // Retain that actual result alongside uncertain saves, so reopening a
           // view or command cannot offer a fresh mutation in the same runtime.

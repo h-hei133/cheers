@@ -23,6 +23,7 @@ import { runModelPresetCommand } from './model/presetCommand.js';
 import { providerCredentialBaseUrl } from '../auth/account/target.js';
 import { modelDefaultSource, modelDefaultSourceLine, sessionOwnsModel } from './model/defaultSource.js';
 import { sessionModelCatalog } from '../catalog/models.js';
+import { EXTENSION_MODEL_PREFIX, sessionProviderScope } from '../catalog/providers.js';
 import { readLogicalModel } from '../../session/model/logical.js';
 import type { VirtualModelMetadata } from '../models/virtual/contract.js';
 
@@ -116,7 +117,11 @@ function renderCatalogView(context: CommandContext): string {
   const physical = renderCatalog({ providers: catalog, configPath: userCatalogPath(), diagnostics: catalogDiagnostics,
     availability: modelCatalogAvailability(context, { config, catalog, active }) });
   const virtual = context.sessionId ? sessionModelCatalog(context.cwd, context.sessionId, catalog).virtual : [];
-  return virtual.length ? `${physical}\n\nVirtual models\n${virtual.map(model => `- ${model.provider}/${model.id} (${model.name})`).join('\n')}` : physical;
+  const extension = context.sessionId && sessionProviderScope(context.cwd, context.sessionId, catalog, active).registration;
+  return [physical,
+    ...(virtual.length ? [`Virtual models\n${virtual.map(model => `- ${model.provider}/${model.id} (${model.name})`).join('\n')}`] : []),
+    ...(extension ? [`Extension models\n${extension.models.map(model => `- ${EXTENSION_MODEL_PREFIX}${extension.id}/${model.id}`).join('\n')}`] : []),
+  ].join('\n\n');
 }
 
 function modelCatalogAvailability(context: CommandContext, input: Pick<ReturnType<typeof modelConfiguration>, 'config' | 'catalog' | 'active'>) {

@@ -37,11 +37,21 @@ export async function prepareExtensionFiles(input: Omit<ExtensionFilesInput, 'si
     get ui() { return active?.ui; },
     getAllTools: () => (active ?? input.inspect).getAllTools?.() ?? [],
     getActiveTools: () => (active ?? input.inspect).getActiveTools?.() ?? [],
+    setActiveTools: (names, owner, signal) => {
+      const host = requireActive(active);
+      if (!host.setActiveTools) throw new Error('Session tool selection is unavailable from this host.');
+      host.setActiveTools(names, owner, signal);
+    },
     getCommands: () => (active ?? input.inspect).getCommands?.() ?? [],
     setThinkingLevel: (level, signal) => {
       const host = requireActive(active);
       if (!host.setThinkingLevel) throw new ExtensionThinkingError('Session thinking level is unavailable from this host.');
       return host.setThinkingLevel(level, signal);
+    },
+    setModel: (model, signal) => {
+      const host = requireActive(active);
+      if (!host.setModel) throw new ExtensionThinkingError('Session model selection is unavailable from this host.');
+      return host.setModel(model, signal);
     },
     sendMessage: async message => { await requireActive(active).sendMessage?.(message); },
     appendEntry: async (type, data) => { await requireActive(active).appendEntry?.(type, data); },

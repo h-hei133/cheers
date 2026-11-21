@@ -52,6 +52,8 @@ export function captureExtension(value: unknown): LoadedInProcessExtension {
   fields.commands = Object.freeze(resourceArray(fields.commands).map(command => captureCommand(command)));
   if (fields.virtualModels !== undefined) fields.virtualModels = Object.freeze(resourceArray(fields.virtualModels)
     .map(model => resourceRecord(model, ['route'])));
+  if (fields.messageRenderers !== undefined) fields.messageRenderers = Object.freeze(resourceArray(fields.messageRenderers)
+    .map(renderer => resourceRecord(renderer, ['render'])));
   fields.shortcuts = Object.freeze(resourceArray(fields.shortcuts).map(shortcut => resourceRecord(shortcut, ['run'])));
   fields.flags = Object.freeze(resourceArray(fields.flags).map(flag => resourceRecord(flag)));
   fields.handlers = captureHandlers(fields.handlers);
@@ -61,5 +63,5 @@ export function captureExtension(value: unknown): LoadedInProcessExtension {
   // Keep their captured reference; classes and nested callbacks are valid non-JSON exports.
   if (fields.signal !== undefined) AbortSignal.prototype.throwIfAborted.call(fields.signal);
   return resourceRecord<LoadedInProcessExtension>(fields, ['readWorkspaceFile'],
-    ['tools', 'commands', 'virtualModels', 'signal', 'shortcuts', 'flags', 'handlers', 'events', 'exports']);
+    ['tools', 'commands', 'virtualModels', 'messageRenderers', 'signal', 'shortcuts', 'flags', 'handlers', 'events', 'exports']);
 }

@@ -9,13 +9,15 @@ import { sameValue } from '../../config/values.js';
 import { SessionModelWriteError, type ModelWriteState } from './outcome.js';
 
 import { isThinkingPreference, type ThinkingPreference } from '../../core/models/effort.js';
-import type { SessionModelPolicy, SessionModelPreset, SessionModelRole, SessionModelSelection, SessionVirtualModelSelection } from "./contract.js";
+import type { SessionExtensionProvider, SessionModelPolicy, SessionModelPreset, SessionModelRole, SessionModelSelection, SessionVirtualModelSelection } from "./contract.js";
 
 export function decodeSessionModel(value: unknown): SessionModelSelection | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const candidate = value as Record<string, unknown>;
   const virtualModel = decodeVirtualModel(candidate.virtualModel);
   if (Object.hasOwn(candidate, 'virtualModel') && !virtualModel) return undefined;
+  const extensionProvider = decodeExtensionProvider(candidate.extensionProvider);
+  if (Object.hasOwn(candidate, 'extensionProvider') && (!extensionProvider || virtualModel)) return undefined;
   if (typeof candidate.provider !== 'string' || !candidate.provider.trim()) return undefined;
   if (candidate.model === undefined ? !virtualModel : typeof candidate.model !== 'string' || !candidate.model.trim()) return undefined;
   if (candidate.connectionScope === 'provider'
@@ -34,7 +36,17 @@ export function decodeSessionModel(value: unknown): SessionModelSelection | unde
   if (contextWindow !== undefined && (!Number.isSafeInteger(contextWindow) || (contextWindow as number) < 1)) return undefined;
   const address = candidate.connectionScope === 'provider' ? { connectionScope: 'provider' as const }
     : { connectionId: (candidate.connectionId as string).trim(), ...(candidate.connectionScope === 'session' ? { connectionScope: 'session' as const } : {}) };
-  return { ...address, ...(roles ? { roles } : {}), ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), ...(serviceTier !== undefined ? { serviceTier: (serviceTier as string).trim() } : {}), ...(presets ? { presets } : {}), ...(candidate.skillful !== undefined ? { skillful: candidate.skillful as boolean } : {}), ...(contextWindow !== undefined ? { contextWindow: contextWindow as number } : {}), provider: candidate.provider.trim(), ...(candidate.model !== undefined ? { model: (candidate.model as string).trim() } : {}), ...(virtualModel ? { virtualModel } : {}) } as SessionModelSelection;
+  return { ...address, ...(roles ? { roles } : {}), ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), ...(serviceTier !== undefined ? { serviceTier: (serviceTier as string).trim() } : {}), ...(presets ? { presets } : {}), ...(candidate.skillful !== undefined ? { skillful: candidate.skillful as boolean } : {}), ...(contextWindow !== undefined ? { contextWindow: contextWindow as number } : {}), provider: candidate.provider.trim(), ...(candidate.model !== undefined ? { model: (candidate.model as string).trim() } : {}), ...(virtualModel ? { virtualModel } : {}), ...(extensionProvider ? { extensionProvider } : {}) } as SessionModelSelection;
+}
+
+function decodeExtensionProvider(value: unknown): SessionExtensionProvider | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const { id, baseUrl } = value as Record<string, unknown>;
+  if (Object.keys(value).length !== 2 || typeof id !== 'string' || !/^[a-z0-9][a-z0-9_.-]{0,127}$/.test(id)
+    || typeof baseUrl !== 'string' || baseUrl.length > 2048 || baseUrl !== baseUrl.trim()) return undefined;
+  const url = URL.canParse(baseUrl) ? new URL(baseUrl) : undefined;
+  if (!url || url.username || url.password || url.search || url.hash || !['http:', 'https:'].includes(url.protocol)) return undefined;
+  return { id, baseUrl };
 }
 
 export function decodeVirtualModel(value: unknown): SessionVirtualModelSelection | undefined {

@@ -49,6 +49,8 @@ export interface ScopedMcpServerConfig extends McpServerConfig {
   readonly scope: McpConfigScope
   readonly sourcePath?: string
   readonly overridePath?: string
+  /** Ephemeral owner of an extension definition; equal URLs can belong to different generations. */
+  readonly extensionOwner?: string
 }
 
 export type McpConnectionState =

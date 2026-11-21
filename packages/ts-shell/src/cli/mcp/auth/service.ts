@@ -53,7 +53,7 @@ export class McpAuthService implements McpHttpAuthorization {
 }
 
 export function authorizationForMcp(name: string, config: ScopedMcpServerConfig): McpHttpAuthorization | undefined {
-  return config.transport === 'http' && config.url ? new McpAuthService(name, config) : undefined;
+  return config.transport === 'http' && config.url && config.extensionOwner === undefined ? new McpAuthService(name, config) : undefined;
 }
 
 /** OAuth discovery/exchange is bounded and never receives configured MCP headers. */

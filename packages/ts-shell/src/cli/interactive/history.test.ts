@@ -8,6 +8,8 @@ import { copyPicker } from './picker/copy.js';
 import { renderBlock } from '../../presentation/tui/transcript/blocks.js';
 import { rewindPoints, rewindPicker } from "./picker/rewind.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
+import { runExtensionFactory } from '../../extensions/runtime/inProcessLoader.js';
+import { registerCatalogContribution } from '../../core/catalog/contributions.js';
 
 let nextTurnId = 0;
 /**
@@ -36,6 +38,55 @@ const CONVERSATION = [
 ];
 
 describe("restoring a conversation", () => {
+  it('uses a live custom renderer for visible messages and restores the original after retirement', async () => {
+    const cwd = process.cwd();
+    const controller = new AbortController();
+    let rendered = 0;
+    const loaded = await runExtensionFactory({ workspaceRoot: cwd, signal: controller.signal, factory: api => {
+      api.registerMessageRenderer('annotation', message => {
+        rendered++;
+        expect(Object.isFrozen(message)).toBe(true);
+        return `\x1b[31mShown ${String(message.content)}\x1b[0m`;
+      });
+    } });
+    const session = { id: 'render-annotation', turns: [
+      { role: 'custom', content: 'Original', customType: 'annotation', display: true },
+      { role: 'custom', content: 'Hidden', customType: 'annotation', display: false },
+    ] } as never;
+    const unregister = registerCatalogContribution({ root: cwd, sessionId: 'render-annotation', commands: [], tools: [], skills: () => [],
+      messageRenderers: loaded.messageRenderers, signal: loaded.signal });
+    const show = () => {
+      const transcript = new Transcript();
+      appendConversation({ transcript, context: { cwd, runtimeConfig: {} } as never }, session);
+      return transcript.all().map(block => block.text);
+    };
+    try {
+      expect(show()).toEqual(['Shown Original']);
+      expect(rendered).toBe(1);
+      controller.abort();
+      expect(show()).toEqual(['Original']);
+      expect(rendered).toBe(1);
+    } finally { unregister(); }
+  });
+
+  it('renders only displayed custom messages and retains earlier source text for copying', () => {
+    const messages: SessionMessage[] = Array.from({ length: 80 }, (_, index) => ({
+      role: 'custom', customType: 'annotation', display: true, content: `Message ${index}`,
+    }));
+    messages.push(turn('user', 'Latest question'));
+    const rendered: string[] = [];
+    const restored = restoreConversation(messages, [], true, message => {
+      rendered.push(String(message.content));
+      return `Shown ${String(message.content)}`;
+    });
+    expect(restored.omitted).toBe(21);
+    expect(restored.earlier.at(-1)?.text).toBe('Message 20');
+    expect(rendered).toHaveLength(59);
+    expect(rendered[0]).toBe('Message 21');
+    expect(restored.blocks[0]?.text).toBe('Shown Message 21');
+    expect(restored.blocks.at(-1)?.text).toBe('Latest question');
+  });
+
   it('restores answer boundaries while a tool-calling assistant retains its excluded identity', () => {
     const withTools = { ...turn('assistant', 'Inspecting.'), tool_calls: [{ id: 'boundary-read', type: 'function' as const,
       function: { name: 'read', arguments: '{"path":"source.ts"}' } }] };

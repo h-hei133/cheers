@@ -287,6 +287,9 @@ const bootstrap = new vm.Script(\`
     events: eventsBus,
     ui,
     registerVirtualModel: () => { throw new Error('Virtual model registration is unavailable in worker extensions. Use a session extension.'); },
+    registerMessageRenderer: () => { throw new Error('Message renderer registration is unavailable in worker extensions. Use a session extension.'); },
+    registerMcpServer: () => { throw new Error('MCP server registration is unavailable in worker extensions. Use a session extension.'); },
+    registerProvider: () => { throw new Error('Provider registration is unavailable in worker extensions. Use a session extension.'); },
     registerTool: (tool) => {
       if (!tool || typeof tool.name !== 'string' || !tool.name.trim() || typeof tool.execute !== 'function') {
         throw new Error('Extension registerTool requires { name, execute }.');
@@ -347,6 +350,8 @@ const bootstrap = new vm.Script(\`
     getAllTools: () => rpc('host.getAllTools', {}),
     getCommands: () => rpc('host.getCommands', {}),
     setThinkingLevel: async () => { throw new Error('Installed extension scripts have no session model control.'); },
+    setActiveTools: async () => { throw new Error('Installed extension scripts have no session tool selection control.'); },
+    setModel: async () => { throw new Error('Installed extension scripts have no session model control.'); },
     sendMessage: (msg) => rpc('host.sendMessage', { msg }),
     appendEntry: (customType, data) => rpc('host.appendEntry', { customType: String(customType ?? ''), data }),
   };

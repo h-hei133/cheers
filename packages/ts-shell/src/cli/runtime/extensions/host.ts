@@ -9,8 +9,9 @@ import type { ExtensionHostBridge } from '../../../extensions/runtime/inProcessL
 import { resolveUiHost, type ExtensionUiHost } from '../../../extensions/runtime/ui.js';
 import type { SessionManager } from '../../../session/SessionManager.js';
 import type { CoreMcpGateway } from '../../../core/mcp/gateway.js';
+import type { RuntimeConfig } from '../../../config/runtimeConfig.js';
 import { queueExtensionMessage } from '../inputQueue.js';
-import { sessionThinkingSetter } from './model.js';
+import { sessionModelSetters } from './model.js';
 
 interface UiBinding {
   host: Required<ExtensionUiHost>;
@@ -21,6 +22,7 @@ interface HostState {
   readonly host: ExtensionHostBridge;
   readonly admission: () => string | undefined;
   readonly uiAdmission: () => string | undefined;
+  readonly toolSelection: () => readonly string[] | undefined;
   readonly quiesce: () => void;
   readonly close: () => void;
   refreshUi?: () => void;
@@ -40,6 +42,7 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
   let closed = false;
   let closing = false;
   let lastUi: UiBinding | undefined;
+  let selection: { readonly names: readonly string[]; readonly owner: AbortSignal } | undefined;
   const admission = () => closed || context.session.id !== sessionId || context.session.createdAt !== createdAt || context.cwd !== root
     ? 'Extension session or workspace changed.' : configured();
   const check = () => { const refusal = admission(); if (refusal) throw new Error(refusal); };
@@ -49,6 +52,7 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
     if (validateStartup?.() === false) throw new Error('Extension startup arguments have not been admitted.');
   };
   const uiAdmission = () => admission() ?? (closing ? 'Extension session is closing.' : undefined);
+  const toolSelection = () => selection && !selection.owner.aborted && !uiAdmission() ? selection.names : undefined;
   const allTools = () => {
     check();
     return [...new Set([...createCoreToolRegistry().keys(), ...catalogContributions(root, sessionId).flatMap(entry => entry.tools.map(tool => tool.name)),
@@ -61,11 +65,24 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
       lastUi = surfaces.get(context);
       return lastUi?.host;
     },
-    getActiveTools: () => { check(); return runtime.input?.()?.activeTools?.() ?? filterVisibleToolNames(allTools(), context.runtimeConfig); },
+    getActiveTools: () => {
+      check();
+      return runtime.input?.()?.activeTools?.() ?? filterVisibleToolNames(allTools(), selectedToolConfig(context.runtimeConfig, toolSelection()));
+    },
+    setActiveTools: (names, owner, signal) => {
+      operations();
+      signal.throwIfAborted();
+      owner.throwIfAborted();
+      if (runtime.isRunning() && (!replacement || runtime.commands.current !== replacement || replacement.controller.signal.aborted)) {
+        throw new Error('Finish the current session operation before changing active tools.');
+      }
+      selection = { names: Object.freeze([...names]), owner };
+      context.promptIdentity = undefined;
+    },
     getAllTools: allTools,
     getCommands: () => { check(); return [...new Set([...createCommandRegistry(root, context.runtimeConfig).keys(),
       ...catalogContributions(root, sessionId).flatMap(entry => entry.commands.map(command => command.name))])]; },
-    setThinkingLevel: sessionThinkingSetter(context, runtime, operations),
+    ...sessionModelSetters(context, runtime, operations),
     sendMessage: async message => {
       operations();
       if (typeof message !== 'string' || !message.trim()) throw new Error('Extension message must be nonempty text.');
@@ -86,7 +103,7 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
       if (result !== 'saved') throw new Error(result === 'unverified' ? 'Extension entry persistence is unverified.' : 'Extension entry was not saved.');
     },
   };
-  const state: HostState = { host, admission, uiAdmission, quiesce: () => {
+  const state: HostState = { host, admission, uiAdmission, toolSelection, quiesce: () => {
     const ownedSurface = hosts.get(context) === state ? surfaces.get(context) : undefined;
     closing = true;
     state.refreshUi = undefined;
@@ -105,6 +122,18 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
 
 export function extensionHostFor(context: ShellRuntimeContext): ExtensionHostBridge | undefined {
   return hosts.get(context)?.host;
+}
+
+/** A session selection can only narrow the pool admitted by the active configuration. */
+export function sessionToolConfig(context: ShellRuntimeContext, config: RuntimeConfig) {
+  const readSelection = () => hosts.get(context)?.toolSelection();
+  const selection = readSelection();
+  return { config: selectedToolConfig(config, selection),
+    admission: () => selection !== readSelection() ? 'Extension tool selection changed. Start a new request.' : undefined };
+}
+
+function selectedToolConfig(config: RuntimeConfig, selection: readonly string[] | undefined): RuntimeConfig {
+  return selection ? { ...config, allowedTools: filterVisibleToolNames(selection, config), toolDiscovery: 'full' } : config;
 }
 
 /** Stop new operations while the original generation remains available to shutdown observers. */

@@ -13,6 +13,8 @@ import { createSkillCatalog } from "./skills.js";
 import { createCatalogObservation } from "./observation.js";
 import { observeCatalogContributions } from '../../../core/catalog/contributions.js';
 import { sessionModelCatalog } from '../../../core/catalog/models.js';
+import { EXTENSION_MODEL_PREFIX, sessionProviderScope } from '../../../core/catalog/providers.js';
+import { resolveProviderCredential } from '../../../core/shell/providerCredentials.js';
 import { toolPoolFor } from "../../runtime/tools.js";
 import { mcpCatalogFilter } from '../../../core/tools/mcp.js';
 import type { ShellRuntimeContext } from "../../../core/shell/runtimeContext.js";
@@ -49,8 +51,16 @@ async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gate
   if (kind === "mcp") return serverCatalog(context.cwd);
   if (kind === "connection") return connectionCatalog();
   if (kind === "model" || kind === "provider") {
-    const catalog = sessionModelCatalog(context.cwd, context.session.id, context.configuration.current.catalog);
-    return modelCatalog(kind, catalog.physical, catalog.virtual);
+    const { catalog, config } = context.configuration.current;
+    const models = sessionModelCatalog(context.cwd, context.session.id, catalog);
+    const ordinary = modelCatalog(kind, catalog, models.virtual);
+    if (kind === 'provider') return ordinary;
+    const target = context.resolveConfigTarget?.(config, context.session.id) ?? resolveProviderCredential({ runtimeConfig: config });
+    const provider = sessionProviderScope(context.cwd, context.session.id, catalog, target).registration;
+    return provider ? [...ordinary, ...provider.models.map(model => {
+      const value = `${EXTENSION_MODEL_PREFIX}${provider.id}/${model.id}`;
+      return { value, label: value };
+    })] : ordinary;
   }
   if (kind === "workflow") return workflowCatalog(context.cwd);
   if (kind === "record" || kind === "invalidatable" || kind === "candidate" || kind === "approvable" || kind === "approved") return memoryCatalog(kind, context);

@@ -17,7 +17,8 @@ export function registerSdkExtensions(root: string, sessionId: string, resources
           () => runEventHandlers({handlers:ext.handlers, event, payload, aliases, signal, ownerSignal:ext.signal}))
         : undefined;
       cleanups.push(registerCatalogContribution({root, sessionId, commands:ext.commands, tools:ext.tools,
-        virtualModels:ext.virtualModels, signal:ext.signal, skills:() => [], ...(onEvent ? {onEvent} : {})}, catalog));
+        virtualModels:ext.virtualModels, messageRenderers:ext.messageRenderers, mcpServers:ext.mcpServers, providers:ext.providers,
+        signal:ext.signal, skills:() => [], ...(onEvent ? {onEvent} : {})}, catalog));
     }
     return cleanups;
   } catch (error) {

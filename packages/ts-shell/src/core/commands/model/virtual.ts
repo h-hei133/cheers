@@ -48,7 +48,8 @@ export async function setVirtualModel(target: SessionVirtualModelSelection, cont
       return !refusal && !context.signal?.aborted && sessionVirtualModels(context.cwd, sessionId).includes(definition);
     };
     if (!current()) return 'Model switch blocked: session, configuration or virtual model registration changed.';
-    const physical = baseline.selection ?? captureAuthority(context, choice.config);
+    const { extensionProvider: _extensionProvider, ...physical } = baseline.selection
+      ?? { ...captureAuthority(context, choice.config), extensionProvider: undefined };
     const next: SessionModelSelection = { ...physical, virtualModel: { ...target } };
     const previous = projectLogicalModel(baseline.selection);
     const fromModel = previous ? `${previous.provider}/${previous.model}` : 'default';

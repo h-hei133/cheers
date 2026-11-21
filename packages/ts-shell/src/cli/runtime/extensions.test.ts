@@ -19,6 +19,7 @@ import { cliExtensionArguments, type CliExtensionArguments } from '../options/ex
 import { writeCatalogCache } from '../../core/models/catalogStore.js';
 import { SessionManager } from '../../session/SessionManager.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../session/model/state.js';
+import { renderCustomMessage } from '../../core/catalog/renderers.js';
 
 let directory: string; let context: ShellRuntimeContext;
 beforeEach(() => {
@@ -41,6 +42,24 @@ function install(args?: CliExtensionArguments) {
     hooks: new HookDispatcher(), emit: () => {}, permissionScope: 'ask' }), undefined, undefined, args);
   return commands;
 }
+
+it('renders through the file host and falls back for invalid or failed renderers', async () => {
+  const file = path.join(directory, 'render.ts');
+  fs.writeFileSync(file, `export default api => {
+    api.registerMessageRenderer('valid', value => Object.getPrototypeOf(value) === Object.prototype && Object.isFrozen(value)
+      ? 'Rendered ' + value.content : 'Invalid invocation');
+    api.registerMessageRenderer('oversized', () => '字'.repeat(12000));
+    api.registerMessageRenderer('failed', () => { throw new Error('Unrenderable'); });
+  };`);
+  context.cliExtensionPaths = [file];
+  install();
+  await startExtensionsFor(context);
+  const render = (customType: string) => renderCustomMessage(directory, context.session.id,
+    { role: 'custom', customType, content: 'original', display: true });
+  expect(render('valid')).toBe('Rendered original');
+  expect(render('oversized')).toBeUndefined();
+  expect(render('failed')).toBeUndefined();
+});
 
 it.each(['applied', 'saved'] as const)('reports %s effort through the file callback host while preserving model controls', async status => {
   writeCatalogCache([{ id: 'openai', models: [{ id: 'test-model', reasoning: true, maxTokens: 4096, contextWindow: 128_000 }] }]);
