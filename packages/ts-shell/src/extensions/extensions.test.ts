@@ -6,6 +6,7 @@ import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { execFileSync } from 'node:child_process';
 import { create, Header } from 'tar';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { canonical, digest, manifest as parseManifest } from './registry/validation.js';
 import { changeSources, selectedSource, trustAnchor } from './registry/sources.js';
@@ -34,6 +35,14 @@ import { projectExtensions } from './view/projection.js';
 import { packageActions } from './view/actions.js';
 import type { ExtensionManager, ExtensionSnapshot } from './view/model.js';
 import { ShellCommandRuntime } from '../core/shell/command.js';
+import { CoreMcpGateway, type McpDefinitionSource } from '../core/mcp/gateway.js';
+import { McpSessionGateway } from '../core/mcp/scope.js';
+import { sessionMcpDefinitions } from '../core/catalog/mcp.js';
+import { mcpConfigPath } from '../core/mcp/config/document.js';
+import { addMcpDefinition } from '../cli/mcp/config.js';
+import { sessionProviders, sessionProviderScope } from '../core/catalog/providers.js';
+import { currentMessageText, renderCustomMessages } from '../core/catalog/renderers.js';
+import type { CustomAgentMessage } from '../core/agent/custom.js';
 
 
 let root: string; let workspace: string; let server: Server; let base: string; let service: ExtensionService;
@@ -60,9 +69,21 @@ function localPackage(name: string, version = '1.0.0', parent = workspace): stri
   return directory;
 }
 
-async function archive(pinned = '1.0.0', permissions: 'read' | 'write' = 'read'): Promise<Release> {
+async function archive(pinned = '1.0.0', permissions: 'read' | 'write' = 'read', registration?: {
+  readonly declaration?: NonNullable<ExtensionManifest['providers']>[number];
+  readonly renderers?: ExtensionManifest['messageRenderers'];
+  readonly source: string;
+  readonly file?: string;
+}): Promise<Release> {
   const source = path.join(root, `source-${pinned}`); fs.mkdirSync(path.join(source, 'skills/shared'), { recursive: true }); fs.mkdirSync(path.join(source, 'scripts'), { recursive: true });
-  const declared = manifest(pinned, permissions); fs.writeFileSync(path.join(source, 'extension.json'), JSON.stringify(declared));
+  const defaults = manifest(pinned, permissions);
+  const script = registration?.declaration?.script ?? registration?.renderers?.[0]?.script;
+  const fileName = registration?.file ?? 'scripts/catalogue.ts';
+  const declared = script ? { ...defaults, ...(registration?.declaration ? { providers: [registration.declaration] } : {}),
+    ...(registration?.renderers ? { messageRenderers: registration.renderers } : {}),
+    scripts: [...defaults.scripts, { name: script, path: fileName }] } : defaults;
+  if (registration) fs.writeFileSync(path.join(source, fileName), registration.source);
+  fs.writeFileSync(path.join(source, 'extension.json'), JSON.stringify(declared));
   fs.writeFileSync(path.join(source, 'skills/shared/SKILL.md'), '---\nname: shared\ndescription: package shared skill\n---\nPackage text </skill> cannot approve writes.');
   fs.writeFileSync(path.join(source, 'scripts/echo.sh'), 'printf "fixture:%s:%s:%s\\n" "$1" "$EXTENSION_WORKSPACE" "${FAKE_PROVIDER_KEY-absent}"\nif [ "$1" = write ]; then printf touched > "$EXTENSION_WORKSPACE/touched"; fi\n');
   fs.writeFileSync(path.join(source, 'scripts/wait.sh'), 'printf started\nsleep 25\n');
@@ -199,7 +220,224 @@ describe('signed marketplace protocol and bounded archive ownership', () => {
     expect(() => parseManifest({ ...manifest(), lifecycle: { install: 'bad' } })).toThrow('Unknown');
     expect(() => parseManifest({ ...manifest(), scripts: [{ name: 'echo', path: '../escape.sh' }] })).toThrow('Unsafe');
   });
+
+  it('captures only exact, bounded installed stdio server declarations', () => {
+    const allowed = { name: 'sample-mcp', command: process.execPath, args: ['first', 'second'] };
+    expect(parseManifest({ ...manifest(), mcpServers: [allowed] }).mcpServers).toEqual([allowed]);
+    for (const servers of [
+      [{ ...allowed, command: 'node' }], [{ ...allowed, args: undefined }], [{ ...allowed, env: {} }],
+      [{ ...allowed, name: 'sample__mcp' }], [allowed, allowed], [{ ...allowed, args: ['nul\0arg'] }],
+    ]) {
+      expect(() => parseManifest({ ...manifest(), mcpServers: servers })).toThrow();
+    }
+  });
+
+  it('accepts only canonical provider endpoints and declared JS scripts', () => {
+    const provider = { name: 'sample-provider', script: 'catalogue', runtime: 'openai', baseUrl: 'https://example.invalid/api' };
+    const data = { ...manifest(), scripts: [{ name: 'catalogue', path: 'catalogue.ts' }], commands: [], tools: [], providers: [provider] };
+    expect(parseManifest(data).providers).toEqual([provider]);
+    for (const declaration of [
+      { ...provider, script: 'unknown' }, { ...provider, runtime: 'unknown' }, { ...provider, baseUrl: `${provider.baseUrl}/` },
+      { ...provider, baseUrl: 'https://user:fixture@example.invalid' }, { ...provider, apiKey: 'fixture' },
+    ]) expect(() => parseManifest({ ...data, providers: [declaration] })).toThrow();
+    expect(() => parseManifest({ ...data, scripts: [{ name: 'catalogue', path: 'catalogue.sh' }] })).toThrow('JavaScript');
+  });
+
+  it('accepts only inert and unique renderer declarations for declared JS scripts', () => {
+    const renderer = { customType: 'sample.note', script: 'catalogue' };
+    const data = { ...manifest(), scripts: [{ name: 'catalogue', path: 'catalogue.ts' }], commands: [], tools: [], messageRenderers: [renderer] };
+    expect(parseManifest(data).messageRenderers).toEqual([renderer]);
+    for (const declaration of [{ ...renderer, script: 'unknown' }, { ...renderer, customType: 'sample:note' }, { ...renderer, render: 'code' }]) {
+      expect(() => parseManifest({ ...data, messageRenderers: [declaration] })).toThrow();
+    }
+    expect(() => parseManifest({ ...data, messageRenderers: [renderer, renderer] })).toThrow('Duplicate');
+    expect(() => parseManifest({ ...data, scripts: [{ name: 'catalogue', path: 'catalogue.sh' }] })).toThrow('JavaScript');
+  });
 });
+
+it.each([true, false])('qualifies a signed worker only for its approved endpoint (exact=%s)', async exactEndpoint => {
+  const declaration = { name: 'sample-provider', script: 'catalogue', runtime: 'openai', baseUrl: 'https://example.invalid/api' } as const;
+  const release = await archive('1.1.0', 'read', { declaration, file: 'scripts/catalogue.mjs', source: `export default async api => {
+    await api.sendMessage('qualification must have no host privileges').then(
+      () => { throw new Error('Host mutation was accepted'); },
+      error => { if (!error.message.includes('no host privileges')) throw error; });
+    api.registerProvider(${JSON.stringify(declaration.name)}, {
+      runtime: 'openai', baseUrl: ${JSON.stringify(exactEndpoint ? declaration.baseUrl : 'https://example.invalid/unapproved')}, models: [{ id: 'worker-model' }]
+    });
+  }; export function run() { throw new Error('Qualification ran the script entry point'); }` });
+  await install('1.1.0');
+  await enable();
+  expect(sessionProviders(workspace, service.sessionId)).toEqual([]);
+  const approval = activationOperation(service, workspace, 'grant', 'sample', 'provider:sample-provider');
+  expect(approval.explicitApproval).toBe(true);
+  for (const value of [declaration.name, declaration.runtime, declaration.baseUrl, release.digest, 'script:catalogue']) expect(approval.preview).toContain(value);
+  allow = false;
+  await service.approve(approval, 'extension_grant');
+  expect(sessionProviders(workspace, service.sessionId)).toEqual([]);
+  allow = true;
+  await grant('provider:sample-provider');
+  expect(sessionProviders(workspace, service.sessionId)).toEqual([]);
+  expect(service.errors).toContain('sample: provider:sample-provider withheld because the separate script:catalogue grant is missing.');
+  await grant('script:catalogue');
+  const providers = sessionProviders(workspace, service.sessionId);
+  if (!exactEndpoint) {
+    expect(providers).toEqual([]);
+    expect(service.errors).toContain('sample: installed provider registration was withheld.');
+    return;
+  }
+  expect(providers).toMatchObject([{ id: declaration.name, runtime: declaration.runtime, baseUrl: declaration.baseUrl, models: [{ id: 'worker-model' }] }]);
+  expect(sessionProviders(workspace, 'another-session')).toEqual([]);
+  const scope = sessionProviderScope(workspace, service.sessionId, [], { provider: 'openai', baseUrl: declaration.baseUrl, model: 'worker-model',
+    expectedEnvVarName: 'FIXTURE_API_KEY', credential: { provider: 'openai', authMode: 'api-key', source: 'env', envVarName: 'FIXTURE_API_KEY' } },
+  { id: declaration.name, baseUrl: declaration.baseUrl });
+  expect(scope.registration).toBe(providers[0]);
+  expect(scope.admission?.()).toBeUndefined();
+  const state = service.store.read(), [record] = state.packages;
+  const activation = record!.activation[workspace]!;
+  service.store.locked(state, current => service.store.publish({ ...current, packages: [{ ...record!, activation: {
+    ...record!.activation, [workspace]: { ...activation, grants: ['script:catalogue'] },
+  } }] }, { effect: 'saved', detail: 'Fixture provider revoked.' }));
+  expect(scope.admission?.()).toContain('registration changed');
+  expect(sessionProviders(workspace, service.sessionId)).toEqual([]);
+  await service.invalidate();
+  await grant('provider:sample-provider');
+  expect(sessionProviders(workspace, service.sessionId)).toMatchObject([{ id: declaration.name }]);
+  expect(scope.admission?.()).toContain('registration changed');
+  await service.close();
+  expect(sessionProviders(workspace, service.sessionId)).toEqual([]);
+});
+
+it('renders displayed messages with a signed isolated worker only while its exact grants remain current', async () => {
+  const renderers = ['sample.note', 'sample.other'].map(customType => ({ customType, script: 'catalogue' }));
+  const release = await archive('1.1.0', 'read', { renderers, source: `export default async api => {
+    await api.readWorkspaceFile('secret').then(
+      () => { throw new Error('Host read was accepted'); },
+      error => { if (!error.message.includes('no host privileges')) throw error; });
+    api.registerMessageRenderer('sample.note', message => {
+      if (!Object.isFrozen(message) || !Object.isFrozen(message.data)) throw new Error('Mutable input');
+      if (message.content === 'oversized') return '\\u6587'.repeat(12 * 1024);
+      if (message.content === 'failed') throw new Error('Private fixture error');
+      if (message.content === 'nonprimitive') return { get then() { throw new Error('Getter ran'); } };
+      return 'note:' + message.content;
+    });
+    api.registerMessageRenderer('sample.other', () => 'ungranted');
+  }; export function run() { throw new Error('Renderer ran the script entry point'); }` });
+  const message = (content: string, display = true, customType = 'sample.note'): CustomAgentMessage => ({ role: 'custom', customType, content, display, data: { n: 1 } });
+  const messages = [message('one'), message('hidden', false), message('other', true, 'sample.other'), message('oversized'),
+    message('failed'), message('nonprimitive'), message('two')];
+  await install('1.1.0');
+  await enable();
+  const lookup = (signal?: AbortSignal) => renderCustomMessages(workspace, service.sessionId, messages, signal);
+  expect((await lookup()).size).toBe(0);
+  const approval = activationOperation(service, workspace, 'grant', 'sample', 'renderer:sample.note');
+  expect(approval.explicitApproval).toBe(true);
+  for (const term of ['sample.note', 'script:catalogue', release.digest]) expect(approval.preview).toContain(term);
+  allow = false;
+  await service.approve(approval, 'extension_grant');
+  expect((await lookup()).size).toBe(0);
+  allow = true;
+  await grant('renderer:sample.note');
+  expect((await lookup()).size).toBe(0);
+  expect(service.errors).toContain('sample: renderer:sample.note withheld because the separate script:catalogue grant is missing.');
+  await grant('script:catalogue');
+  const results = await lookup();
+  expect([...results].map(([index, row]) => [index, currentMessageText(row)])).toEqual([[0, 'note:one'], [6, 'note:two']]);
+  expect((await renderCustomMessages(workspace, 'another-session', messages)).size).toBe(0);
+  expect((await lookup(AbortSignal.abort())).size).toBe(0);
+  const state = service.store.read(), [record] = state.packages;
+  const active = record!.activation[workspace]!;
+  service.store.locked(state, current => service.store.publish({ ...current, packages: [{ ...record!, activation: {
+    ...record!.activation, [workspace]: { ...active, grants: ['script:catalogue'] },
+  } }] }, { effect: 'saved', detail: 'Fixture renderer revoked.' }));
+  expect(currentMessageText(results.get(0)!)).toBeUndefined();
+  expect((await lookup()).size).toBe(0);
+  await service.invalidate();
+  await grant('renderer:sample.note');
+  expect(currentMessageText(results.get(0)!)).toBeUndefined();
+  expect(currentMessageText((await lookup()).get(0)!)).toBe('note:one');
+});
+
+it('launches installed stdio only for the exact approved session generation and retires the process on revoke', async () => {
+  const directory = localPackage('mcp-package');
+  const log = path.join(root, 'mcp-events.jsonl');
+  const privateArg = 'synthetic-sensitive-argument';
+  const args = [path.resolve('src/core/mcp/fixtures/mockMcpServer.mjs'), '--log', log, '--content', privateArg];
+  const declaration = { name: 'sample-mcp', command: process.execPath, args };
+  fs.writeFileSync(path.join(directory, 'extension.json'), JSON.stringify({ ...manifest(), mcpServers: [declaration] }));
+  const operation = await installOperation(service, './mcp-package');
+  expect(operation.preview).not.toContain(privateArg);
+  expect((await pluginCommand(['install', './mcp-package'], service)).installConfirmed).toBe(true);
+  expect((await pluginCommand(['details', 'sample'], service)).output).not.toContain(privateArg);
+  const { digest } = service.store.read().packages[0]!.active;
+  const approved = { command: declaration.command, args, extension: { packageId: 'sample', digest, workspace } };
+  const configPath = mcpConfigPath(workspace, 'user');
+  const writeApproval = (config: typeof approved | undefined) => fs.writeFileSync(configPath, JSON.stringify({
+    mcpServers: config ? { [declaration.name]: config } : {},
+  }));
+  const select = (name: string) => name === declaration.name;
+  const shared = new CoreMcpGateway(workspace);
+  const definitions: McpDefinitionSource = sessionMcpDefinitions(() => service.sessionId);
+  const gateway = new McpSessionGateway(shared, () => workspace, () => () => undefined, definitions);
+  const peer = new McpSessionGateway(shared, () => workspace, () => () => undefined, sessionMcpDefinitions(() => 'another-session'));
+  let pid: number | undefined;
+  const records = (): Array<{ event: string; pid: number }> => fs.readFileSync(log, 'utf8').trimEnd().split('\n').map(line => JSON.parse(line));
+  try {
+    const connect = Client.prototype.connect;
+    const publish = () => addMcpDefinition('user', declaration.name, approved, {
+      root: workspace, trusted: () => true, gate: () => service.options.gate('mcp'), sourceAccess: () => {},
+      changed: () => gateway.configurationChanged(),
+    });
+    allow = false;
+    expect((await publish()).report).toMatchObject({ facts: { status: 'unchanged' } });
+    expect(fs.existsSync(configPath)).toBe(false);
+    allow = true;
+    expect((await publish()).report).toMatchObject({ facts: { status: 'persisted' } });
+    expect((await gateway.snapshot(undefined, undefined, select)).tools).toEqual([]);
+    await enable();
+    expect((await gateway.snapshot(undefined, undefined, select)).tools).toEqual([]);
+    await grant('mcp:sample-mcp');
+    for (const mismatch of [
+      undefined, { ...approved, args: [...args].reverse() },
+      { ...approved, command: path.join(root, 'other-command') },
+      { ...approved, extension: { ...approved.extension, workspace: directory } },
+      { ...approved, extension: { ...approved.extension, digest: '0'.repeat(64) } },
+      { ...approved, extension: { ...approved.extension, packageId: 'different' } },
+    ]) {
+      writeApproval(mismatch);
+      expect((await gateway.snapshot(undefined, undefined, select)).tools).toEqual([]);
+      expect(fs.existsSync(log)).toBe(false);
+    }
+    writeApproval(approved);
+    expect((await shared.snapshot(undefined, undefined, select)).tools).toEqual([]);
+    expect((await peer.snapshot(undefined, undefined, select)).tools).toEqual([]);
+    expect(fs.existsSync(log)).toBe(false);
+    const revokeAtStart = vi.spyOn(Client.prototype, 'connect').mockImplementationOnce(function (this: Client, ...once) {
+      writeApproval(undefined);
+      return connect.apply(this, once);
+    });
+    try { await expect(gateway.refresh(declaration.name, { exactTarget: true })).rejects.toThrow(); }
+    finally { revokeAtStart.mockRestore(); }
+    expect(fs.existsSync(log)).toBe(false);
+    writeApproval(approved);
+    const snapshot = await gateway.refresh(declaration.name, { exactTarget: true });
+    const contractId = snapshot.tools[0]?.contractId;
+    expect(contractId).toBeTruthy();
+    expect(snapshot.clients).toMatchObject([{ type: 'connected', config: { transport: 'stdio', extensionOwner: expect.any(String) } }]);
+    pid = records()[0]!.pid;
+    await expect(gateway.invokeTool(declaration.name, 'echo_message', { message: 'data' }, undefined, { contractId })).resolves.toEqual({ content: 'echo:data' });
+    await expect(gateway.content(declaration.name, { action: 'resources' })).resolves.toMatchObject({ result: { kind: 'resources' } });
+    expect((await pluginCommand(['revoke', 'sample', 'mcp:sample-mcp'], service)).output).toContain('durability: confirmed');
+    await vi.waitFor(() => expect(() => process.kill(pid!, 0)).toThrow(/ESRCH/));
+    await expect(gateway.invokeTool(declaration.name, 'echo_message', { message: 'blocked' }, undefined, { contractId })).rejects.toThrow();
+    await grant('mcp:sample-mcp');
+    await expect(gateway.invokeTool(declaration.name, 'echo_message', { message: 'old' }, undefined, { contractId })).rejects.toThrow();
+    expect(records().filter(event => event.event === 'tools/call')).toHaveLength(1);
+    const successor = records().filter(event => event.event === 'start').at(-1)!.pid;
+    expect(successor).not.toBe(pid);
+    writeApproval(undefined);
+    await vi.waitFor(() => expect(() => process.kill(successor, 0)).toThrow(/ESRCH/));
+  } finally { await Promise.all([gateway.close(), peer.close(), shared.close()]); }
+}, 12_000);
 
 describe('exact npm package installation', () => {
   it('publishes the approved scoped archive and enables or rolls back retained versions offline', async () => {

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { registryBytes, ARCHIVE_BYTES, exact } from '../registry/client.js';
 import { assertVersionSource, readSources, selectedSource, sourceIdentity } from '../registry/sources.js';
-import { canonical, name, text, version } from '../registry/validation.js';
+import { canonical, manifestForInspection, name, text, version } from '../registry/validation.js';
 import { exactNpm, npmPackageName, npmRegistry } from '../registry/npm.js';
 import { gitArchiveTarget, gitSpec, type GitRelease } from '../registry/git.js';
 import { validateArchive, validateGitArchive, validateNpmArchive, type ValidatedArchive } from '../archive/validation.js';
@@ -109,7 +109,7 @@ function packageOperation(host: LifecycleHost, source: InstallSource, replacing?
   } else if (state.packages.length >= 64) throw new Error('Installed extension limit reached.');
   const description = old ? `Replace ${name}@${old.active.manifest.version} with ${name}@${version}` : `Install ${name}@${version}`;
   const receipt = { effect: 'published' as const, detail: `${name}@${version} package files published; activation and grants cleared.` };
-  return { preview: `${description}\n${source.preview}\nSHA256 ${approved.digest}\nManifest ${canonical(approved.manifest)}\nNo lifecycle scripts run. Activation and capability grants start empty.`,
+  return { preview: `${description}\n${source.preview}\nSHA256 ${approved.digest}\nManifest ${canonical(manifestForInspection(approved.manifest))}\nNo lifecycle scripts run. Activation and capability grants start empty.`,
     ...(approved.origin === 'npm' || approved.origin === 'git' ? { explicitApproval: true } : {}),
     apply: async context => {
       const check = () => {

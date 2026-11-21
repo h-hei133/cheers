@@ -6,6 +6,7 @@ import type { PackageRecord } from '../model.js';
 import { getInstalledPlugins } from '../../core/commands/plugin/store.js';
 import path from 'node:path';
 import { captureWorkspaceRoot } from '../../core/workspace/roots.js';
+import { redactReportText } from '../../core/security/redaction.js';
 
 export function rootIdentity(root: string): string { return fs.realpathSync(root); }
 export function rootSignature(root: string): string { return captureWorkspaceRoot(root, root, 'read').identity; }
@@ -13,8 +14,10 @@ export function validGrant(record: PackageRecord, grant: string): void {
   const manifest = record.active.manifest;
   if (grant === 'prompt' && manifest.skills.length) return;
   const [kind, target, extra] = grant.split(':');
-  if (extra || !target || !['script', 'command', 'tool'].includes(kind!)) throw new Error('Select a declared prompt, script, command or tool grant.');
-  const entries = kind === 'script' ? manifest.scripts : kind === 'command' ? manifest.commands : manifest.tools;
+  if (extra !== undefined || !target || !['script', 'command', 'tool', 'mcp', 'provider', 'renderer'].includes(kind!)) throw new Error('Select a declared prompt, script, command, tool, MCP, provider or renderer grant.');
+  const entries = kind === 'script' ? manifest.scripts : kind === 'command' ? manifest.commands
+    : kind === 'mcp' ? manifest.mcpServers ?? [] : kind === 'provider' ? manifest.providers ?? []
+      : kind === 'renderer' ? manifest.messageRenderers?.map(entry => ({ name: entry.customType })) ?? [] : manifest.tools;
   if (!entries.some(entry => entry.name === target)) throw new Error('That capability was not declared by this exact installed version.');
 }
 export function activationOperation(host: LifecycleHost, root: string, action: 'enable' | 'disable' | 'grant' | 'revoke', packageName: string, grant?: string): Operation {
@@ -26,7 +29,15 @@ export function activationOperation(host: LifecycleHost, root: string, action: '
   }
   if (grant) validGrant(record, grant);
   if ((action === 'grant' || action === 'revoke') && !grant) throw new Error('A separate declared capability grant is required.');
-  return { preview: `${action} ${packageName}${grant ? ` ${grant}` : ''}\nWorkspace ${scope}\nSource ${record.active.source}; version ${record.active.manifest.version}; SHA256 ${record.active.digest}\nDeclared permissions ${canonical(record.active.manifest.permissions)}\nEnablement does not grant prompt or executable capabilities. Every execution still uses ordinary approval.`, apply: async context => {
+  const nativeMcp = action === 'grant' && grant?.startsWith('mcp:');
+  const provider = action === 'grant' ? record.active.manifest.providers?.find(entry => `provider:${entry.name}` === grant) : undefined;
+  const renderer = action === 'grant' ? record.active.manifest.messageRenderers?.find(entry => `renderer:${entry.customType}` === grant) : undefined;
+  const approval = provider ? `Register ${provider.name} for ${provider.runtime} at ${redactReportText(provider.baseUrl, 2048)}. Requests use the configured endpoint and its credential. Requires the separate script:${provider.script} grant.`
+    : nativeMcp ? 'An exact user MCP configuration can launch this server with your OS permissions. The extension script sandbox does not apply.'
+      : renderer ? `Allow the isolated ${renderer.script} renderer to read displayed messages of type ${renderer.customType} and supply display text. Requires the separate script:${renderer.script} grant.`
+        : 'Enablement does not grant prompt or executable capabilities. Every execution still uses ordinary approval.';
+  return { ...(nativeMcp || provider || renderer ? { explicitApproval: true } : {}),
+    preview: `${action} ${packageName}${grant ? ` ${grant}` : ''}\nWorkspace ${scope}\nSource ${record.active.source}; version ${record.active.manifest.version}; SHA256 ${record.active.digest}\nDeclared permissions ${canonical(record.active.manifest.permissions)}\n${approval}`, apply: async context => {
     context.abortSignal?.throwIfAborted(); host.check(); if (rootIdentity(root) !== scope || rootSignature(root) !== workspaceIdentity) throw new Error('Approved workspace identity changed.');
     const outcome = host.store.locked(state, current => {
       host.check(); if (action === 'enable' || action === 'grant') { assertPackage(record, host.store); assertVersionSource(record.active); }

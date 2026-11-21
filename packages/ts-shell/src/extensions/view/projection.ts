@@ -25,7 +25,7 @@ export function projectExtensions(state: ExtensionState, sources: readonly Exten
   });
   let projectedBytes = actionBytes(installTarget.view) + bases.reduce((sum, base) => sum + base.bytes, 0);
   const notices = boundedLines([
-    'Installation, enablement and capability grants are separate. Execution requires Linux bubblewrap, current policy and ordinary approval.',
+    'Installation, enablement and capability grants are separate. Extension scripts require Linux bubblewrap, current policy and ordinary approval.',
     ...(offline ? ['Offline: registry requests are unavailable.'] : []),
     ...(sources ? [] : ['Source registry unavailable; source trust is unknown.']),
     ...errors.map(safeText), ...outcomes.map(detail => safeText(`${detail}; durability unknown`)),
@@ -49,6 +49,9 @@ export function projectExtensions(state: ExtensionState, sources: readonly Exten
       ...base.record.history.map(entry => safeText(`Retained ${entry.manifest.version}; source ${entry.source}; SHA256 ${entry.digest}`)),
       ...base.active.manifest.commands.map(entry => safeText(`Command ${entry.name}: ${entry.description}`)),
       ...base.active.manifest.tools.map(entry => safeText(`Tool ${entry.name}: ${entry.description}`)),
+      ...(base.active.manifest.mcpServers ?? []).map(entry => safeText(`MCP ${entry.name}: requires exact user configuration`)),
+      ...(base.active.manifest.providers ?? []).map(entry => safeText(`Provider ${entry.name} (${entry.runtime})`)),
+      ...(base.active.manifest.messageRenderers ?? []).map(entry => safeText(`Message renderer ${entry.customType} (${entry.script})`)),
     ], DETAIL_LINES, Math.max(0, PROJECTION_BYTES - projectedBytes));
     projectedBytes += detail.bytes;
     omittedDetailLines += detail.omitted;

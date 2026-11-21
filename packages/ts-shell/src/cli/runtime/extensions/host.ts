@@ -87,6 +87,10 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
     ...sessionModelSetters(context, runtime, operations, () => host, hookApproval),
     sendMessage: async message => {
       operations();
+      if (typeof message === 'object' && message !== null) {
+        runtime.appendCustomMessage(sessionId, message, true);
+        return;
+      }
       if (typeof message !== 'string' || !message.trim()) throw new Error('Extension message must be nonempty text.');
       const input = runtime.input();
       if (input) input.followUp(message, 'extension');

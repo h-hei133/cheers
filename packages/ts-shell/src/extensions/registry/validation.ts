@@ -2,6 +2,11 @@ import { createHash } from 'node:crypto';
 import { isRecord } from '../../core/values/record.js';
 import type { ExtensionManifest, Release, CatalogPage } from '../model.js';
 import { captureFlag } from '../runtime/flag.js';
+import { mcpStdioLaunch } from '../../core/mcp/config/stdio.js';
+import { mcpServerName } from '../../core/mcp/config/definition.js';
+import { MAX_EXTENSION_MCP_SERVERS } from '../runtime/mcp.js';
+import { captureProviderEndpoint, MAX_EXTENSION_PROVIDERS } from '../runtime/provider.js';
+import { rendererType } from '../runtime/renderer.js';
 
 export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
@@ -9,6 +14,12 @@ export function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 export function digest(value: string | Buffer): string { return createHash('sha256').update(value).digest('hex'); }
+export function manifestForInspection(value: ExtensionManifest): ExtensionManifest {
+  if (!value.mcpServers) return value;
+  return { ...value, mcpServers: value.mcpServers.map(server => ({
+    ...server, args: server.args.map(() => '[configured argument omitted]'),
+  })) };
+}
 export function text(value: unknown, max = 256): string {
   if (typeof value !== 'string' || !value.length || value.length > max || /[\x00-\x1f\x7f]/.test(value)) throw new Error('Malformed registry text.');
   return value;
@@ -48,6 +59,34 @@ export function manifest(value: unknown): ExtensionManifest {
     if (entry.type === undefined) throw new Error('An installed extension flag requires its type.');
     return { ...flag, script: name(entry.script) };
   });
+  const mcpServers = value.mcpServers === undefined ? undefined : list(value.mcpServers).map(entry => ({
+    name: mcpServerName(name(entry.name)), ...mcpStdioLaunch(entry.command, entry.args),
+  }));
+  if (mcpServers) {
+    if (mcpServers.length > MAX_EXTENSION_MCP_SERVERS) throw new Error('Extension MCP server registration limit exceeded.');
+    unique(mcpServers.map(entry => entry.name));
+  }
+  const providers = value.providers === undefined ? undefined : list(value.providers).map(entry => ({
+    ...captureProviderEndpoint(entry.name, entry.runtime, entry.baseUrl), script: name(entry.script),
+  }));
+  if (providers) {
+    if (providers.length > MAX_EXTENSION_PROVIDERS) throw new Error('Extension provider registration limit exceeded.');
+    if (providers.some(entry => entry.name.length > 64)) throw new Error('Installed extension provider names are limited to 64 characters.');
+    unique(providers.map(entry => entry.name));
+    unique(providers.map(entry => JSON.stringify([entry.runtime, entry.baseUrl])));
+    if (providers.some(entry => !scripts.some(script => script.name === entry.script && /\.(?:js|mjs|ts)$/.test(script.path)))) {
+      throw new Error('Installed extension providers require a declared JavaScript or TypeScript script.');
+    }
+  }
+  const messageRenderers = value.messageRenderers === undefined ? undefined : list(value.messageRenderers).map(entry => ({
+    customType: rendererType(entry.customType), script: name(entry.script),
+  }));
+  if (messageRenderers) {
+    unique(messageRenderers.map(entry => entry.customType));
+    if (messageRenderers.some(entry => !scripts.some(script => script.name === entry.script && /\.(?:js|mjs|ts)$/.test(script.path)))) {
+      throw new Error('Installed message renderers require a declared JavaScript or TypeScript script.');
+    }
+  }
   unique(scripts.map(entry => entry.name)); unique(skills.map(entry => entry.path)); unique(commands.flatMap(entry => [entry.name, ...entry.aliases ?? []])); unique(tools.map(entry => entry.name));
   if ([...commands, ...tools].some(entry => !scripts.some(script => script.name === entry.script))) throw new Error('Unknown extension script.');
   if (flags) {
@@ -58,7 +97,8 @@ export function manifest(value: unknown): ExtensionManifest {
   }
   const result: ExtensionManifest = { schema: 1, name: name(value.name), version: version(value.version), ...(value.description !== undefined ? { description: text(value.description) } : {}),
     permissions: { workspace: value.permissions.workspace as 'read' | 'write', network: 'none' }, skills, scripts, commands, tools,
-    ...(flags ? { flags } : {}) };
+    ...(flags ? { flags } : {}), ...(mcpServers ? { mcpServers } : {}), ...(providers ? { providers } : {}),
+    ...(messageRenderers ? { messageRenderers } : {}) };
   // Unknown fields are refused: a signed permission must not be silently ignored.
   if (canonical(result) !== canonical(value)) throw new Error('Unknown or noncanonical extension manifest fields.');
   return result;

@@ -19,6 +19,7 @@ export interface QueryStreamingMessage {
 }
 
 export type QueryEvent =
+  | { readonly type: 'message.custom'; readonly sessionId: string; readonly message: import('../../agent/custom.js').CustomAgentMessage }
   | {readonly type:'input.handled'; readonly sessionId: string; readonly streamingBehavior?: 'steer' | 'followUp'}
   | {readonly type:'input.rejected'; readonly sessionId: string; readonly streamingBehavior: 'steer' | 'followUp'}
   | import('./lifecycle.js').LifecycleRecord
@@ -180,6 +181,7 @@ export function isDurableQueryEvent(event: QueryEvent): boolean {
     // surface when to draw it. Recording both would put one message in the
     // transcript twice.
     && event.type !== 'message.delivered'
+    && event.type !== 'message.custom'
     && event.type !== 'message.finished'
     && event.type !== 'input.handled'
     && event.type !== 'input.rejected'

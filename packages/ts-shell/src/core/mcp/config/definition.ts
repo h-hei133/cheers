@@ -1,8 +1,9 @@
 import { isRecord } from '../../values/record.js';
 import { inspectConfigDocument, parseConfigText } from '../../../config/syntax.js';
 import type { McpServerConfig } from '../types.js';
+import { mcpExtensionApproval, mcpStdioLaunch } from './stdio.js';
 
-const fields = new Set(['transport', 'enabled', 'command', 'args', 'url', 'env', 'headers', 'bearerTokenEnvVar', 'scope', 'authRequired']);
+const fields = new Set(['transport', 'enabled', 'command', 'args', 'url', 'env', 'headers', 'bearerTokenEnvVar', 'scope', 'authRequired', 'extension']);
 
 export function mcpServerName(value: string): string {
   if (!value || value.length > 128 || value.trim() !== value || /[\x00-\x1f\x7f]/.test(value) || value.includes('__')
@@ -40,6 +41,13 @@ export function mcpServerDefinition(value: unknown, complete = false): McpServer
       || url.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) throw new Error('MCP HTTP requires HTTPS or an explicit loopback URL without credentials or fragment.');
   }
   if (complete && (transport === 'stdio' ? !value.command : !value.url)) throw new Error('MCP definition is incomplete.');
+  if (value.extension !== undefined) {
+    if (transport !== 'stdio' || Object.keys(value).some(key => !['transport', 'enabled', 'command', 'args', 'extension'].includes(key))) {
+      throw new Error('Extension MCP approval accepts only a stdio command, arguments and enablement.');
+    }
+    mcpStdioLaunch(value.command, value.args);
+    return { ...value, transport, extension: mcpExtensionApproval(value.extension) } as McpServerConfig;
+  }
   return { ...value, transport } as McpServerConfig;
 }
 

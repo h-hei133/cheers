@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { Worker } from 'node:worker_threads'
+import { createHash } from 'node:crypto'
 import { types as nodeTypes } from 'node:util'
 import ts from 'typescript'
 import type { CommandDefinition } from '../../core/commands/types.js'
@@ -17,6 +18,7 @@ import { ExtensionInitialization, type ExtensionInitializationOptions } from './
 import { resolveUiHost, type ExtensionUiHost, type ExtensionUiApi } from './ui.js'
 import { currentExtensionInvocation, reloadStartupSignal, renderExtensionMessage, runExtensionInvocation } from './context.js'
 import { captureMessageRenderer, createMessageRendererBridge, invokeMessageRenderer, MAX_MESSAGE_RENDERERS, type ExtensionMessageRenderer, type RegisteredMessageRenderer } from './renderer.js'
+import type { InstalledProvider } from './provider.js'
 import { captureExtensionMcpServer, MAX_EXTENSION_MCP_SERVERS, type ExtensionMcpServer, type RegisteredMcpServer } from './mcp.js'
 import { captureExtensionProvider, MAX_EXTENSION_PROVIDERS, type ExtensionProvider } from './provider.js'
 import type { CatalogProvider } from '../../core/models/catalog.js'
@@ -118,6 +120,8 @@ export interface LoadedInProcessExtension {
 export type ExtensionFactory = (api: ExtensionAPI) => void | Promise<void>
 
 export type InProcessExtensionInvoke =
+  | { readonly kind: 'qualify' }
+  | { readonly kind: 'render'; readonly messages: readonly Parameters<ExtensionMessageRenderer>[0][] }
   | { readonly kind: 'tool'; readonly name: string; readonly args?: Record<string, unknown> }
   | { readonly kind: 'command'; readonly name: string; readonly args?: readonly string[]; readonly shortcutKey?: string }
   | { readonly kind: 'event'; readonly event: string; readonly aliases?: readonly string[]; readonly payload?: unknown }
@@ -229,7 +233,7 @@ async function handleWorkerHostRpc(
 /** Transpile `.ts` / `.mts` / `.mjs` / `.js` extension scripts to CommonJS across all platforms. */
 export function transpileExtensionSource(source: string, filePath: string): string {
   return ts.transpileModule(source, {
-    fileName: filePath,
+    fileName: filePath.replace(/\.(mjs|mts)$/, (_, extension: string) => `.${extension.slice(1)}`),
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true, allowJs: true },
   }).outputText
 }
@@ -528,10 +532,17 @@ export async function executeInProcessScript(options: {
   readonly host?: ExtensionHostBridge
   readonly check?: () => void
   readonly flags?: readonly WorkerFlag[]
+  readonly providers?: readonly InstalledProvider[]
+  readonly rendererTypes?: readonly string[]
+  readonly sourceDigest?: string
 }): Promise<ToolExecutionResult> {
   options.context.abortSignal?.throwIfAborted()
-  const rawSource = fs.readFileSync(options.scriptFile, 'utf8')
-  const code = transpileExtensionSource(rawSource, options.scriptFile)
+  const isolated = options.invoke?.kind === 'qualify' || options.invoke?.kind === 'render'
+  const rawSource = fs.readFileSync(options.scriptFile)
+  if (isolated && (!options.sourceDigest || createHash('sha256').update(rawSource).digest('hex') !== options.sourceDigest)) {
+    throw new Error('Installed extension source differs from the reviewed package.')
+  }
+  const code = transpileExtensionSource(rawSource.toString('utf8'), options.scriptFile)
   const timeoutMs = 30_000
   const registeredTools: Array<{ readonly name: string; readonly description: string }> = []
   const registeredCommands: Array<{ readonly name: string; readonly description: string; readonly aliases: readonly string[] }> = []
@@ -542,9 +553,11 @@ export async function executeInProcessScript(options: {
   const invocationUi = options.host?.ui
   const host: ExtensionHostBridge | undefined = options.host ? { ...options.host, ui: invocationUi } : undefined
 
+  if (isolated) { options.check?.(); options.context.abortSignal?.throwIfAborted() }
   const worker = new Worker(EXTENSION_WORKER_SOURCE, {
     eval: true,
     env: {},
+    execArgv: [],
     resourceLimits: { maxOldGenerationSizeMb: 64, maxYoungGenerationSizeMb: 16 },
     workerData: {
       code,
@@ -552,6 +565,8 @@ export async function executeInProcessScript(options: {
       argv: [...options.argv],
       workspaceRoot: options.root,
       ...(options.flags?.length ? { flags: options.flags } : {}),
+      ...(options.providers?.length ? { providers: options.providers } : {}),
+      ...(options.rendererTypes?.length ? { rendererTypes: options.rendererTypes } : {}),
       ...(options.invoke ? { invoke: options.invoke } : {}),
       ...(options.invoke?.kind === 'event' ? {
         notification: isNotificationEvent(options.invoke.event),
@@ -559,6 +574,9 @@ export async function executeInProcessScript(options: {
       } : {}),
     },
   })
+
+  let termination: Promise<number> | undefined
+  const stop = () => termination ??= worker.terminate()
 
   try {
     const outcome = await new Promise<{ readonly ok: boolean; readonly output: string }>((resolve) => {
@@ -572,12 +590,12 @@ export async function executeInProcessScript(options: {
         resolve(res)
       }
       const onAbort = () => {
-        void worker.terminate()
+        void stop().catch(() => {})
         worker.unref()
         finish({ ok: false, output: 'Extension execution aborted.' })
       }
       const timer = setTimeout(() => {
-        void worker.terminate()
+        void stop().catch(() => {})
         worker.unref()
         finish({ ok: false, output: `Extension execution timed out after ${timeoutMs}ms.` })
       }, timeoutMs)
@@ -585,8 +603,10 @@ export async function executeInProcessScript(options: {
       options.context.abortSignal?.addEventListener('abort', onAbort, { once: true })
 
       worker.on('message', (msg: { readonly kind: string; readonly json: string }) => {
+        if (settled) return
         if (msg.kind === 'done') finish({ ok: true, output: msg.json })
         else if (msg.kind === 'error') finish({ ok: false, output: msg.json })
+        else if (isolated) return
         else if (msg.kind === 'registerTool') {
           const info = JSON.parse(msg.json) as { name: string; description?: string }
           registeredTools.push({ name: info.name, description: String(info.description ?? '') })
@@ -624,7 +644,12 @@ export async function executeInProcessScript(options: {
       })
     })
 
-    const detail = redactUnsafeReportText(redactReportText(outcome.output, 16_000, { projectRoot: options.root }), new Set(), 16_000)
+    let cleanup = 'confirmed'
+    if (isolated) {
+      try { await stop() } catch { cleanup = 'unknown' }
+    }
+
+    const detail = isolated ? '' : redactUnsafeReportText(redactReportText(outcome.output, 16_000, { projectRoot: options.root }), new Set(), 16_000)
     return {
       success: outcome.ok,
       output: `${detail}\nExtension execution: ${outcome.ok ? 'completed' : 'failed'}; exit ${outcome.ok ? 0 : 1}; mode in-process; source ${options.record.source}; SHA256 ${options.record.digest}.`,
@@ -633,7 +658,7 @@ export async function executeInProcessScript(options: {
         source: options.record.source,
         version: options.record.manifest.version,
         digest: options.record.digest,
-        cleanup: 'confirmed',
+        cleanup,
         eventOutput: outcome.output,
         registeredTools,
         registeredCommands,
@@ -644,7 +669,7 @@ export async function executeInProcessScript(options: {
     }
   } finally {
     hostCalls.abort()
-    void worker.terminate().catch(() => {})
+    void stop().catch(() => {})
     worker.unref()
   }
 }

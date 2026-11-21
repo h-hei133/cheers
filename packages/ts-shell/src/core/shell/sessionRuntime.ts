@@ -11,6 +11,7 @@ import type { ProjectMemoryStore } from "../../memory/projectMemoryStoreContract
 import type { QueryEvent } from "../query/runtime/events.js";
 import { isDurableQueryEvent } from "../query/runtime/events.js";
 import { notifyObservers } from './observers.js';
+import { customMessageWriter } from './messages.js';
 import type { QueryRuntimeStateSeed } from "../query/runtime/state.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import { PromptPublicationError } from '../../session/store/prompt/intent.js';
@@ -117,6 +118,7 @@ export type QueryEventObserver = (event: QueryEvent) => void;
 
 export class ShellSessionRuntime {
   readonly commands = new ShellCommandRuntime();
+  readonly appendCustomMessage: ReturnType<typeof customMessageWriter>;
   private readonly deps: SessionRuntimeDependencies;
   private readonly stateMachine = new ShellStateMachine();
   private readonly eventObservers = new Set<QueryEventObserver>();
@@ -132,6 +134,8 @@ export class ShellSessionRuntime {
 
   constructor(deps: SessionRuntimeDependencies) {
     this.deps = deps;
+    this.appendCustomMessage = customMessageWriter(deps.sessionManager, () => !!(this.currentRun || this.currentRunController),
+      event => notifyObservers(this.eventObservers, event));
   }
 
   /**

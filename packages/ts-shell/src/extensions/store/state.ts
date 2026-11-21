@@ -9,6 +9,7 @@ import { assertManifestFiles, inventoryDigest } from '../archive/inventory.js';
 import { npmArchiveUrl, npmIntegrity, npmPackageName, npmRegistry } from '../registry/npm.js';
 import { assertGitArchiveUrl, gitRelease } from '../registry/git.js';
 import type { ExtensionState, PackageRecord, VersionRecord, EffectOutcome } from '../model.js';
+import { MAX_MESSAGE_TYPE_LENGTH } from '../runtime/renderer.js';
 import { assertStoragePath } from './paths.js';
 import { clearUnknownOutcomes, readUnknownOutcomes, unknownFile, writeUnknownOutcomes } from './unknown.js';
 export { assertStoragePath, storageIdentity, assertStorageIdentity } from './paths.js';
@@ -77,7 +78,8 @@ export function readState(file = extensionFile()): ExtensionState {
       if (version.storage.at(-1)!.path !== path.parse(selected).root) throw new Error('Installed storage ancestry is incomplete.');
     }
     for (const [root, activation] of Object.entries(entry.activation)) {
-      if (!path.isAbsolute(root) || !isRecord(activation) || typeof activation.workspaceIdentity !== 'string' || activation.workspaceIdentity.length > 128 || typeof activation.enabled !== 'boolean' || !Array.isArray(activation.grants) || activation.grants.length > 128 || activation.grants.some(grant => typeof grant !== 'string' || grant.length > 100)) throw new Error('Invalid extension activation.');
+      if (!path.isAbsolute(root) || !isRecord(activation) || typeof activation.workspaceIdentity !== 'string' || activation.workspaceIdentity.length > 128 || typeof activation.enabled !== 'boolean' || !Array.isArray(activation.grants) || activation.grants.length > 128
+        || activation.grants.some(grant => typeof grant !== 'string' || grant.length > (grant.startsWith('renderer:') ? 'renderer:'.length + MAX_MESSAGE_TYPE_LENGTH : 100))) throw new Error('Invalid extension activation.');
     }
     return { name: entry.name as string, active, history, activation: entry.activation as PackageRecord['activation'] };
   });

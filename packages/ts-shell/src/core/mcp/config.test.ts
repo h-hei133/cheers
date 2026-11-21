@@ -104,4 +104,26 @@ describe("project-scoped MCP configuration", () => {
     expect(() => loadMcpConfigs(root, true)).toThrow('configuration source changed');
     expect(changed).toBe(true);
   });
+
+  it('keeps a stdio extension approval out of ordinary configuration and rejects project authorization', () => {
+    const root = path.join(tempDir, 'workspace');
+    const user = mcpConfigPath(root, 'user');
+    const project = mcpConfigPath(root, 'project');
+    const approval = { command: process.execPath, args: ['server.mjs'],
+      extension: { packageId: 'sample', digest: 'a'.repeat(64), workspace: root } };
+    fs.mkdirSync(path.dirname(user), { recursive: true });
+    fs.writeFileSync(user, JSON.stringify({ mcpServers: { local: approval } }));
+    expect(loadMcpConfigs(root, true).local).toBeUndefined();
+    expect(loadMcpConfigs(root, false, undefined, 'all').local).toMatchObject({ ...approval, scope: 'user' });
+
+    fs.mkdirSync(path.dirname(project), { recursive: true });
+    for (const config of [approval, { enabled: true }]) {
+      fs.writeFileSync(project, JSON.stringify({ mcpServers: { local: config } }));
+      expect(() => loadMcpConfigs(root, true)).toThrow('user configuration');
+      expect(loadMcpConfigs(root, false).local).toBeUndefined();
+    }
+    fs.rmSync(project);
+    fs.writeFileSync(user, JSON.stringify({ mcpServers: { local: { ...approval, env: {} } } }));
+    expect(() => loadMcpConfigs(root, false)).toThrow('only a stdio command');
+  });
 });

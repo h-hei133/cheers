@@ -175,5 +175,13 @@ export function registerPackage(host: RegistrationHost, record: PackageRecord): 
         return event === 'session_before_tree' ? treeResult : currentPayload;
       }
     : undefined;
-  return registerCatalogContribution({ root: host.root, sessionId: host.sessionId, commands, tools, skills, ...(onEvent ? { onEvent } : {}) });
+  const stdioMcpServers = (manifest.mcpServers ?? []).flatMap(server => {
+    const grant = `mcp:${server.name}`;
+    return activation.grants.includes(grant) ? [{
+      ...server, approval: { packageId: record.name, digest: record.active.digest, workspace: host.root },
+      assertCurrent: () => host.current(record, grant),
+    }] : [];
+  });
+  return registerCatalogContribution({ root: host.root, sessionId: host.sessionId, commands, tools, skills,
+    stdioMcpServers, ...(onEvent ? { onEvent } : {}) });
 }

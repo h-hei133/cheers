@@ -50,7 +50,8 @@ export function parseMcpDocument(target: string, text: string, validate = true):
 }
 
 /** Project definitions replace user definitions; an enabled-only override retains its source identity. */
-export function loadMcpConfigs(root: string, allowProjectScope: boolean, replacement?: { scope: McpConfigScope; text: string }): Record<string, ScopedMcpServerConfig> {
+export function loadMcpConfigs(root: string, allowProjectScope: boolean, replacement?: { scope: McpConfigScope; text: string },
+  view: 'ordinary' | 'all' = 'ordinary'): Record<string, ScopedMcpServerConfig> {
   const merged: Record<string, ScopedMcpServerConfig> = Object.create(null);
   const projectPath = allowProjectScope ? mcpConfigPath(root, 'project') : undefined;
   for (const scope of ['user', 'project'] as const) {
@@ -60,10 +61,16 @@ export function loadMcpConfigs(root: string, allowProjectScope: boolean, replace
     for (const [name, definition] of Object.entries(document?.values.mcpServers ?? {})) {
       if (isMcpEnableOverride(definition)) {
         if (scope !== 'project' || !Object.hasOwn(merged, name)) throw new McpConfigLoadError(target, new Error('An enabled-only override requires a user server definition; remove the project override before deleting its user definition.'));
+        if (merged[name]?.extension) throw new McpConfigLoadError(target, new Error('An extension MCP approval can only be changed by its user configuration.'));
         merged[name] = { ...merged[name]!, enabled: definition.enabled, overridePath: target };
-      } else merged[name] = { ...mcpServerDefinition(definition), scope, sourcePath: target };
+      } else {
+        const captured = mcpServerDefinition(definition);
+        if (captured.extension && scope !== 'user') throw new McpConfigLoadError(target, new Error('Extension MCP approvals require user configuration.'));
+        merged[name] = { ...captured, scope, sourcePath: target };
+      }
     }
   }
   if (projectPath !== undefined && mcpConfigPath(root, 'project') !== projectPath) throw new McpConfigLoadError(projectPath, new Error('configuration source changed; retry acquisition'));
+  if (view === 'ordinary') for (const [name, config] of Object.entries(merged)) if (config.extension) delete merged[name];
   return merged;
 }

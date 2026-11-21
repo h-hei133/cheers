@@ -86,7 +86,8 @@ import { turnCacheMissNotice } from "../../observability/cacheWaste.js";
 import { getSessionUsage } from "../../observability/usageTelemetry.js";
 import { catalogModel } from "../../core/models/catalog.js";
 import { readAmbientFacts, readPeerSessionCount } from "./ambientFacts.js";
-import { appendConversation, showConversation, startFreshSession, type HistoryTarget } from "./history.js";
+import { appendConversation, appendCustomMessage, showConversation, startFreshSession, type HistoryTarget } from "./history.js";
+import { HistoryRenderers } from './extensions/history.js';
 import { startupObservers, time } from '../../observability/startupTiming.js';
 import { Pager, pageLongOutput } from "../../presentation/tui/chrome/pager.js";
 import { TranscriptSearch } from "../../presentation/tui/transcript/searchState.js";
@@ -187,6 +188,7 @@ export class InteractiveMode {
   private readonly readline: ReadlineInterface;
   private readonly gesture: { lastCancelAt?: number; lastEscapeAt?: number } = {};
   private readonly shortcutLifetime = new AbortController();
+  private readonly historyRenderers = new HistoryRenderers();
   private vimSelection: SourceSelection | undefined;
   /**
    * The bindings in force.
@@ -658,7 +660,10 @@ export class InteractiveMode {
       if (this.stopped || this.closing) throw new Error('The interactive input host is closing.');
       this.extensionBinding.refresh(this.extensionUi.host);
     });
-    this.releaseEvents = this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
+    this.releaseEvents = this.options.sessionRuntime.observeEvents(event => {
+      if (event.type === 'message.custom') appendCustomMessage(this.historyTarget(), event.sessionId, event.message);
+      else this.sink.handleEvent(event);
+    });
     this.releaseInputQueue = attachSubmissionQueue(this.options.sessionRuntime, this.queue, text => this.runQueued(text, this.queue.takeAttachments()),
       () => !(!this.startup.admitted() || this.busy || this.pickerPending || this.overlay.active || this.extensionUi.active || this.stopped || this.questions.question()));
     this.releaseGoalSubmission = attachGoalSubmission(this.options.sessionRuntime, {
@@ -738,6 +743,7 @@ export class InteractiveMode {
     // that every subscription or the terminal was restored.
     for (const cleanup of [
       () => this.shortcutLifetime.abort(),
+      () => this.historyRenderers.clear(),
       () => { this.releaseTerminalPalette?.(); this.releaseTerminalPalette = undefined; this.terminalTheme?.dispose(); this.terminalTheme = undefined; },
       () => { this.releaseTerminalProtocol?.(); this.releaseTerminalProtocol = undefined; },
       () => this.extensionBinding.dispose(),
@@ -850,7 +856,7 @@ export class InteractiveMode {
         interrupt: () => void this.interrupt(),
         exit: () => this.shutdown(),
         redraw: () => this.tui.requestRender(),
-        clearScreen: () => { this.state.transcript.clear(); this.tui.requestRender({ force: true }); },
+        clearScreen: () => { this.historyRenderers.clear(); this.state.transcript.clear(); this.tui.requestRender({ force: true }); },
         cycleAgentMode: () => this.cycleAgentMode(),
         cyclePermissionScope: () => this.cyclePermissionScope(),
         scroll: (rows) => {
@@ -1402,6 +1408,7 @@ export class InteractiveMode {
       editor: this.state.editor,
       sessionManager: this.options.sessionManager,
       context: this.options.runtimeContext,
+      renderers: { view: this.historyRenderers, changed: () => this.tui.requestRender() },
     };
   }
 
@@ -1700,6 +1707,7 @@ export class InteractiveMode {
   private async shutdown(): Promise<void> {
     if (this.closing || this.stopped) return;
     this.closing = true;
+    this.historyRenderers.clear();
     // A single stdin chunk can contain the exit key and further complete keys,
     // paste or mouse events. Detach dispatch before yielding to the drain.
     let failure: { cause: unknown } | undefined;

@@ -16,7 +16,10 @@ export function packageActions(record: PackageRecord, root: string, workspaceIde
   const declared = [...(record.active.manifest.skills.length ? ['prompt'] : []),
     ...record.active.manifest.scripts.map(entry => `script:${entry.name}`),
     ...record.active.manifest.commands.map(entry => `command:${entry.name}`),
-    ...record.active.manifest.tools.map(entry => `tool:${entry.name}`)];
+    ...record.active.manifest.tools.map(entry => `tool:${entry.name}`),
+    ...(record.active.manifest.mcpServers ?? []).map(entry => `mcp:${entry.name}`),
+    ...(record.active.manifest.providers ?? []).map(entry => `provider:${entry.name}`),
+    ...(record.active.manifest.messageRenderers ?? []).map(entry => `renderer:${entry.customType}`)];
   return [
     actionTarget([enabled ? 'disable' : 'enable', record.name], 'Changes enablement for this workspace. Enablement grants no capabilities.'),
     actionTarget(['update', record.name], 'Review another exact package. Activation and grants will clear.', 'release'),
@@ -26,7 +29,9 @@ export function packageActions(record: PackageRecord, root: string, workspaceIde
       return actionTarget(['rollback', record.name, duplicate ? selected.digest : version], `Retained ${version} SHA256 ${selected.digest}. Activation and grants will clear.`);
     }),
     ...[...new Set([...declared, ...grants])].map(grant => actionTarget([grants.includes(grant) ? 'revoke' : 'grant', record.name, grant],
-      grants.includes(grant) ? 'Revoke this workspace capability.' : 'Grant this declared capability separately. Executions still require ordinary approval.')),
+      grants.includes(grant) ? 'Revoke this workspace capability.' : grant.startsWith('renderer:')
+        ? 'Allow the isolated renderer to read displayed messages of this type.'
+        : 'Grant this declared capability separately. Executions still require ordinary approval.')),
     actionTarget(['uninstall', record.name], 'Remove reviewed intact owned versions. Preserve user data and unknown content.'),
   ];
 }

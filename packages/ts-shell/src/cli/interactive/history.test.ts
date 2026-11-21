@@ -1,15 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 import { createShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import { forgetSessionTodos, getSessionTodos, setSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 import { Transcript } from "../../presentation/tui/transcript/container.js";
-import { appendConversation, restoreConversation, showConversation, startFreshSession } from "./history.js";
+import { appendConversation, appendCustomMessage, restoreConversation, showConversation, startFreshSession } from "./history.js";
 import { copyPicker } from './picker/copy.js';
 import { renderBlock } from '../../presentation/tui/transcript/blocks.js';
 import { rewindPoints, rewindPicker } from "./picker/rewind.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import { runExtensionFactory } from '../../extensions/runtime/inProcessLoader.js';
 import { registerCatalogContribution } from '../../core/catalog/contributions.js';
+import { HistoryRenderers } from './extensions/history.js';
 
 let nextTurnId = 0;
 /**
@@ -38,6 +39,69 @@ const CONVERSATION = [
 ];
 
 describe("restoring a conversation", () => {
+  it('shows bound installed renderer output and restores the original when its contribution retires', async () => {
+    const cwd = process.cwd();
+    const session = { id: 'installed-annotation', createdAt: '2026-11-21T00:00:00.000Z', turns: [
+      { role: 'custom', content: 'Original', customType: 'annotation', display: true },
+      { role: 'custom', content: 'Hidden', customType: 'annotation', display: false },
+    ] } as never;
+    const view = new HistoryRenderers();
+    const transcript = new Transcript();
+    const changed = vi.fn();
+    let allowed = true;
+    const renderBatch = vi.fn(async (messages: ReadonlyArray<{ content: unknown }>) => messages.map(message => `\x1b[31mShown ${String(message.content)}\x1b[0m`));
+    const unregister = registerCatalogContribution({ root: cwd, sessionId: 'installed-annotation', commands: [], tools: [], skills: () => [],
+      installedRenderers: [{ customTypes: ['annotation'], admission: () => { if (!allowed) throw new Error('Retired'); }, renderBatch }] });
+    try {
+      const target = { transcript, context: { cwd, session, runtimeConfig: {} } as never, renderers: { view, changed } };
+      appendConversation(target, session);
+      expect(transcript.all().map(block => block.text)).toEqual(['Original']);
+      await vi.waitFor(() => expect(transcript.all().map(block => block.text)).toEqual(['Shown Original']));
+      expect(renderBatch.mock.calls).toHaveLength(1);
+      expect(renderBatch).toHaveBeenCalledWith([expect.objectContaining({ content: 'Original' })], expect.any(AbortSignal));
+      appendCustomMessage(target, 'installed-annotation', { role: 'custom', display: false, customType: 'annotation', content: 'Private' });
+      appendCustomMessage(target, 'different-session', { role: 'custom', display: true, customType: 'annotation', content: 'Different' });
+      appendCustomMessage(target, 'installed-annotation', { role: 'custom', display: true, customType: 'annotation', content: 'Live' });
+      expect(transcript.all().map(block => block.text)).toEqual(['Shown Original', 'Live']);
+      await vi.waitFor(() => expect(transcript.all().map(block => block.text)).toEqual(['Shown Original', 'Shown Live']));
+      expect(renderBatch.mock.calls.map(([messages]) => messages.map(message => message.content))).toEqual([['Original'], ['Live']]);
+      allowed = false;
+      unregister();
+      await vi.waitFor(() => expect(transcript.all().map(block => block.text)).toEqual(['Original', 'Live']));
+    } finally { unregister(); view.clear(); }
+  });
+
+  it('cancels pending custom history rendering when the displayed session changes', async () => {
+    const cwd = process.cwd();
+    const session = { id: 'original-annotation', createdAt: '2026-11-21T00:00:00.000Z', turns: [
+      { role: 'custom', content: 'Old content', customType: 'annotation', display: true },
+    ] };
+    const next = { ...session, id: 'replacement-annotation', turns: [turn('user', 'Current content')] };
+    const view = new HistoryRenderers();
+    const transcript = new Transcript();
+    const context = { cwd, session, runtimeConfig: {} };
+    const changed = vi.fn();
+    const target = { transcript, context: context as never, renderers: { view, changed }, sessionManager: {} as never };
+    let signal: AbortSignal | undefined;
+    let finish!: (value: readonly string[]) => void;
+    const unregister = registerCatalogContribution({ root: cwd, sessionId: session.id, commands: [], tools: [], skills: () => [],
+      installedRenderers: [{ customTypes: ['annotation'], admission: () => {}, renderBatch: (_, current) => {
+        signal = current;
+        return new Promise(resolve => { finish = resolve; });
+      } }] });
+    try {
+      appendConversation(target, session as never);
+      expect(signal?.aborted).toBe(false);
+      Object.assign(context, { session: next });
+      showConversation(target, next as never);
+      expect(signal?.aborted).toBe(true);
+      finish(['Late text']);
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(transcript.all().map(block => block.text)).toEqual(['Current content']);
+      expect(changed).not.toHaveBeenCalled();
+    } finally { unregister(); view.clear(); }
+  });
+
   it('uses a live custom renderer for visible messages and restores the original after retirement', async () => {
     const cwd = process.cwd();
     const controller = new AbortController();

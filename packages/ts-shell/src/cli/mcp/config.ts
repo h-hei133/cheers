@@ -30,7 +30,7 @@ function report(output: string, status = 'inspected', connection = 'not-tested')
 }
 
 function summary(name: string, config: ScopedMcpServerConfig): string {
-  return `${name}: ${config.enabled === false ? 'disabled' : 'enabled'}; transport=${config.transport}; scope=${config.scope}; source=${JSON.stringify(config.sourcePath)}${config.overridePath ? `; override=${JSON.stringify(config.overridePath)}` : ''}`;
+  return `${name}: ${config.enabled === false ? 'disabled' : 'enabled'}; transport=${config.transport}; scope=${config.scope}; source=${JSON.stringify(config.sourcePath)}${config.overridePath ? `; override=${JSON.stringify(config.overridePath)}` : ''}${config.extension ? `; held for extension ${config.extension.packageId}` : ''}`;
 }
 
 function display(config: ScopedMcpServerConfig): string {
@@ -63,7 +63,7 @@ async function runConfigOperation(action: string, values: readonly string[], hos
       checkTarget(mcpConfigPath(host.root, 'user'), options, false);
       if (host.trusted()) checkTarget(mcpConfigPath(host.root, 'project'), options, false);
     }
-    const configs = action === 'list' || action === 'show' ? loadMcpConfigs(host.root, host.trusted()) : Object.create(null) as Record<string, ScopedMcpServerConfig>;
+    const configs = action === 'list' || action === 'show' ? loadMcpConfigs(host.root, host.trusted(), undefined, 'all') : Object.create(null) as Record<string, ScopedMcpServerConfig>;
     if (action === 'list') return report(['MCP definitions (no connections opened)', ...Object.entries(configs).map(([name, config]) => summary(name, config))].join('\n'));
     if (action === 'show') {
       const config = configs[mcpServerName(values[0]!)]; if (!config) throw new Error('MCP server was not found.');
@@ -130,7 +130,9 @@ async function runConfigOperation(action: string, values: readonly string[], hos
       } catch (error) { return error instanceof Error ? error.message : 'MCP configuration input admission refused.'; }
     };
     const definition = servers[name];
-    const preview = `${scope} server ${JSON.stringify(name)}: ${action}\n${definition ? display({ ...(definition as ScopedMcpServerConfig), scope, sourcePath: target }) : '(remove scoped entry)'}\nExact next file SHA-256: ${createHash('sha256').update(next).digest('hex')}; ${Buffer.byteLength(next)} bytes.\nArguments, environment/header values are omitted; approval binds exact bytes. Saving does not start a server or approve remote operations.`;
+    const capture = definition as ScopedMcpServerConfig | undefined;
+    const preview = `${scope} server ${JSON.stringify(name)}: ${action}\n${capture ? display({ ...capture, scope, sourcePath: target }) : '(remove scoped entry)'}\nExact next file SHA-256: ${createHash('sha256').update(next).digest('hex')}; ${Buffer.byteLength(next)} bytes.\nArguments, environment/header values are omitted; approval binds exact bytes. Saving does not start a server or approve remote operations.${capture?.extension && capture.enabled !== false
+      ? '\nFor a matching active extension, MCP operations may launch this server with your OS permissions.' : ''}`;
     const result = await runPreparedTool(filePublication(target, next, CONFIG_MAX_BYTES, admission, currentAdmission, 'MCP configuration', preview), {},
       { ...options, admission }, host.signal, undefined, 'MCP configuration publication', { eventKey: 'mcpPublication' });
     const status = String(result.metadata?.status ?? 'unchanged');

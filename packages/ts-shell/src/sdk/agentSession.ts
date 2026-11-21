@@ -30,8 +30,6 @@ import type { ToolDefinition } from "../tools/types.js";
 import { getWorkflowGitContext } from "../core/workspace/git.js";
 import { DefaultResourceLoader, type LoadExtensionsResult, type ResourceLoader } from "./resourceLoader.js";
 import { SessionUi } from './ui.js';
-import { snapshotCustomMessage } from '../core/agent/custom.js';
-import { snapshotData } from '../core/values/data.js';
 import { sessionModelCatalog, sessionVirtualModels } from '../core/catalog/models.js';
 import { parseModelSelection } from '../core/models/virtual/selection.js';
 import { setVirtualModel } from '../core/commands/model/virtual.js';
@@ -133,9 +131,7 @@ export class AgentSession {
   appendCustomMessage(payload: import('../core/agent/custom.js').CustomMessageInput): void {
     if (this.disposed) throw new Error('Agent session is disposed.');
     if (this.sessionRuntime.isRunning()) throw new Error('Wait for the active turn before appending custom history.');
-    const saved = snapshotData(payload, { bytes: 32 * 1024 * 1024, nodes: 100_000, depth: 32 });
-    const message = snapshotCustomMessage({ ...(saved as object), role: 'custom' });
-    this.sessionManager.addTurn(this.sessionId, message);
+    this.sessionRuntime.appendCustomMessage(this.sessionId, payload);
     const session = this.sessionManager.getSession(this.sessionId);
     if (session) this.runtimeContext.session = session;
   }

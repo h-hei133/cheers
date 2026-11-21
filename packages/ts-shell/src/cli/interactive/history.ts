@@ -12,6 +12,7 @@ import type { SessionReport } from '../../session/reports/model.js';
 import type { CustomAgentMessage } from '../../core/agent/custom.js';
 import { renderCustomMessage } from '../../core/catalog/renderers.js';
 import { dialogText } from './extensions/limits.js';
+import type { CustomHistoryRow, HistoryRenderers } from './extensions/history.js';
 
 /**
  * Putting a session's conversation back on screen.
@@ -37,7 +38,7 @@ export interface RestoredHistory {
 
 /** Blocks for a session's conversation, oldest first, bounded. */
 export function restoreConversation(turns: readonly SessionMessage[], reports: readonly SessionReport[] = [], collapseThinking = true,
-  renderCustom?: (message: CustomAgentMessage) => string | undefined): RestoredHistory {
+  renderCustom?: (message: CustomAgentMessage, block: Block) => string | undefined): RestoredHistory {
   const blocks: Block[] = [];
   const customBlocks = new Map<number, CustomAgentMessage>();
   const reportGroups = groupReports(turns, reports);
@@ -47,12 +48,11 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
   for (const turn of turns) {
     if (turn.role === 'custom') {
       if (turn.display) {
-        const images = imagesOf(turn.content);
         if (renderCustom) {
           customBlocks.set(blocks.length, turn);
           if (customBlocks.size > MAX_RESTORED) customBlocks.delete(customBlocks.keys().next().value!);
         }
-        blocks.push({ ...textBlock('notice', messageToText(turn.content)), ...(images.length ? { images } : {}) });
+        blocks.push(customMessageBlock(turn));
       }
     } else if (turn.role === "user") {
       if (turn.metadata?.source === 'goal-continuation') {
@@ -139,7 +139,7 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
   if (renderCustom) {
     for (const [index, message] of customBlocks) {
       if (index < omitted) continue;
-      const text = renderCustom(message);
+      const text = renderCustom(message, blocks[index]!);
       if (text !== undefined) blocks[index]!.text = dialogText(text, 32 * 1024);
     }
   }
@@ -164,6 +164,7 @@ export interface HistoryTarget {
     discardIfEmpty(sessionId: string): boolean;
   };
   readonly context: ShellRuntimeContext;
+  readonly renderers?: { readonly view: HistoryRenderers; readonly changed: () => void };
 }
 
 /**
@@ -181,16 +182,21 @@ export function showConversation(target: HistoryTarget, snapshot?: Session): voi
 }
 
 /** Startup keeps its welcome and diagnostics while using the same history projection. */
-export function appendConversation(target: Pick<HistoryTarget, 'transcript' | 'editor'> & Partial<Pick<HistoryTarget, 'context'>>, session: Session): void {
+export function appendConversation(target: Pick<HistoryTarget, 'transcript' | 'editor' | 'renderers'> & Partial<Pick<HistoryTarget, 'context'>>, session: Session): void {
   // The checklist belongs to the session being shown, and switching to a
   // session is the moment to say so. Doing it here rather than at each command
   // that can switch is what makes `/resume`, the sessions panel, a fork, and a
   // rewind all correct: they establish a session by calling this, and a session
   // that is being shown is a session whose checklist has just been restored.
   replayTodosFromMessages(session.id, session.turns);
-  const root = target.context?.cwd;
+  const context = target.context;
+  const root = context?.cwd;
+  const customRows: CustomHistoryRow[] = [];
   const restored = restoreConversation(session.turns, session.reports, target.context?.runtimeConfig.collapseThinking ?? true,
-    root ? message => renderCustomMessage(root, session.id, message) : undefined);
+    root ? (message, block) => {
+      customRows.push({ message, block });
+      return renderCustomMessage(root, session.id, message);
+    } : undefined);
   const notice = restored.omitted > 0
     ? textBlock("notice", `${restored.omitted} earlier messages are not shown.`)
     : undefined;
@@ -198,10 +204,36 @@ export function appendConversation(target: Pick<HistoryTarget, 'transcript' | 'e
   if (notice) target.transcript.append(notice);
   for (const block of restored.blocks) target.transcript.append(block);
   target.transcript.finalizeAll();
+  if (root && context && target.renderers) {
+    target.renderers.view.show({ root, sessionId: session.id, transcript: target.transcript, rows: customRows,
+      isCurrent: () => context.cwd === root && context.session.id === session.id && context.session.createdAt === session.createdAt,
+      changed: target.renderers.changed });
+  }
   const userPrompts = session.turns
     .filter((turn) => turn.role === "user" && messageToText(turn.content).trim().length > 0)
     .map((turn) => typeof turn.metadata?.originalInput === 'string' ? turn.metadata.originalInput : messageToText(turn.content));
   target.editor?.loadHistory(userPrompts);
+}
+
+function customMessageBlock(message: CustomAgentMessage): Block {
+  const images = imagesOf(message.content);
+  return { ...textBlock('notice', messageToText(message.content)), ...(images.length ? { images } : {}) };
+}
+
+export function appendCustomMessage(target: Pick<HistoryTarget, 'transcript' | 'context' | 'renderers'>,
+  sessionId: string, message: CustomAgentMessage): void {
+  const { context, transcript, renderers } = target;
+  const { cwd: root, session } = context;
+  if (session.id !== sessionId || !message.display) return;
+  const block = transcript.append(customMessageBlock(message));
+  const text = renderCustomMessage(root, sessionId, message);
+  if (text !== undefined) transcript.setText(block, dialogText(text, 32 * 1024));
+  if (renderers) {
+    renderers.view.append({ root, sessionId, transcript,
+      isCurrent: () => context.cwd === root && context.session.id === sessionId && context.session.createdAt === session.createdAt,
+      changed: renderers.changed }, { message, block });
+    renderers.changed();
+  }
 }
 
 /**

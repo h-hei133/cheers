@@ -33,6 +33,9 @@ export async function executeScript(host: ExecutionHost, record: VersionRecord, 
   const entry = record.manifest.scripts.find(value => value.name === script); if (!entry) throw new Error('Unknown extension script.');
   const absolute = path.join(owned, entry.path);
   if (/\.(?:js|mjs|ts)$/.test(entry.path)) {
+    const isolated = invoke?.kind === 'qualify' || invoke?.kind === 'render';
+    const providers = record.manifest.providers?.filter(provider => provider.script === script);
+    const rendererTypes = record.manifest.messageRenderers?.filter(renderer => renderer.script === script).map(renderer => renderer.customType);
     const stored = readSandboxRules(host.root);
     if ((stored.network?.allowedDomains ?? []).length) throw new Error('Extension network grant is unsupported; execution was refused.');
     if ((stored.filesystem?.allowRead ?? []).length || (stored.filesystem?.allowWrite ?? []).length) throw new Error('Extension scripts cannot inherit broader filesystem sandbox grants.');
@@ -44,9 +47,12 @@ export async function executeScript(host: ExecutionHost, record: VersionRecord, 
       denyRules: host.denyRules,
       context,
       ...(invoke ? { invoke } : {}),
-      ...(invoke?.kind === 'command' && invoke.shortcutKey !== undefined ? { check: current } : {}),
+      ...(isolated ? { sourceDigest: record.files[entry.path] } : {}),
+      ...(providers?.length ? { providers } : {}),
+      ...(rendererTypes?.length ? { rendererTypes } : {}),
+      ...(isolated || invoke?.kind === 'command' && invoke.shortcutKey !== undefined ? { check: current } : {}),
       ...(host.flags?.length ? { flags: host.flags } : {}),
-      ...(host.extensionHost ? { host: host.extensionHost } : {}),
+      ...(!isolated && host.extensionHost ? { host: host.extensionHost } : {}),
     });
   }
   if (process.platform !== 'linux') throw new Error('Isolated extension script execution currently requires Linux bubblewrap.');

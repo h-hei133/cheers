@@ -55,6 +55,10 @@ export class CoreMcpClient {
   async connect(admission?: Admission, signal?: AbortSignal): Promise<McpConnectionState> {
     assertAdmission(admission);
     signal?.throwIfAborted();
+    if (this.config.extension && (!this.config.extensionOwner || !this.connectionAdmission)) {
+      return this.failed('Extension MCP approval has no active session owner.');
+    }
+    if (this.config.extension) assertAdmission(this.connectionAdmission);
     if (this.closed) return this.failed("MCP client is closed");
     if (this.config.enabled === false) return { type: "disabled", name: this.name, config: this.config };
     if (this.config.authRequired && this.config.transport !== 'http') return { type: "needs-auth", name: this.name, config: this.config };
@@ -86,7 +90,7 @@ export class CoreMcpClient {
       cwd: this.workspaceRoot,
       stderr: "pipe",
       maxBufferSize: 10 * 1024 * 1024,
-    }, admission);
+    }, admission, this.config.extension ? this.connectionAdmission : undefined);
     // Draining avoids blocking the server; raw diagnostics may contain credentials.
     if (transport instanceof McpStdioTransport) transport.stderr?.on("data", () => {});
     client.onerror = () => {
@@ -115,6 +119,7 @@ export class CoreMcpClient {
     try {
       await this.withCancellation(signal => client.connect(transport, { timeout: this.timeoutMs, signal }), signal, admission);
       assertAdmission(admission);
+      if (this.config.extension) assertAdmission(this.connectionAdmission);
       signal?.throwIfAborted();
       if (this.closed) throw new Error("MCP client closed during connection");
       this.connected = true;
@@ -160,6 +165,7 @@ export class CoreMcpClient {
           { method: "tools/list", params: cursor ? { cursor } : {} },
           ListToolsResultSchema, { timeout: remaining, signal }), signal, admission);
         assertAdmission(admission);
+        if (this.config.extension) assertAdmission(this.connectionAdmission);
         signal?.throwIfAborted();
         if (this.closed || !this.connected || revision !== this.catalogRevision) throw new Error("MCP tool catalog changed during listing");
         bytes += Buffer.byteLength(JSON.stringify(result), "utf8");
@@ -205,7 +211,9 @@ export class CoreMcpClient {
     try {
       await this.requireClient(admission, signal);
       const channel = this.contentChannel!;
-      return await this.withCancellation(signal => channel.run(request, signal, this.timeoutMs, admission), signal, admission);
+      const result = await this.withCancellation(signal => channel.run(request, signal, this.timeoutMs, admission), signal, admission);
+      if (this.config.extension) assertAdmission(this.connectionAdmission);
+      return result;
     } catch (error) {
       throw protocolFailure(error, "protocol");
     }
@@ -233,13 +241,26 @@ export class CoreMcpClient {
     } catch (error) {
       if (signal?.aborted) throw new McpClassifiedError(classifyMcpFailure({ failureClass: 'timeout-cancelled',
         detail: 'MCP tool result is unconfirmed after cancellation; remote effects may have occurred. No operation was replayed.' }));
+      this.assertExtensionToolResultAdmission();
       // Remote rejections are protocol failures; returned data is validated separately below.
       throw protocolFailure(error, "protocol");
     }
+    this.assertExtensionToolResultAdmission();
     const parsed = CallToolResultSchema.safeParse(response);
     if (!parsed.success) throw protocolFailure(new Error("MCP tool returned a malformed result"), "malformed-result");
     catalog.validate(toolName, parsed.data);
     return projectMcpResult(parsed.data);
+  }
+
+  private assertExtensionToolResultAdmission(): void {
+    if (!this.config.extension) return;
+    try {
+      this.abort.signal.throwIfAborted();
+      assertAdmission(this.connectionAdmission);
+    } catch {
+      throw new McpClassifiedError(classifyMcpFailure({ failureClass: 'unknown',
+        detail: 'MCP tool result is unconfirmed after extension authority changed; remote effects may have occurred. No operation was replayed.' }));
+    }
   }
 
   close(): Promise<void> {

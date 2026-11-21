@@ -10,23 +10,46 @@ export interface RegisteredMessageRenderer {
   readonly render: ExtensionMessageRenderer;
 }
 
+export interface InstalledRenderer {
+  readonly customType: string;
+  readonly script: string;
+}
+
+export interface InstalledMessageRenderers {
+  readonly customTypes: readonly string[];
+  readonly admission: () => void;
+  readonly renderBatch: (messages: readonly CustomAgentMessage[], signal: AbortSignal) => Promise<readonly (string | null)[]>;
+}
+
 export const MAX_MESSAGE_RENDERERS = 64;
+export const MAX_MESSAGE_TYPE_LENGTH = 128;
+export const MAX_RENDER_BATCH_MESSAGES = 32;
+export const MAX_RENDER_BATCH_BYTES = 512 * 1024;
+export const MAX_RENDER_TEXT_BYTES = 32 * 1024;
+
+export function rendererType(value: unknown): string {
+  if (typeof value !== 'string' || value.length > MAX_MESSAGE_TYPE_LENGTH || !/^[\w.-]+$/.test(value)) throw new Error('Invalid custom message type.');
+  return value;
+}
 
 export function captureMessageRenderer(customType: unknown, render: unknown): RegisteredMessageRenderer {
-  if (typeof customType !== 'string' || !/^[\w.-]{1,128}$/.test(customType)
-    || typeof render !== 'function' || types.isProxy(render)) throw new Error('Invalid custom message renderer.');
-  return Object.freeze({ customType, render: render as ExtensionMessageRenderer });
+  if (typeof render !== 'function' || types.isProxy(render)) throw new Error('Invalid custom message renderer.');
+  return Object.freeze({ customType: rendererType(customType), render: render as ExtensionMessageRenderer });
+}
+
+export function captureRendererMessage(message: CustomAgentMessage): CustomAgentMessage {
+  return snapshotData(message, { bytes: 256 * 1024, nodes: 4096, depth: 24 }) as unknown as CustomAgentMessage;
 }
 
 export function invokeMessageRenderer(render: ExtensionMessageRenderer, message: CustomAgentMessage,
   invoke?: (callback: ExtensionMessageRenderer, json: string) => unknown): string | undefined {
-  const captured = snapshotData(message, { bytes: 256 * 1024, nodes: 4096, depth: 24 });
-  const result = invoke ? invoke(render, JSON.stringify(captured)) : render(captured as unknown as CustomAgentMessage);
+  const captured = captureRendererMessage(message);
+  const result = invoke ? invoke(render, JSON.stringify(captured)) : render(captured);
   if (types.isPromise(result)) {
     void Promise.prototype.then.call(result, undefined, () => undefined);
     return undefined;
   }
-  return typeof result === 'string' && Buffer.byteLength(result) <= 32 * 1024 ? result : undefined;
+  return typeof result === 'string' && Buffer.byteLength(result) <= MAX_RENDER_TEXT_BYTES ? result : undefined;
 }
 
 /** File renderers receive only VM-owned data and return primitive text. */

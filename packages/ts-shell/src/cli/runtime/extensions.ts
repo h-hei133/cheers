@@ -127,7 +127,8 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
       lifecycle = new ExtensionSessionLifecycle(context);
       const check = () => { const refused = configurationAdmission(context)() ?? (context.session.id !== session || context.cwd !== root ? 'Extension session or workspace changed.' : undefined); if (refused) throw new Error(refused); };
       service = new ExtensionService({ root, gate: tool => ({ ...gate(tool), admission: () => gate(tool).admission?.() ?? (context.session.id !== session || context.cwd !== root ? 'Extension session changed.' : undefined) }),
-        check, extensionHost, installedValues: () => installedValues, offline: () => context.runtimeConfig.offline === true, denyRules: () => context.runtimeConfig.denyRules,
+        check, extensionHost, installedValues: () => installedValues, physicalCatalog: () => context.configuration.current.catalog,
+        offline: () => context.runtimeConfig.offline === true, denyRules: () => context.runtimeConfig.denyRules,
         assertSourceAccess: absolute => { check(); assertSourceAccess(absolute, context.projectRoot ?? root, context.session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules); },
         assertWorkspace: write => { check(); const primary = context.projectRoot ?? root; assertSourceAccess(root, primary, context.session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules); if (write) selectWorkspaceRoot(primary, context.session.workspaceRoots ?? [], root, 'write'); } });
       cliCleanups.splice(0).forEach(unregister => unregister());
@@ -147,7 +148,11 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
         signal.throwIfAborted();
         check();
         assertSourceAccess(absolute, context.projectRoot ?? root, context.session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules);
-      }, gate, signal, extensionHost, shortcutBinding, cliArguments, preparedFiles).then(values => { installedValues = values; argumentsAdmitted = true; });
+      }, gate, signal, extensionHost, shortcutBinding, cliArguments, preparedFiles).then(async values => {
+        installedValues = values;
+        await installed.qualify(signal);
+        argumentsAdmitted = true;
+      });
       // Consumers await the same initialization; observe failures during startup as well.
       void ready.then(() => { if (initialization?.signal === signal) initializing = false; }, () => {
         if (initialization?.signal === signal) { initializing = false; initialization.abort(); }

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CoreMcpGateway } from "./gateway.js";
 import { CoreMcpClient } from "./client.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
+import type { ScopedMcpServerConfig } from "./types.js";
 
 const server = path.resolve("src/core/mcp/fixtures/mockMcpServer.mjs");
 let root: string;
@@ -47,6 +48,30 @@ afterEach(async () => {
 });
 
 describe("standard MCP connection lifetime", () => {
+  it("reports an unconfirmed stdio extension tool outcome when its grant is revoked in flight", async () => {
+    let granted = true;
+    const definition: ScopedMcpServerConfig = {
+      ...config(), transport: 'stdio', scope: 'user', extensionOwner: 'installed-generation',
+      extension: { packageId: 'sample', digest: 'a'.repeat(64), workspace: root },
+    };
+    const owner = new CoreMcpGateway(root, undefined, undefined, undefined, {
+      read: (): Record<string, ScopedMcpServerConfig> => granted ? { local: definition } : {},
+      subscribe: () => () => {},
+    });
+    owners.push(owner);
+    const snapshot = await owner.snapshot();
+    const contractId = snapshot.tools[0]?.contractId;
+    expect(contractId).toBeTruthy();
+    const result = owner.invokeTool('local', 'echo_message', { message: 'mcp-hold' }, undefined, { contractId })
+      .catch((error: unknown) => error);
+    await vi.waitFor(() => expect(records().filter(event => event.event === 'tools/call')).toHaveLength(1));
+    granted = false;
+    await owner.configurationChanged();
+    expect(await result).toMatchObject({ failureClass: 'unknown', message: expect.stringContaining('MCP tool result is unconfirmed') });
+    expect(records().filter(event => event.event === 'tools/call')).toHaveLength(1);
+    expect(alive(records()[0].pid)).toBe(false);
+  });
+
   it("handshakes once, paginates, and reuses one process across snapshots and calls", async () => {
     configure(root, config(["--paginate"]));
     const owner = gateway();

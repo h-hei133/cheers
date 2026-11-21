@@ -1,7 +1,7 @@
 import { catalogProvider, type CatalogProvider } from '../models/catalog.js';
 import type { ProviderCredentialResolution } from '../auth/credential.js';
 import { providerCredentialEndpoint } from '../auth/account/target.js';
-import { catalogContributions } from './contributions.js';
+import { catalogContributions, contributedProviders } from './contributions.js';
 import type { SessionExtensionProvider } from '../../session/model/contract.js';
 import { readSessionModelStrict } from '../../session/model/state.js';
 import type { Admission } from '../network/admission.js';
@@ -18,7 +18,7 @@ export function extensionModelReference(value: string | undefined): { readonly i
 }
 
 export function sessionProviders(root: string, sessionId: string) {
-  return catalogContributions(root, sessionId).flatMap(entry => entry.providers ?? []);
+  return catalogContributions(root, sessionId).flatMap(contributedProviders);
 }
 
 /** Extension metadata can describe an explicit credential endpoint without changing its address or protocol. */

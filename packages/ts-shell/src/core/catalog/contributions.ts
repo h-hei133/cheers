@@ -1,7 +1,8 @@
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createStateChanges } from '../state/changes.js';
-import { captureMessageRenderer, MAX_MESSAGE_RENDERERS, type RegisteredMessageRenderer } from '../../extensions/runtime/renderer.js';
+import { captureMessageRenderer, MAX_MESSAGE_RENDERERS, rendererType, type InstalledMessageRenderers,
+  type RegisteredMessageRenderer } from '../../extensions/runtime/renderer.js';
 import { captureExtensionMcpServer, MAX_EXTENSION_MCP_SERVERS, type RegisteredMcpServer } from '../../extensions/runtime/mcp.js';
 import { captureExtensionProvider, EXTENSION_MODEL_PREFIX, MAX_EXTENSION_PROVIDERS } from '../../extensions/runtime/provider.js';
 import { commandInvocations } from '../commands/invocation.js';
@@ -20,6 +21,14 @@ import {InputRefusal} from '../hooks/input/error.js';
 import {captureCompactResult} from '../../extensions/events/compact.js';
 import {captureToolResult} from '../../extensions/events/result.js';
 import { captureMessageResult } from '../../extensions/events/message.js';
+import { mcpExtensionApproval, mcpStdioLaunch, type McpExtensionApproval, type McpStdioLaunch } from '../mcp/config/stdio.js';
+
+interface StdioMcpContribution extends McpStdioLaunch {
+  readonly name: string;
+  readonly approval: McpExtensionApproval;
+  readonly assertCurrent: () => void;
+  readonly extensionOwner?: string;
+}
 
 /** Neutral session composition port. The feature owner retains lifecycle and authority. */
 export interface CatalogContribution {
@@ -31,8 +40,11 @@ export interface CatalogContribution {
   readonly onEvent?: (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => Promise<unknown>;
   readonly virtualModels?: readonly CapturedVirtualModelDefinition[];
   readonly messageRenderers?: readonly RegisteredMessageRenderer[];
+  readonly installedRenderers?: readonly InstalledMessageRenderers[];
   readonly mcpServers?: readonly RegisteredMcpServer[];
+  readonly stdioMcpServers?: readonly StdioMcpContribution[];
   readonly providers?: readonly CatalogProvider[];
+  readonly providerAdmission?: () => void;
   /** The generation that owns these callbacks, independent of an individual request. */
   readonly signal?: AbortSignal;
 }
@@ -51,7 +63,9 @@ export function registerCatalogContribution(entry: CatalogContribution, physical
   const virtualModels = captureVirtualDefinitions(entry.virtualModels ?? [], admission);
   const providers = Object.freeze((entry.providers ?? []).map(({ id, label, runtime, baseUrl, models }) =>
     captureExtensionProvider(id, { label, runtime, baseUrl, models })));
-  const activeProviders = catalogContributions(entry.root, entry.sessionId).flatMap(value => value.providers ?? []);
+  const assertProviders = entry.providerAdmission;
+  const providerAdmission = () => { admission(); assertProviders?.(); admission(); };
+  const activeProviders = catalogContributions(entry.root, entry.sessionId).flatMap(contributedProviders);
   if (providers.length + activeProviders.length > MAX_EXTENSION_PROVIDERS) throw new Error('Extension provider registration limit exceeded.');
   const registeredProviders = [...activeProviders, ...providers];
   if (new Set(registeredProviders.map(value => value.id)).size !== registeredProviders.length
@@ -63,12 +77,22 @@ export function registerCatalogContribution(entry: CatalogContribution, physical
     const definition = captureExtensionMcpServer(name, { url: config.url, enabled: config.enabled });
     return Object.freeze({ name: definition.name, config: Object.freeze({ ...definition.config, extensionOwner: randomUUID() }) });
   }));
-  const activeServers = catalogContributions(entry.root, entry.sessionId).flatMap(value => value.mcpServers ?? []);
-  if (activeServers.length + mcpServers.length > MAX_EXTENSION_MCP_SERVERS) throw new Error('Extension MCP server registration limit exceeded.');
-  if (new Set([...activeServers, ...mcpServers].map(server => server.name)).size !== activeServers.length + mcpServers.length) {
+  const stdioMcpServers = Object.freeze((entry.stdioMcpServers ?? []).map(server => {
+    const assertCurrent = server.assertCurrent;
+    return Object.freeze({ ...mcpStdioLaunch(server.command, server.args), name: server.name,
+      approval: mcpExtensionApproval(server.approval), extensionOwner: randomUUID(),
+      assertCurrent: () => { admission(); assertCurrent(); admission(); } });
+  }));
+  const activeServers = catalogContributions(entry.root, entry.sessionId).flatMap(value => [...value.mcpServers ?? [], ...value.stdioMcpServers ?? []]);
+  const serverNames = [...activeServers, ...mcpServers, ...stdioMcpServers].map(server => server.name);
+  if (serverNames.length > MAX_EXTENSION_MCP_SERVERS) throw new Error('Extension MCP server registration limit exceeded.');
+  if (new Set(serverNames).size !== serverNames.length) {
     throw new Error('Extension MCP server registration collision.');
   }
-  const activeRenderers = catalogContributions(entry.root, entry.sessionId).flatMap(value => value.messageRenderers ?? []);
+  const activeRenderers = catalogContributions(entry.root, entry.sessionId).flatMap(value => [
+    ...(value.messageRenderers ?? []).map(renderer => renderer.customType),
+    ...(value.installedRenderers ?? []).flatMap(renderer => renderer.customTypes),
+  ]);
   const messageRenderers = Object.freeze((entry.messageRenderers ?? []).map(renderer => {
     const definition = captureMessageRenderer(renderer.customType, renderer.render);
     return Object.freeze({ customType: definition.customType, render: (message: Parameters<typeof definition.render>[0]) => {
@@ -78,8 +102,26 @@ export function registerCatalogContribution(entry: CatalogContribution, physical
       return result;
     } });
   }));
-  if (messageRenderers.length + activeRenderers.length > MAX_MESSAGE_RENDERERS) throw new Error('Message renderer registration limit exceeded.');
-  if (new Set([...activeRenderers, ...messageRenderers].map(value => value.customType)).size !== activeRenderers.length + messageRenderers.length) {
+  const installedRenderers = Object.freeze((entry.installedRenderers ?? []).map(renderer => {
+    const customTypes = Object.freeze(renderer.customTypes.map(rendererType));
+    const assertCurrent = renderer.admission;
+    const renderBatch = renderer.renderBatch;
+    const current = () => { admission(); assertCurrent(); admission(); };
+    return Object.freeze({ customTypes, admission: current,
+      renderBatch: async (messages: Parameters<typeof renderBatch>[0], signal: AbortSignal) => {
+        current();
+        const active = AbortSignal.any([signal, eventLifetime.signal]);
+        active.throwIfAborted();
+        const result = await renderBatch(messages, active);
+        active.throwIfAborted();
+        current();
+        return result;
+      } });
+  }));
+  const rendererTypes = [...activeRenderers, ...messageRenderers.map(value => value.customType),
+    ...installedRenderers.flatMap(value => value.customTypes)];
+  if (rendererTypes.length > MAX_MESSAGE_RENDERERS) throw new Error('Message renderer registration limit exceeded.');
+  if (new Set(rendererTypes).size !== rendererTypes.length) {
     throw new Error('Message renderer registration collision.');
   }
   const existing = catalogContributions(entry.root, entry.sessionId).flatMap(value => value.commands).flatMap(commandInvocations).map(value => value.name);
@@ -122,7 +164,8 @@ export function registerCatalogContribution(entry: CatalogContribution, physical
     admission(); assertCurrentSignal();
     return result;
   }, { admission });
-  const captured = Object.freeze({ ...entry, root: path.resolve(entry.root), virtualModels, messageRenderers, mcpServers, providers, ...(onEvent ? { onEvent } : {}) });
+  const captured = Object.freeze({ ...entry, root: path.resolve(entry.root), virtualModels, messageRenderers, installedRenderers,
+    mcpServers, stdioMcpServers, providers, providerAdmission, ...(onEvent ? { onEvent } : {}) });
   const retire = () => {
     if (!active) return;
     active = false;
@@ -141,6 +184,11 @@ export function catalogContributions(root = process.cwd(), sessionId?: string): 
   const selected = [...entries].filter(entry => path.resolve(entry.root) === path.resolve(root) && (sessionId === undefined || entry.sessionId === sessionId));
   // A root-only compatibility caller cannot borrow one of several sessions' gates.
   return sessionId === undefined && new Set(selected.map(entry => entry.sessionId)).size > 1 ? [] : selected;
+}
+export function contributedProviders(entry: CatalogContribution): readonly CatalogProvider[] {
+  if (!entry.providers?.length) return [];
+  try { entry.providerAdmission?.(); return entry.providers; }
+  catch { return []; }
 }
 export function observeCatalogContributions(root: string | undefined, changed: () => void): () => void { return changes.subscribe(root === undefined ? '*' : path.resolve(root), changed); }
 

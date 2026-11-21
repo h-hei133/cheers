@@ -1,5 +1,8 @@
 import type { StorageIdentity } from './store/paths.js';
 import type { ExtensionFlag } from './runtime/flag.js';
+import type { InstalledProvider } from './runtime/provider.js';
+import type { InstalledRenderer } from './runtime/renderer.js';
+import type { McpStdioLaunch } from '../core/mcp/config/stdio.js';
 
 export interface ExtensionManifest {
   readonly schema: 1;
@@ -12,6 +15,9 @@ export interface ExtensionManifest {
   readonly commands: readonly { readonly name: string; readonly aliases?: readonly string[]; readonly description: string; readonly script: string }[];
   readonly tools: readonly { readonly name: string; readonly description: string; readonly script: string }[];
   readonly flags?: readonly (ExtensionFlag & { readonly script: string })[];
+  readonly providers?: readonly InstalledProvider[];
+  readonly messageRenderers?: readonly InstalledRenderer[];
+  readonly mcpServers?: readonly (McpStdioLaunch & { readonly name: string })[];
 }
 export interface TrustAnchor {
   readonly keyId: string;

@@ -9,6 +9,7 @@ import { createShortcutCapture, MAX_SHORTCUTS } from './shortcut.js';
 import { createSessionCancellationCapture } from '../events/decision.js';
 import { createFlagCapture, EXTENSION_FLAG_NAME } from './flag.js';
 import { normalizeKey } from '../../presentation/tui/input/keyId.js';
+import { MAX_RENDER_TEXT_BYTES } from './renderer.js';
 
 export const EXTENSION_WORKER_SOURCE = `
 const vm = require('node:vm');
@@ -70,6 +71,43 @@ const promiseBrand = Object.setPrototypeOf(value => { try { return types.isPromi
 const proxyBrand = Object.setPrototypeOf(value => { try { return types.isProxy(value); } catch { return true; } }, null);
 const normalizeShortcut = Object.setPrototypeOf(value => typeof value === 'string'
   ? (${normalizeKey.toString()})(value) : undefined, null);
+const qualify = workerData.invoke?.kind === 'qualify';
+const render = workerData.invoke?.kind === 'render';
+const isolated = qualify || render;
+const declaredRenderers = new Set(workerData.rendererTypes ?? []);
+const registeredRenderers = new Map();
+let rendererFailed = false;
+const captureRenderer = Object.setPrototypeOf((name, callback) => {
+  if (!declaredRenderers.has(name) || registeredRenderers.has(name) || typeof callback !== 'function' || types.isProxy(callback)) {
+    rendererFailed = true;
+    return false;
+  }
+  registeredRenderers.set(name, callback);
+  return true;
+}, null);
+const selectRenderer = Object.setPrototypeOf(name => registeredRenderers.get(name), null);
+const rendered = [];
+const collectText = Object.setPrototypeOf(value => {
+  if (rendered.length >= workerData.invoke.messages.length) return;
+  rendered.push(typeof value === 'string' && value.length <= ${MAX_RENDER_TEXT_BYTES}
+    && Buffer.byteLength(value) <= ${MAX_RENDER_TEXT_BYTES} ? value : null);
+}, null);
+const declaredProviders = new Map((workerData.providers ?? []).map(entry => [entry.name, entry]));
+const registeredProviders = new Map();
+let providerFailed = false;
+const captureProvider = Object.setPrototypeOf((name, input) => {
+  try {
+    const declared = declaredProviders.get(name);
+    if (!declared || registeredProviders.has(name)) throw new Error('Provider declaration unavailable.');
+    const definition = captureData(input, { bytes: 128 * 1024, nodes: 8192, depth: 4, allowCrossRealm: true });
+    if (!definition || definition.runtime !== declared.runtime || typeof definition.baseUrl !== 'string'
+      || definition.baseUrl.length > 2048 || new URL(definition.baseUrl).href.replace(/\\/+$/, '') !== declared.baseUrl) {
+      throw new Error('Provider declaration changed.');
+    }
+    registeredProviders.set(name, definition);
+    return true;
+  } catch { providerFailed = true; return false; }
+}, null);
 
 const vmCtx = vm.createContext(Object.create(null), {
   name: 'extension-worker',
@@ -77,6 +115,7 @@ const vmCtx = vm.createContext(Object.create(null), {
 });
 
 const sendBridge = Object.setPrototypeOf((kind, jsonPayload) => {
+  if (isolated) return;
   parentPort.postMessage({ kind: String(kind), json: String(jsonPayload ?? '') });
 }, null);
 
@@ -99,6 +138,11 @@ Object.defineProperty(vmCtx, '__SESSION_CANCELLATION', { value: sessionCancellat
 Object.defineProperty(vmCtx, '__EVENT_NOTIFICATION', { value: workerData.notification === true, enumerable: false });
 Object.defineProperty(vmCtx, '__EVENT_TRANSITION', { value: workerData.transition === true, enumerable: false });
 Object.defineProperty(vmCtx, '__WORKER_FLAGS', { value: JSON.stringify(workerData.flags ?? []), enumerable: false });
+Object.defineProperty(vmCtx, '__ISOLATED', { value: isolated, enumerable: false });
+Object.defineProperty(vmCtx, '__CAPTURE_PROVIDER', { value: captureProvider, enumerable: false });
+Object.defineProperty(vmCtx, '__CAPTURE_RENDERER', { value: captureRenderer, enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__SELECT_RENDERER', { value: selectRenderer, enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__COLLECT_TEXT', { value: collectText, enumerable: false, configurable: true });
 Object.defineProperty(vmCtx, '__TOOL_RESULT', { value: toolResult, enumerable: false });
 Object.defineProperty(vmCtx, '__MESSAGE_RESULT', { value: messageResult, enumerable: false });
 Object.defineProperty(vmCtx, '__INPUT_RESULT', { value: inputResult, enumerable: false });
@@ -114,10 +158,18 @@ const bootstrap = new vm.Script(\`
   const onReply = globalThis.__onReply;
   const promiseBrand = globalThis.__PROMISE_BRAND;
   const proxyBrand = globalThis.__PROXY_BRAND;
+  const captureRenderer = globalThis.__CAPTURE_RENDERER;
+  const selectRenderer = globalThis.__SELECT_RENDERER;
+  const collectText = globalThis.__COLLECT_TEXT;
   delete globalThis.__send;
   delete globalThis.__onReply;
   delete globalThis.__PROMISE_BRAND;
   delete globalThis.__PROXY_BRAND;
+  delete globalThis.__CAPTURE_RENDERER;
+  delete globalThis.__SELECT_RENDERER;
+  delete globalThis.__COLLECT_TEXT;
+  const parse = JSON.parse, keys = Object.keys, freeze = Object.freeze;
+  const then = Promise.prototype.then, apply = Reflect.apply;
   const __name = (target, value) => Object.defineProperty(target, 'name', { value, configurable: true });
   const captureShortcut = (${createShortcutCapture.toString()})(proxyBrand);
   const shortcutInvocation = globalThis.__SHORTCUT_INVOKE ? JSON.parse(globalThis.__SHORTCUT_INVOKE) : undefined;
@@ -157,8 +209,9 @@ const bootstrap = new vm.Script(\`
   const reduceInputHook = (${createInputHookReducer.toString().replaceAll('\\', '\\\\')})(captureInputHook);
   const freezeData = value => {
     if (value && typeof value === 'object') {
-      for (const key of Object.keys(value)) freezeData(value[key]);
-      Object.freeze(value);
+      const fields = keys(value);
+      for (let index = 0; index < fields.length; index++) freezeData(value[fields[index]]);
+      freeze(value);
     }
     return value;
   };
@@ -206,6 +259,7 @@ const bootstrap = new vm.Script(\`
   });
 
   function rpc(op, payload) {
+    if (globalThis.__ISOLATED) return Promise.reject(new Error('Isolated extension callbacks have no host privileges.'));
     const id = ++seq;
     return new Promise((resolve, reject) => {
       pending.set(id, { resolve, reject });
@@ -287,9 +341,13 @@ const bootstrap = new vm.Script(\`
     events: eventsBus,
     ui,
     registerVirtualModel: () => { throw new Error('Virtual model registration is unavailable in worker extensions. Use a session extension.'); },
-    registerMessageRenderer: () => { throw new Error('Message renderer registration is unavailable in worker extensions. Use a session extension.'); },
+    registerMessageRenderer: (name, callback) => {
+      if (!captureRenderer(name, callback)) throw new Error('Message renderer registration is unavailable without a matching unique installed declaration.');
+    },
     registerMcpServer: () => { throw new Error('MCP server registration is unavailable in worker extensions. Use a session extension.'); },
-    registerProvider: () => { throw new Error('Provider registration is unavailable in worker extensions. Use a session extension.'); },
+    registerProvider: (name, definition) => {
+      if (!globalThis.__CAPTURE_PROVIDER(name, definition)) throw new Error('Provider registration is unavailable without a matching unique installed declaration.');
+    },
     registerTool: (tool) => {
       if (!tool || typeof tool.name !== 'string' || !tool.name.trim() || typeof tool.execute !== 'function') {
         throw new Error('Extension registerTool requires { name, execute }.');
@@ -355,10 +413,24 @@ const bootstrap = new vm.Script(\`
     sendMessage: (msg) => rpc('host.sendMessage', { msg }),
     appendEntry: (customType, data) => rpc('host.appendEntry', { customType: String(customType ?? ''), data }),
   };
+  return () => {
+    const messages = parse(globalThis.__INVOKE).messages;
+    for (let index = 0; index < messages.length; index++) {
+      const message = freezeData(messages[index]);
+      let text;
+      try {
+        const callback = selectRenderer(message.customType);
+        const value = callback?.(message);
+        if (promiseBrand(value)) apply(then, value, [undefined, () => undefined]);
+        else if (typeof value === 'string') text = value;
+      } catch {}
+      collectText(text);
+    }
+  };
 })();
 \`, { filename: 'extension-bootstrap.js' });
 
-bootstrap.runInContext(vmCtx);
+const renderBatch = bootstrap.runInContext(vmCtx);
 
 parentPort.on('message', (msg) => {
   if (msg && msg.kind === 'reply' && typeof dispatchReply === 'function') {
@@ -378,6 +450,7 @@ parentPort.on('message', (msg) => {
         if (typeof exp.default === 'function') await exp.default(api);
         else if (typeof exp.activate === 'function') await exp.activate(api);
         globalThis.__checkWorkerFlags();
+        if (globalThis.__ISOLATED) return;
         if (globalThis.__runInstalledShortcut) return await globalThis.__runInstalledShortcut();
         const invoke = globalThis.__INVOKE ? JSON.parse(globalThis.__INVOKE) : null;
         if (invoke && invoke.kind === 'tool') {
@@ -494,7 +567,18 @@ parentPort.on('message', (msg) => {
     if (guardedInvoke) { runner.runInContext(vmCtx, { timeout: 5000 }); return; }
     const value = await Promise.resolve(runner.runInContext(vmCtx, { timeout: 5000 }));
     const isEventInvoke = Boolean(workerData.invoke && workerData.invoke.kind === 'event');
-    if (!isEventInvoke && value && typeof value === 'object' && typeof value.output === 'string' && typeof value.success === 'boolean') {
+    if (qualify) {
+      if (providerFailed) throw new Error('Installed extension provider registration was refused.');
+      if (rendererFailed) throw new Error('Installed message renderer registration was refused.');
+      parentPort.postMessage({ kind: 'done', json: JSON.stringify({ providers: [...registeredProviders], renderers: [...registeredRenderers.keys()] }) });
+    } else if (render) {
+      if (providerFailed || rendererFailed || workerData.invoke.messages.some(message => !registeredRenderers.has(message.customType))) {
+        throw new Error('Installed message renderer changed.');
+      }
+      Object.defineProperty(vmCtx, '__renderBatch', { value: renderBatch });
+      new vm.Script('__renderBatch()').runInContext(vmCtx, { timeout: 100 });
+      parentPort.postMessage({ kind: 'done', json: JSON.stringify(rendered) });
+    } else if (!isEventInvoke && value && typeof value === 'object' && typeof value.output === 'string' && typeof value.success === 'boolean') {
       parentPort.postMessage({ kind: value.success ? 'done' : 'error', json: value.output });
     } else {
       parentPort.postMessage({
@@ -503,7 +587,7 @@ parentPort.on('message', (msg) => {
       });
     }
   } catch (err) {
-    parentPort.postMessage({ kind: 'error', json: err instanceof Error ? err.message : String(err) });
+    parentPort.postMessage({ kind: 'error', json: isolated ? 'Isolated extension invocation failed.' : err instanceof Error ? err.message : String(err) });
   }
 })();
 `;

@@ -1,3 +1,5 @@
+import type { McpExtensionApproval } from './config/stdio.js';
+
 export type McpTransport = 'stdio' | 'http' | 'ws' | 'sdk'
 
 export type McpConfigScope = 'user' | 'project'
@@ -35,6 +37,8 @@ export interface McpServerConfig {
   readonly url?: string
   readonly scope?: McpConfigScope
   readonly authRequired?: boolean
+  /** Held user definition matched against an active installed package before discovery. */
+  readonly extension?: McpExtensionApproval
   /**
    * Tools this server is taken to expose, without asking it.
    *

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { changeSources, readSources, selectedSource, sourceIdentity, sourceUrl, trustAnchor } from '../registry/sources.js';
-import { canonical, name } from '../registry/validation.js';
+import { canonical, manifestForInspection, name } from '../registry/validation.js';
 import { details, search } from '../registry/client.js';
 import type { ExtensionService } from '../service.js';
 import type { LocalCommandResult } from '../../core/commands/types.js';
@@ -13,7 +13,13 @@ export async function marketplaceCommand(args: string[], service: ExtensionServi
     if (rest.length) throw new Error('Too many marketplace arguments.');
     if (['list', 'ls'].includes(action) && !target) return { kind: 'local', output: readSources().map(source => `${source.name}: ${source.url}; ${source.trust ? `trusted ${source.trust.keyId} ${source.trust.fingerprint}; provenance ${source.trust.provenance}` : 'registered, untrusted'}`).join('\n') || 'No marketplace sources registered.' };
     if (action === 'search' && target && input) { const source = selectedSource(target); const page = await service.request(signal => search(source, input, extra, signal, service.offline())); if (sourceIdentity(selectedSource(target)) !== sourceIdentity(source)) throw new Error('Selected source changed during query.'); return { kind: 'local', output: `${JSON.stringify(page, null, 2)}\nQuery only; no package installed or enabled.` }; }
-    if (action === 'details' && target && input && !extra) { const source = selectedSource(target); const result = await service.request(signal => details(source, input, signal, service.offline())); if (sourceIdentity(selectedSource(target)) !== sourceIdentity(source)) throw new Error('Selected source changed during query.'); return { kind: 'local', output: JSON.stringify(result, null, 2) }; }
+    if (action === 'details' && target && input && !extra) {
+      const source = selectedSource(target);
+      const result = await service.request(signal => details(source, input, signal, service.offline()));
+      if (sourceIdentity(selectedSource(target)) !== sourceIdentity(source)) throw new Error('Selected source changed during query.');
+      const inspected = result.map(release => ({ ...release, manifest: manifestForInspection(release.manifest) }));
+      return { kind: 'local', output: JSON.stringify(inspected, null, 2) };
+    }
     const before = readSources(); const identity = canonical(before); let next: ExtensionSource[]; let recheck = () => {};
     if (action === 'add' && target && input && !extra) {
       const selected = name(target); sourceUrl(input); if (before.some(entry => entry.name === selected)) throw new Error('Marketplace source already registered.');

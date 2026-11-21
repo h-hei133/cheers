@@ -24,6 +24,8 @@ import { isNotificationEvent } from './events/model.js';
 import { isSessionTransitionEvent, sessionCancellation } from './events/decision.js';
 import { InstalledShortcuts, type InstalledShortcut } from './runtime/shortcut.js';
 import { scriptOptions, type InstalledOptionValue } from './runtime/options.js';
+import { qualifyInstalled } from './runtime/qualify.js';
+import type { CatalogProvider } from '../core/models/catalog.js';
 
 export interface ExtensionServiceOptions {
   readonly root: string;
@@ -39,6 +41,7 @@ export interface ExtensionServiceOptions {
   readonly assertSourceAccess?: (absolute: string) => void;
   readonly npmRegistry?: string;
   readonly gitArchiveBase?: string;
+  readonly physicalCatalog?: () => readonly CatalogProvider[];
 }
 export class ExtensionService implements LifecycleHost {
   readonly store: ExtensionStore;
@@ -58,6 +61,7 @@ export class ExtensionService implements LifecycleHost {
   private readonly shortcuts = new InstalledShortcuts();
   private watchers: Array<() => void> = [];
   private publication = '';
+  private qualification?: Promise<void>;
   constructor(readonly options: ExtensionServiceOptions) {
     this.store = options.store ?? new ExtensionStore(); this.root = rootIdentity(options.root); this.sessionId = options.gate('extension_manage').sessionId;
     const workspaceIdentity = rootSignature(this.root);
@@ -69,10 +73,14 @@ export class ExtensionService implements LifecycleHost {
     this.watchers = [this.store.file, sourceFile()].map(file => observeDirectory(file, () => { if (this.snapshot() !== this.publication) void this.invalidate().catch(() => {}); }));
   }
   private snapshot(): string { try { return canonical({ state: this.store.read(), sources: readSources() }); } catch { return 'invalid'; } }
-  current(record: PackageRecord, grant: string, epoch = this.epoch): void {
+  current(record: PackageRecord, grant: string | readonly string[], epoch = this.epoch, revision?: number): void {
     this.check(); if (epoch !== this.epoch || this.store.outcomes.some(value => value.durability === 'unknown')) throw new Error('Extension capability has been revoked or publication is uncertain.');
-    const current = this.store.read().packages.find(entry => entry.name === record.name); const activation = current?.activation[this.root];
-    if (!current || canonical(current.active) !== canonical(record.active) || !activation?.enabled || activation.workspaceIdentity !== rootSignature(this.root) || !activation.grants.includes(grant)) throw new Error('Extension capability grant is absent or stale.');
+    const registry = this.store.read();
+    const current = registry.packages.find(entry => entry.name === record.name); const activation = current?.activation[this.root];
+    const requiredGrants = typeof grant === 'string' ? [grant] : grant;
+    if ((revision !== undefined && registry.revision !== revision) || !current || canonical(current.active) !== canonical(record.active)
+      || !activation?.enabled || activation.workspaceIdentity !== rootSignature(this.root)
+      || requiredGrants.some(value => !activation.grants.includes(value))) throw new Error('Extension capability grant is absent or stale.');
     assertVersionSource(record.active);
     assertInventory(versionPath(current.active, this.store.file), current.active);
   }
@@ -101,8 +109,41 @@ export class ExtensionService implements LifecycleHost {
   }
   async invalidate(except?: AbortSignal): Promise<void> {
     const revision = ++this.epoch; this.registrations.splice(0).forEach(unregister => unregister());
+    this.qualification = undefined;
     this.shortcuts.retire();
-    await this.cancel(except); if (revision === this.epoch && !this.closed && !this.drainUnknown) this.activate();
+    await this.cancel(except);
+    if (revision === this.epoch && !this.closed && !this.drainUnknown) {
+      this.activate();
+      await this.qualify(except);
+    }
+  }
+  qualify(signal?: AbortSignal): Promise<void> {
+    const epoch = this.epoch;
+    return this.qualification ??= this.calls.run(async signal => {
+      let registry: ReturnType<ExtensionStore['read']>;
+      try { registry = this.store.read(); } catch { return; }
+      await qualifyInstalled({
+        host: { file: this.store.file, root: this.root, check: this.check, denyRules: this.options.denyRules },
+        sessionId: this.sessionId, calls: this.calls, installedValues: this.options.installedValues,
+        physicalCatalog: this.options.physicalCatalog,
+        isCurrent: () => epoch === this.epoch,
+        current: (record, grants) => {
+          this.current(record, grants, epoch, registry.revision);
+          this.options.assertWorkspace(false);
+        },
+        publish: unregister => { this.registrations.push(unregister); },
+        report: message => { this.errors.push(message); },
+        loseProcessAuthority: () => this.loseProcessAuthority(),
+      }, registry.packages, signal);
+    }, signal);
+  }
+  private loseProcessAuthority(): void {
+    this.drainUnknown = true; this.processCleanupUnknown = true; this.epoch++;
+    this.registrations.splice(0).forEach(unregister => unregister());
+    this.shortcuts.retire();
+    const detail = 'Extension process or runtime-home cleanup is unknown; capabilities withheld.';
+    this.errors.push(detail);
+    try { this.store.recordUnknown({ effect: 'executed', detail }); } catch { /* The in-process flag still blocks. */ }
   }
   async cancel(except?: AbortSignal): Promise<void> {
     if (!await this.calls.cancel(except)) {
@@ -166,12 +207,7 @@ export class ExtensionService implements LifecycleHost {
       const flags = scriptOptions(record, this.store.file, script, this.options.installedValues?.());
       const result = await executeScript({ file: this.store.file, root: this.root, check: this.check, denyRules: this.options.denyRules, execution: this.options.execution, extensionHost: this.options.extensionHost, flags }, record.active, script, args, current, { ...context, abortSignal: signal }, invoke);
       if (result.metadata?.cleanup === 'unknown') {
-        this.drainUnknown = true; this.processCleanupUnknown = true; this.epoch++;
-        this.registrations.splice(0).forEach(unregister => unregister());
-        this.shortcuts.retire();
-        const detail = 'Extension process or runtime-home cleanup is unknown; capabilities withheld.';
-        this.errors.push(detail);
-        try { this.store.recordUnknown({ effect: 'executed', detail }); } catch { /* The in-process flag still blocks. */ }
+        this.loseProcessAuthority();
       }
       try { current(); } catch { return { ...result, success: false, output: `${result.output}\nExtension authority changed after execution; actual receipt remains visible.` }; }
       this.shortcuts.publish(record, script, result);
