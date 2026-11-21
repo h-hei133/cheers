@@ -10,10 +10,12 @@ import { prepareShellStartup } from '../../../core/shell/bootstrap.js';
 import { getWorkflowGitContext } from '../../../core/workspace/git.js';
 import { StreamingRenderer } from '../../../presentation/terminal/streaming.js';
 import { SessionManager } from '../../SessionManager.js';
+import { sessionWorkspaceAdmission } from '../../continuation/workspace.js';
 import { readSessionRegistryStore } from '../currentSessionRegistry.js';
 import { createSessionStoreLayout, locateExistingSessionLayout, type SessionFileLayout } from '../sessionFileLayout.js';
 import { previewPendingSessionRecord } from '../sessionStore.js';
 import { SessionStoreAccess } from '../sessionStoreAccess.js';
+import { readSessionSnapshot } from '../snapshot.js';
 import { readSessionFileVersion } from '../version.js';
 import { promptIntentPath } from './intent.js';
 
@@ -35,6 +37,48 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+it.each([false, true])('admits only the prepared workspace while reselecting the current session (replaced marker: %s)', replace => {
+  const manager = new SessionManager();
+  const store = new SessionStoreAccess();
+  const session = manager.createNew(root);
+  const other = manager.createNew(root, { activate: false });
+  const profile = createSessionStoreLayout();
+  const layout = locateExistingSessionLayout(profile, session.id);
+  const marker = promptIntentPath(layout);
+  const otherMarker = promptIntentPath(locateExistingSessionLayout(profile, other.id));
+  const expected = store.readCurrentSessionSelection(root);
+  const checks: Array<string | undefined> = [];
+
+  const result = manager.tryResume(session.id, root, { mode: 'continuity-only', expectedVersion: readSessionFileVersion(layout),
+    activation: { guard: { source: { projectRoot: root, expected }, destination: expected, admission: () => {
+      if (fs.existsSync(marker) && checks.length === 0) {
+        expect(() => readSessionSnapshot(layout)).toThrow('persistence is unknown');
+        fs.copyFileSync(marker, otherMarker);
+        expect(sessionWorkspaceAdmission(manager, other)).toContain('authority could not be checked');
+        fs.unlinkSync(otherMarker);
+        if (replace) {
+          fs.copyFileSync(marker, `${marker}.replacement`);
+          fs.renameSync(`${marker}.replacement`, marker);
+        }
+        checks.push(sessionWorkspaceAdmission(manager, session));
+      }
+      return sessionWorkspaceAdmission(manager, session);
+    } } },
+  });
+
+  if (replace) {
+    expect(checks).toEqual([expect.stringContaining('authority could not be checked')]);
+    expect(result).toMatchObject({ ok: false, activation: 'unknown' });
+    expect(store.readCurrentSessionSelection(root)).toEqual(expected);
+    expect(sessionWorkspaceAdmission(manager, session)).toContain('authority could not be checked');
+  } else {
+    expect(checks).toEqual([undefined]);
+    expect(result).toMatchObject({ ok: true, session: { id: session.id } });
+    expect(store.readCurrentSessionSelection(root)?.activationId).not.toBe(expected?.activationId);
+    expect(fs.existsSync(marker)).toBe(false);
+  }
 });
 
 function interruptResume(layout: SessionFileLayout, sessionId: string, registry: string, stage: Stage, destination?: string) {

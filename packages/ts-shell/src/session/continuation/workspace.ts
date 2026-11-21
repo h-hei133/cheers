@@ -23,7 +23,7 @@ export interface WorkspaceChangeResult {
 export function sessionWorkspaceAdmission(manager: Pick<SessionManager, 'getSessionDirPath'>, session: Session): string | undefined {
   try {
     const layout = projectSessionFileLayout({ sessionsDir: dirname(manager.getSessionDirPath(session.id)), sessionId: session.id });
-    const { metadata, state, assertCurrent } = readSessionSnapshot(layout, { includeTranscript: true });
+    const { metadata, state, assertCurrent } = readSessionSnapshot(layout, { includeTranscript: true, forWorkspaceAdmission: true });
     if (!metadata || metadata.id !== session.id || metadata.createdAt !== session.createdAt
       || normalizePathIdentity(metadata.projectRoot || state.projectRoot || session.projectRoot) !== normalizePathIdentity(session.projectRoot)
       || (state.projectRoot !== undefined && normalizePathIdentity(state.projectRoot) !== normalizePathIdentity(session.projectRoot))

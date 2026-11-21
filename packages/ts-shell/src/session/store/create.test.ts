@@ -38,8 +38,10 @@ function startCreator(project: string, reservation: string) {
     const target = ${JSON.stringify(reservation)};
     const release = ${JSON.stringify(release)};
     const open = fs.openSync;
+    let announced = false;
     fs.openSync = (name, flags, mode) => {
-      if (name === target) {
+      if (name === target && !announced) {
+        announced = true;
         fs.writeSync(1, 'ready\\n');
         const cell = new Int32Array(new SharedArrayBuffer(4));
         const deadline = Date.now() + 15000;

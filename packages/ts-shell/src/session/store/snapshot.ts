@@ -1,4 +1,5 @@
 import type { SessionMetadata } from '../schema/sessionMetadataCodec.js';
+import { assertWorkspaceSnapshotReadable } from './prompt/activation.js';
 import { assertNoPromptIntent } from './prompt/intent.js';
 import type { SessionFileLayout } from './sessionFileLayout.js';
 import { readJsonFileWithRetry, readJsonFileWithRetryAsync } from './sessionFileStore.js';
@@ -35,8 +36,8 @@ function readSessionMetadataRecordAsync(metadataPath: string, maxBytes?: number,
   });
 }
 
-export function readSessionSnapshot(layout: SessionFileLayout, options?: SnapshotOptions) {
-  const capture = captureSnapshot(layout, options);
+export function readSessionSnapshot(layout: SessionFileLayout, options?: SnapshotOptions & { readonly forWorkspaceAdmission?: boolean }) {
+  const capture = captureSnapshot(layout, options, options?.forWorkspaceAdmission ? assertWorkspaceSnapshotReadable : assertNoPromptIntent);
   const metadata = readSessionMetadataRecord(layout.metadataPath, options?.limits?.metadataBytes, options?.signal);
   const state = readStateSnapshotRequired(layout.statePath, options?.limits?.stateBytes, options?.signal);
   capture.assertCurrent();
@@ -51,14 +52,14 @@ export async function readSessionSnapshotAsync(layout: SessionFileLayout, option
   return { metadata, state, ...capture };
 }
 
-function captureSnapshot(layout: SessionFileLayout, options?: SnapshotOptions) {
+function captureSnapshot(layout: SessionFileLayout, options?: SnapshotOptions, assertReadable: (layout: SessionFileLayout) => void = assertNoPromptIntent) {
   const readVersion = () => readSessionFileVersion(layout, { ignoreTranscript: !options?.includeTranscript });
   options?.signal?.throwIfAborted();
-  assertNoPromptIntent(layout);
+  assertReadable(layout);
   const version = readVersion();
   return { version, assertCurrent: () => {
     options?.signal?.throwIfAborted();
     if (readVersion() !== version) throw new SessionSnapshotConflict();
-    assertNoPromptIntent(layout);
+    assertReadable(layout);
   } };
 }

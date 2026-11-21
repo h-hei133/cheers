@@ -822,9 +822,10 @@ describe("CLI streaming baseline (T3)", () => {
     expect(output).toContain(
       "Current session selection store could not be read",
     );
-    expect(output).toContain("Starting a fresh session.");
+    expect(output).toContain("Starting a fresh session without updating the saved selection.");
     expect(output).toContain("Current session");
     expect(output).toContain(`- Project binding: ${projectRoot.replace(/\\/g, "/")}`);
+    expect(fs.readFileSync(currentStorePath, "utf8")).toBe("{broken");
   }, 15000);
 
   it("shows MCP status reasons and do-next for unavailable capabilities", async () => {

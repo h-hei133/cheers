@@ -2,7 +2,9 @@ import fs from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../../../../session/SessionManager.js';
 import { getRuntimeConfig } from '../../../../config/runtimeConfig.js';
+import { ConfigState } from '../../../../config/state.js';
 import { registerCatalogContribution } from '../../../../core/catalog/contributions.js';
+import { configurationBinding } from '../../../../core/shell/configuration.js';
 import { modelPicker } from '../model.js';
 import { readSessionModel } from '../../../../session/model/state.js';
 import { createCatalogLoader } from '../../completion/catalog.js';
@@ -45,8 +47,8 @@ it('offers virtual picker rows without dormant auth and rejects an action captur
 
 it('completes registered identities and refreshes model completion after contribution retirement', async () => {
   const { route, close } = register();
-  const context = { cwd: root, projectRoot: root, session: { id: sessionId }, runtimeConfig: getRuntimeConfig(root),
-    configuration: { current: { revision: 1, catalog: [] } }, skillOptions: {} } as unknown as ShellRuntimeContext;
+  const seed = { cwd: root, projectRoot: root, session: { id: sessionId }, runtimeConfig: getRuntimeConfig(root), skillOptions: {} };
+  const context = { ...seed, configuration: new ConfigState(seed.runtimeConfig, configurationBinding(seed)) } as unknown as ShellRuntimeContext;
   const loader = createCatalogLoader(() => context, {} as CliMcpGateway, []);
   const controller = new AbortController();
   expect((await loader('model', controller.signal)).map(row => row.value)).toContain('adaptive/auto');

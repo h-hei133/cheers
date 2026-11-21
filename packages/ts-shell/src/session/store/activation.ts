@@ -28,6 +28,7 @@ export interface SessionActivationIdentity {
 
 export interface PreparedActivationMetadata {
   readonly receipt: string;
+  readonly checkWorkspaceAdmission?: (check: () => void) => void;
   readonly assertCurrent: () => void;
   readonly finish: () => void;
 }

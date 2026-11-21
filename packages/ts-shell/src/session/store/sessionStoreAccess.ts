@@ -51,7 +51,9 @@ import {
   formatUnreadableSessionDirectoryWarning,
 } from "../presentation/sessionWarningSurface.js";
 import { ArtifactManager } from "../../core/session/artifactManager.js";
+import { decodeWorkspaceRoots } from '../../core/workspace/model.js';
 import { recoverSessionPrompt } from './prompt/commit.js';
+import { readSessionSnapshot } from './snapshot.js';
 
 export interface SessionListOptions {
   /** Resolve an ID prefix before startup admission, including recoverable sessions. */
@@ -122,17 +124,19 @@ export class SessionStoreAccess extends SessionStorePaths {
   }
 
   deleteSession(sessionId: string): void {
+    const layout = locateExistingSessionLayout(this.storeLayout, sessionId);
     let artifactRoots: string[] = [];
     try {
-      const session = this.load(sessionId);
-      artifactRoots = [session.projectRoot, ...(session.workspaceRoots ?? []).map((root) => root.path)];
+      recoverSessionPrompt(layout, sessionId, this.storeLayout.currentSessionStorePath);
+      const { metadata, state } = readSessionSnapshot(layout);
+      if (metadata?.id === sessionId) {
+        artifactRoots = [metadata.projectRoot?.trim() || state.projectRoot?.trim() || process.cwd(),
+          ...decodeWorkspaceRoots(state.workspaceRoots).map(root => root.path)];
+      }
     } catch {
       // Preserve deletion behavior for unreadable or partially-written sessions.
     }
-    deleteSessionRecord({
-      sessionId,
-      layout: locateExistingSessionLayout(this.storeLayout, sessionId),
-    });
+    deleteSessionRecord({ sessionId, layout });
     try {
       ArtifactManager.cleanupSessionArtifacts(sessionId, artifactRoots, { profile: this.storeLayout.profile });
     } catch {

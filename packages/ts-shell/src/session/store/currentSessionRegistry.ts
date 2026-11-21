@@ -310,7 +310,9 @@ export function setCurrentSessionSelection(input: {
       writeTextFileAtomic(input.storePath, JSON.stringify(committed, null, 2), undefined, {
         createParent: false,
         beforeRename: () => {
-          assertActivationGuard(guard, read, normalizedProjectRoot);
+          const check = () => assertActivationGuard(guard, read, normalizedProjectRoot);
+          if (prepared.checkWorkspaceAdmission) prepared.checkWorkspaceAdmission(check);
+          else check();
           if (pathIdentity(parent) !== identity) throw new Error('Current session registry directory changed.');
           const primary = readSessionRegistryStoreAt(input.storePath);
           if (primary.readError || primary.store.resumeStoreId !== registryId) throw new PromptPublicationError('unknown', 'record');

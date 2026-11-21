@@ -87,6 +87,7 @@ This file is the curated, compact index of reusable engineering pitfalls, enviro
 - **Rule**: Use non-recursive exclusive `mkdir` + `wx` creation and lock-guarded CAS (`activationId` + `expectedVersion`) on session activation; retain `unknown` outcomes on write/fsync/readback uncertainty instead of faking rollback.
 - **Read boundary**: Carry the observed activation into implicit startup admission. Preserve the selection after a snapshot version conflict so startup can retry. Compare export file versions before attaching accounting since a completed transaction may already have removed its marker.
 - **Recovery receipt**: Write the activation and transaction receipt in the same registry replacement. Recover against that receipt even after a later selection supersedes the pointer. Verify the saved session version before applying the metadata update.
+- **Same-session admission**: The final workspace read may see its own v4 metadata intent. Verify the exact marker, directory, and pre-commit metadata in the synchronous admission callback. Other reads and v5 state changes require the normal transaction checks.
 
 ### Async Admission Must Recheck Generation, Grants, And Cancellation After Every `await`
 - **Symptom**: A dismissed picker saves stale state, a revoked grant reads attachment content, or a late reload resurrects a closed host/extension.

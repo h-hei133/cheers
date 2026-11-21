@@ -1,15 +1,35 @@
 import fs from "node:fs";
+import { createHash } from "node:crypto";
+import { syncBuiltinESMExports } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createLongSessionContinuityFixture } from "../test-utils/longSessionContinuityFixtures.js";
 import { SessionManager } from "./SessionManager.js";
 import { SessionStoreAccess } from "./store/sessionStoreAccess.js";
+import { createSessionStoreLayout } from "./store/sessionFileLayout.js";
+import { readSessionRegistryStore } from "./store/currentSessionRegistry.js";
+import { promptIntentPath } from "./store/prompt/intent.js";
 import * as sessionRecords from "./store/sessionStore.js";
 import { ArtifactManager } from "../core/session/artifactManager.js";
 import { createProfileContext, withProfile } from "../core/paths/profile/context.js";
 import { forgetSessionTodos, getSessionTodos, setSessionTodos } from "../core/commands/todoCommandRuntime.js";
 import { toChatMessages } from "../turn/prompt.js";
+
+function failSessionRename(matches: (destination: fs.PathLike) => boolean, error: Error, afterRename = false): () => void {
+  const rename = fs.renameSync;
+  const fault = vi.spyOn(fs, "renameSync").mockImplementation((source, destination) => {
+    const fail = matches(destination);
+    if (fail && !afterRename) throw error;
+    rename(source, destination);
+    if (fail) throw error;
+  });
+  syncBuiltinESMExports();
+  return () => {
+    fault.mockRestore();
+    syncBuiltinESMExports();
+  };
+}
 
 describe("SessionManager", () => {
   const originalUserProfile = process.env.USERPROFILE;
@@ -540,104 +560,124 @@ describe("SessionManager", () => {
     expect(afterState.workingMemory?.summary?.[0]?.includes(newRoot)).toBe(true);
   });
 
-  it.each(["lock", "state"] as const)("preserves stored records when root migration fails at %s", stage => {
+  it.each(["lock", "intent"] as const)("preserves stored records when root migration fails at %s", stage => {
     const manager = new SessionManager();
     const oldRoot = path.join(fakeHome, "old-project");
     const newRoot = path.join(fakeHome, "new-project");
     const session = manager.createNew(oldRoot);
-    const sessionDir = manager.getSessionDirPath(session.id);
-    const paths = ["metadata.json", "state.json", "transcript.jsonl"].map(name => path.join(sessionDir, name));
+    const layout = new SessionStoreAccess().stateLayout(session.id);
+    const marker = promptIntentPath(layout);
+    const paths = [layout.metadataPath, layout.statePath, layout.transcriptPath];
     const originalBytes = paths.map(file => fs.readFileSync(file));
-    const failure = vi.spyOn(SessionStoreAccess.prototype, stage === "lock" ? "withSessionStateLock" : "writeJsonFileAtomic")
-      .mockImplementationOnce(() => { throw new Error("migration unavailable"); });
+    const originalSelection = manager.readCurrentSessionSelection(oldRoot);
+    const failure = new Error("migration unavailable");
+    const lock = vi.spyOn(SessionStoreAccess.prototype, "withSessionStateLock");
+    if (stage === "lock") lock.mockImplementationOnce(() => { throw failure; });
+    const restoreRename = stage === "intent" ? failSessionRename(destination => destination === marker, failure) : undefined;
     try {
-      let error: unknown;
-      try { manager.rebindSessionProjectRoot(session.id, newRoot); } catch (caught) { error = caught; }
-      expect(error).toMatchObject({ outcome: "unchanged", stage: stage === "lock" ? "prepare" : "state" });
-      expect(paths.map(file => fs.readFileSync(file))).toEqual(originalBytes);
-      expect(manager.getSession(session.id).projectRoot).toBe(oldRoot);
-      expect(manager.getCurrentSessionForProject(newRoot)).toBeNull();
+      expect(() => manager.rebindSessionProjectRoot(session.id, newRoot)).toThrow(expect.objectContaining({
+        cause: failure, outcome: "unchanged", stage: stage === "lock" ? "prepare" : "selection",
+      }));
     } finally {
-      failure.mockRestore();
+      restoreRename?.();
+      lock.mockRestore();
     }
+    expect(paths.map(file => fs.readFileSync(file))).toEqual(originalBytes);
+    expect(fs.existsSync(marker)).toBe(false);
+    expect(manager.getSession(session.id)?.projectRoot).toBe(oldRoot);
+    expect(manager.readCurrentSessionSelection(oldRoot)).toEqual(originalSelection);
+    expect(manager.readCurrentSessionSelection(newRoot)).toBeUndefined();
   });
 
-  it("reports committed session records when the new project selection cannot be saved", () => {
+  it("recovers the previous records when the registry cannot publish the rebind receipt", () => {
     const manager = new SessionManager();
     const oldRoot = path.join(fakeHome, "old-project");
     const newRoot = path.join(fakeHome, "new-project");
     const session = manager.createNew(oldRoot);
-    const select = vi.spyOn(manager, "setCurrentSessionForProject")
-      .mockImplementationOnce(() => { throw new Error("selection unavailable"); });
+    manager.createNew(newRoot);
+    const store = new SessionStoreAccess();
+    const layout = store.stateLayout(session.id);
+    const marker = promptIntentPath(layout);
+    const registryPath = createSessionStoreLayout().currentSessionStorePath;
+    const paths = [layout.metadataPath, layout.statePath, layout.transcriptPath];
+    const originalBytes = paths.map(file => fs.readFileSync(file));
+    const oldSelection = store.readCurrentSessionSelection(oldRoot);
+    const newSelection = store.readCurrentSessionSelection(newRoot);
+    const failure = new Error("selection unavailable");
+    const restoreRename = failSessionRename(destination => destination === registryPath && fs.existsSync(marker), failure);
     try {
-      let error: unknown;
-      try { manager.rebindSessionProjectRoot(session.id, newRoot); } catch (caught) { error = caught; }
-      expect(error).toMatchObject({ outcome: "committed", stage: "selection" });
-      expect(manager.getSession(session.id).projectRoot).toBe(newRoot);
-      const state = JSON.parse(fs.readFileSync(path.join(manager.getSessionDirPath(session.id), "state.json"), "utf8"));
-      expect(state.projectRoot).toBe(newRoot);
-      expect(manager.getCurrentSessionForProject(newRoot)).toBeNull();
+      expect(() => manager.rebindSessionProjectRoot(session.id, newRoot)).toThrow(expect.objectContaining({
+        cause: failure, outcome: "partial", stage: "selection",
+      }));
     } finally {
-      select.mockRestore();
+      restoreRename();
     }
+    expect(JSON.parse(fs.readFileSync(marker, "utf8"))).toMatchObject({ version: 5, sessionId: session.id });
+    expect(readSessionRegistryStore(registryPath).store.resumeReceipts?.[session.id]).toBeUndefined();
+    expect(paths.map(file => fs.readFileSync(file))).toEqual(originalBytes);
+    expect(store.readSnapshot(session.id)).toMatchObject({ session: { projectRoot: oldRoot }, state: { projectRoot: oldRoot } });
+    expect(fs.existsSync(marker)).toBe(false);
+    expect(paths.map(file => fs.readFileSync(file))).toEqual(originalBytes);
+    expect(store.readCurrentSessionSelection(oldRoot)).toEqual(oldSelection);
+    expect(store.readCurrentSessionSelection(newRoot)).toEqual(newSelection);
   });
 
   it.each([
-    ["before", false], ["after", false], ["restore-failed", false],
-    ["before", true], ["after", true], ["restore-failed", true],
+    ["state", false], ["before-metadata", false], ["after-metadata", false],
+    ["state", true], ["before-metadata", true], ["after-metadata", true],
   ] as const)(
-    "observes real stored records when the metadata write fails: %s, legacy root: %s", (stage, legacyRoot) => {
+    "recovers the committed rebind after a record write fails at %s (legacy root: %s)", (stage, legacyRoot) => {
       const manager = new SessionManager();
       const oldRoot = path.join(fakeHome, "old-project");
       const newRoot = path.join(fakeHome, "new-project");
       const session = manager.createNew(oldRoot);
       manager.persistUserPromptBarrier(session.id, "keep this pending prompt");
       manager.saveInterrupted(session.id);
-      const sessionDir = manager.getSessionDirPath(session.id);
-      const files = ["metadata.json", "state.json", "transcript.jsonl"].map(name => path.join(sessionDir, name));
+      const store = new SessionStoreAccess();
+      const layout = store.stateLayout(session.id);
+      const { metadataPath, statePath, transcriptPath } = layout;
+      const marker = promptIntentPath(layout);
+      const registryPath = createSessionStoreLayout().currentSessionStorePath;
       if (legacyRoot) {
-        const metadata = JSON.parse(fs.readFileSync(files[0], "utf8"));
+        const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
         delete metadata.projectRoot;
-        fs.writeFileSync(files[0], JSON.stringify(metadata));
+        fs.writeFileSync(metadataPath, JSON.stringify(metadata));
       }
-      const originalBytes = files.map(file => fs.readFileSync(file));
+      const transcript = fs.readFileSync(transcriptPath);
       // A rootless legacy record and a same-millisecond timestamp must not make
       // a state-derived Session projection look like a committed metadata write.
       const clock = vi.spyOn(Date.prototype, "toISOString")
-        .mockReturnValue(JSON.parse(originalBytes[0].toString()).updatedAt);
-      const writeMetadata = SessionStoreAccess.prototype.writeSessionMetadata;
-      const writeState = SessionStoreAccess.prototype.writeJsonFileAtomic;
-      const metadata = vi.spyOn(SessionStoreAccess.prototype, "writeSessionMetadata")
-        .mockImplementationOnce(function (next) {
-          if (stage === "after") writeMetadata.call(this, next);
-          throw new Error("metadata write failed");
-        });
-      const state = vi.spyOn(SessionStoreAccess.prototype, "writeJsonFileAtomic");
-      if (stage === "restore-failed") {
-        state.mockImplementationOnce(writeState).mockImplementationOnce(() => { throw new Error("restore failed"); });
-      }
+        .mockReturnValue(JSON.parse(fs.readFileSync(metadataPath, "utf8")).updatedAt);
+      const failedPath = stage === "state" ? statePath : metadataPath;
+      const failure = new Error("record write failed");
+      const restoreRename = failSessionRename(destination => destination === failedPath, failure, stage === "after-metadata");
       try {
-        let error: unknown;
-        try { manager.rebindSessionProjectRoot(session.id, newRoot); } catch (caught) { error = caught; }
-        expect(error).toMatchObject({
-          outcome: stage === "before" ? "restored" : stage === "after" ? "committed" : "partial",
-          stage: "metadata",
-        });
-        const storedMetadata = JSON.parse(fs.readFileSync(files[0], "utf8"));
-        const storedState = JSON.parse(fs.readFileSync(files[1], "utf8"));
-        expect(storedMetadata.projectRoot).toBe(stage === "after" ? newRoot : legacyRoot ? undefined : oldRoot);
-        expect(storedState).toMatchObject({
-          projectRoot: stage === "before" ? oldRoot : newRoot,
-          status: "interrupted", pendingPrompt: "keep this pending prompt",
-        });
-        expect(fs.readFileSync(files[2])).toEqual(originalBytes[2]);
-        if (stage === "before") expect(files.map(file => fs.readFileSync(file))).toEqual(originalBytes);
-        expect(manager.getCurrentSessionForProject(newRoot)).toBeNull();
+        expect(() => manager.rebindSessionProjectRoot(session.id, newRoot)).toThrow(expect.objectContaining({
+          cause: failure, outcome: "partial", stage: "selection",
+        }));
       } finally {
-        metadata.mockRestore();
-        state.mockRestore();
+        restoreRename();
         clock.mockRestore();
       }
+      const pendingState = { status: "interrupted", pendingPrompt: "keep this pending prompt" };
+      const storedMetadata = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
+      expect(storedMetadata.projectRoot).toBe(stage === "after-metadata" ? newRoot : legacyRoot ? undefined : oldRoot);
+      expect(JSON.parse(fs.readFileSync(statePath, "utf8"))).toMatchObject({
+        ...pendingState, projectRoot: stage === "state" ? oldRoot : newRoot,
+      });
+      const selection = store.readCurrentSessionSelection(newRoot);
+      expect(selection).toMatchObject({ sessionId: session.id, activationId: expect.any(String) });
+      const receipt = createHash("sha256").update(fs.readFileSync(marker)).digest("hex");
+      expect(readSessionRegistryStore(registryPath).store.resumeReceipts?.[session.id]).toBe(receipt);
+      expect(store.readSnapshot(session.id)).toMatchObject({
+        session: { id: session.id, projectRoot: newRoot }, state: { ...pendingState, projectRoot: newRoot },
+      });
+      expect(JSON.parse(fs.readFileSync(metadataPath, "utf8")).projectRoot).toBe(newRoot);
+      expect(fs.readFileSync(transcriptPath)).toEqual(transcript);
+      expect(fs.existsSync(marker)).toBe(false);
+      expect(readSessionRegistryStore(registryPath).store.resumeReceipts?.[session.id]).toBeUndefined();
+      expect(new SessionStoreAccess().readSnapshot(session.id).session.projectRoot).toBe(newRoot);
+      expect(store.readCurrentSessionSelection(newRoot)).toEqual(selection);
     },
   );
 

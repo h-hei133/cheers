@@ -9,6 +9,12 @@ import { writeTextFileAtomic } from '../sessionFileStore.js';
 import { assertNoPromptIntent, encodePromptIntent, identifyPromptFile, PromptPublicationError,
   promptFileText, promptIntentPath, type ActivationIntent, type PromptFileChange } from './intent.js';
 
+let checkPreparedWorkspace: ((layout: SessionFileLayout) => boolean) | undefined;
+
+export function assertWorkspaceSnapshotReadable(layout: SessionFileLayout): void {
+  if (!checkPreparedWorkspace?.(layout)) assertNoPromptIntent(layout);
+}
+
 export function prepareActivationMetadata(layout: SessionFileLayout, identity: SessionActivationIdentity,
   metadata: SessionMetadata, state?: SessionStateSnapshot): PreparedActivationMetadata {
   const directory = pathIdentity(layout.sessionDir);
@@ -27,12 +33,23 @@ export function prepareActivationMetadata(layout: SessionFileLayout, identity: S
   } });
   syncStoreDirectory(layout.sessionDir, directory);
   const markerIdentity = pathIdentity(marker);
+  const assertCurrent = () => {
+    assertActivationIntent(layout, intent, encoded, markerIdentity);
+    activationFiles(layout, intent, false);
+  };
   return {
     receipt: hashContent(encoded),
-    assertCurrent: () => {
-      assertActivationIntent(layout, intent, encoded, markerIdentity);
-      activationFiles(layout, intent, false);
-    },
+    assertCurrent,
+    // Only a metadata-only resume may read its own pre-commit workspace.
+    ...(intent.version === 4 ? { checkWorkspaceAdmission: (check: () => void) => {
+      const previous = checkPreparedWorkspace;
+      checkPreparedWorkspace = target => {
+        if (promptIntentPath(target) !== marker) return false;
+        assertCurrent();
+        return true;
+      };
+      try { check(); } finally { checkPreparedWorkspace = previous; }
+    } } : {}),
     finish: () => finishActivationMetadata(layout, intent, true),
   };
 }
