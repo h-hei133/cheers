@@ -47,7 +47,7 @@ import type { RuntimeProvider } from "../config/runtimeConfig.js";
 import { createSyntheticStep } from "../turn/synthetic.js";
 import { syntheticToolIntent } from "../turn/intents.js";
 import { commandEnvironment } from "../runtime/execution/commandEnvironment.js";
-import { createSessionStoreLayout, locateExistingSessionLayout } from "../session/store/sessionFileLayout.js";
+import { SessionStorePaths } from "../session/store/paths.js";
 import { captureThinkingPreference } from '../core/models/preference.js';
 import type { ThinkingPreference } from '../core/models/effort.js';
 import { toolSchemas } from "../turn/tools.js";
@@ -471,9 +471,7 @@ function commandEnvironmentFor(request: CliRuntimeInvocationRequest): Record<str
 
   if (sessionId) {
     try {
-      const layout = createSessionStoreLayout();
-      const file = locateExistingSessionLayout(layout, sessionId);
-      if (file.transcriptPath) facts.sessionFile = file.transcriptPath;
+      facts.sessionFile = new SessionStorePaths().transcriptPath(sessionId);
     } catch {
       // A session file that cannot be located is not a reason to withhold the
       // rest of the facts.
@@ -512,7 +510,7 @@ function sessionPathOption(sessionId: string): { readonly sessionPath: string } 
   // not the session has been written, and reporting one that is not there would tell
   // a consumer to look somewhere with nothing in it.
   try {
-    const candidate = locateExistingSessionLayout(createSessionStoreLayout(), sessionId).sessionDir;
+    const candidate = new SessionStorePaths().sessionDir(sessionId);
     return fs.existsSync(candidate) ? { sessionPath: candidate } : {};
   } catch {
     return {};

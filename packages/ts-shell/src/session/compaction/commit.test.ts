@@ -44,6 +44,32 @@ beforeEach(() => {
 afterEach(() => { lockProbe.beforeRegistryLock = undefined; vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { force: true, recursive: true }); });
 const compactions = () => manager.getTranscriptEvents(sessionId).filter(event => event.type === 'compaction');
 
+it.each([false, true])('checks the exact bytes of a legacy transcript tail during compaction (changed: %s)', changed => {
+  const transcript = new SessionStoreAccess().transcriptPath(sessionId);
+  const { size, ino, dev } = fs.statSync(transcript);
+  fs.appendFileSync(transcript, Buffer.from([0x80]));
+  const source = manager.captureCompactionSource(sessionId);
+  const fsync = fs.fsyncSync;
+  let replaced = false;
+  vi.spyOn(fs, 'fsyncSync').mockImplementation(fd => {
+    const target = fs.fstatSync(fd);
+    if (changed && !replaced && target.ino === ino && target.dev === dev) {
+      replaced = true;
+      const handle = fs.openSync(transcript, 'r+');
+      try { fs.writeSync(handle, Buffer.from([0x81]), 0, 1, size); }
+      finally { fs.closeSync(handle); }
+    }
+    fsync(fd);
+  });
+
+  const result = manager.appendCompactionIfCurrent({ source, summary: 'Compacted history', keptMessages: 0, tokensBefore: 2000 });
+
+  expect(replaced).toBe(changed);
+  expect(result.status).toBe(changed ? 'unverified' : 'committed');
+  expect(manager.getTranscriptEvents(sessionId).some(event => event.type === 'compaction-commit')).toBe(!changed);
+  expect(fs.readFileSync(transcript).subarray(size, size + 2)).toEqual(Buffer.from([changed ? 0x81 : 0x80, 0x0a]));
+});
+
 function registerCompactionHandlers(handlers: Record<string, readonly ((payload: unknown) => unknown)[]>): () => void {
   const registered = new Map(Object.entries(handlers));
   return registerCatalogContribution({ root: home, sessionId, commands: [], tools: [], skills: () => [],

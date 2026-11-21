@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import { freezeDeep } from '../../core/values/freeze.js';
+import { fileIdentity } from '../../core/workspace/files.js';
 import type { SessionStoreAccess } from '../store/sessionStoreAccess.js';
+import { captureTranscriptAppend, reconcileTranscriptAppend } from '../transcript/append.js';
 import { appendTranscriptEvent } from '../transcript/sessionTranscript.js';
 import { createTranscriptEntryId, encodeTranscriptEvent, type TranscriptEvent } from '../sessionEventCodec.js';
 import { selectModelContext } from '../context/selection.js';
@@ -9,16 +11,15 @@ import type { CompactionCommit, CompactionCommitInput, CompactionSource } from '
 import { compactionPublicationDigest } from './publication.js';
 import { buildLinearSessionThreadSnapshot, catchUpSessionThread, sessionThreadPath } from '../schema/sessionThread.js';
 
-function fileIdentity(file: string): string {
+function transcriptIdentity(file: string): string {
   const stat = fs.lstatSync(file);
   if (!stat.isFile()) throw new Error('Compaction source storage is unavailable.');
-  return `${stat.dev}:${stat.ino}:${stat.birthtimeMs}`;
+  return fileIdentity(stat);
 }
 
 function capture(store: SessionStoreAccess, sessionId: string): CompactionSource {
   const layout = store.stateLayout(sessionId);
-  const session = store.load(sessionId);
-  const state = store.readStateSnapshotRequired(layout.statePath);
+  const { session, state } = store.readSnapshot(sessionId);
   const storage = directoryIdentity(layout.sessionDir);
   const history = selectModelContext(session);
   const branch = sessionThreadPath(catchUpSessionThread(state.thread ?? buildLinearSessionThreadSnapshot(session), session));
@@ -56,7 +57,7 @@ function capture(store: SessionStoreAccess, sessionId: string): CompactionSource
   // publication fence; replay still uses the logical identity above so an
   // unknown summary request cannot be sent again after resume.
   const identity = digest([session.id, session.createdAt, storage, [activation?.sessionId, activation?.activationId],
-    fileIdentity(layout.transcriptPath), logicalState, history, sourceActivePath]);
+    transcriptIdentity(layout.transcriptPath), logicalState, history, sourceActivePath]);
   return freezeDeep({ sessionId, identity, replayIdentity, directory: layout.sessionDir, directoryIdentity: storage,
     history: structuredClone(history), sourceActivePath,
     ...(state.pendingPromptEntryId ? { promptEntryId: state.pendingPromptEntryId } : {}) });
@@ -76,8 +77,7 @@ export function commitSessionCompaction(store: SessionStoreAccess, input: Compac
       const current = capture(store, input.source.sessionId);
       if (current.identity !== input.source.identity) return { status: 'refused', reason: 'The session source changed while its summary was generated.' };
       const transcript = store.transcriptPath(input.source.sessionId);
-      const before = fs.readFileSync(transcript, 'utf8');
-      const identity = fileIdentity(transcript);
+      const before = captureTranscriptAppend(transcript);
       const event: TranscriptEvent = { type: 'compaction', id: createTranscriptEntryId('comp'),
         publication: 'prepared',
         sourceActivePath: current.sourceActivePath,
@@ -92,22 +92,18 @@ export function commitSessionCompaction(store: SessionStoreAccess, input: Compac
         return { status: 'refused', reason: 'The session source changed while its summary was generated.' };
       }
       if (input.signal?.aborted) return { status: 'refused', reason: 'Compaction was cancelled.' };
+      const append = { requireExisting: true, expectedIdentity: before.identity, durable: true };
+      const prepared = `${encodeTranscriptEvent(event)}\n`;
       attempted = true;
-      appendTranscriptEvent(transcript, event, undefined, { requireExisting: true });
-      const fd = fs.openSync(transcript, 'r');
-      try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
-      const separator = before.length && !before.endsWith('\n') ? '\n' : '';
-      if (fileIdentity(transcript) !== identity || fs.readFileSync(transcript, 'utf8') !== `${before}${separator}${encodeTranscriptEvent(event)}\n`
+      appendTranscriptEvent(transcript, event, undefined, append);
+      if (!reconcileTranscriptAppend(transcript, before, prepared, false)
         || directoryIdentity(input.source.directory!) !== input.source.directoryIdentity) {
         return { status: 'unverified', reason: 'Compaction append could not be verified.' };
       }
       const publication: TranscriptEvent = { type: 'compaction-commit', id: createTranscriptEntryId('compcommit'),
         compactionId: event.id!, digest: compactionPublicationDigest(event), timestamp: new Date().toISOString() };
-      appendTranscriptEvent(transcript, publication, undefined, { requireExisting: true });
-      const proofFd = fs.openSync(transcript, 'r');
-      try { fs.fsyncSync(proofFd); } finally { fs.closeSync(proofFd); }
-      if (fileIdentity(transcript) !== identity || fs.readFileSync(transcript, 'utf8') !==
-        `${before}${separator}${encodeTranscriptEvent(event)}\n${encodeTranscriptEvent(publication)}\n`
+      appendTranscriptEvent(transcript, publication, undefined, append);
+      if (!reconcileTranscriptAppend(transcript, before, `${prepared}${encodeTranscriptEvent(publication)}\n`, false)
         || directoryIdentity(input.source.directory!) !== input.source.directoryIdentity) {
         return { status: 'unverified', reason: 'Compaction publication could not be verified.' };
       }

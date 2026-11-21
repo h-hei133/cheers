@@ -1,6 +1,9 @@
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../SessionManager.js';
 import { SessionStoreAccess } from '../store/sessionStoreAccess.js';
@@ -14,7 +17,7 @@ beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-fork-'));
   vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
+afterEach(() => { vi.restoreAllMocks(); syncBuiltinESMExports(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 
 it('preserves model selection in a fork under a fresh session revision', () => {
   const manager = new SessionManager(); const source = manager.createNew(root);
@@ -50,17 +53,82 @@ it('forks a historic user entry with all branches retained and no inherited pend
   expect(manager.getCurrentSessionForProject(root)?.id).toBe(source.id);
 });
 
-it('rejects a non-user entry before creation and leaves a failed copy inactive with an explicit identity', () => {
+it('rejects a non-user entry before creation and keeps a failed copy outside the readable store', () => {
   const manager = new SessionManager(); const source = manager.createNew(root);
   manager.addTurn(source.id, { role: 'assistant', content: 'answer' });
   const count = manager.listSessions().length;
   expect(() => manager.fork(source.id, root, { entryId: manager.getSession(source.id)!.turns[0]!.id! })).toThrow('saved user-message');
   expect(manager.listSessions()).toHaveLength(count);
-  const write = vi.spyOn(SessionStoreAccess.prototype, 'writeSessionState').mockImplementationOnce(() => { throw new Error('state write failed'); });
+  const rename = fs.renameSync;
+  vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+    if (path.basename(String(to)) === 'state.json') throw new Error('state write failed');
+    rename(from, to);
+  });
+  syncBuiltinESMExports();
   expect(() => manager.fork(source.id, root, { sessionId: 'sess_partial_fork' })).toThrow(SessionForkError);
-  write.mockRestore();
-  expect(manager.sessionExists('sess_partial_fork')).toBe(true);
+  expect(manager.sessionExists('sess_partial_fork')).toBe(false);
+  expect(manager.listSessions()).toHaveLength(count);
   expect(manager.getCurrentSessionForProject(root)?.id).toBe(source.id);
+});
+
+it.skipIf(process.platform !== 'linux').each(['before', 'after'] as const)('exposes only whole records when a fork process dies %s publication', stage => {
+  const manager = new SessionManager(), store = new SessionStoreAccess();
+  const source = manager.createNew(root);
+  manager.addTurn(source.id, { role: 'user', content: 'copied question' });
+  const targetId = 'sess_interrupted_fork';
+  const target = path.join(store.sessionsDir, targetId);
+  const [major, minor] = process.versions.node.split('.').map(Number);
+  const loader = major === 20 && minor! < 6 ? '--loader' : '--import';
+  const tsx = pathToFileURL(createRequire(import.meta.url).resolve('tsx')).href;
+  const child = spawnSync(process.execPath, ['--conditions=cheers-source', loader, tsx, '--input-type=module', '--eval', `
+    import fs from 'node:fs';
+    import { syncBuiltinESMExports } from 'node:module';
+    import { SessionManager } from ${JSON.stringify(new URL('../SessionManager.ts', import.meta.url).href)};
+    const rename = fs.renameSync;
+    fs.renameSync = (from, to) => {
+      if (to === ${JSON.stringify(target)} && ${stage === 'before'}) process.kill(process.pid, 'SIGKILL');
+      rename(from, to);
+      if (to === ${JSON.stringify(target)}) process.kill(process.pid, 'SIGKILL');
+    };
+    syncBuiltinESMExports();
+    new SessionManager().fork(${JSON.stringify(source.id)}, process.cwd(), { sessionId: ${JSON.stringify(targetId)} });
+  `], { cwd: root, encoding: 'utf8', timeout: 10_000, maxBuffer: 65_536 });
+  expect(child.error).toBeUndefined();
+  expect(child.signal, child.stderr).toBe('SIGKILL');
+  expect(manager.sessionExists(targetId)).toBe(stage === 'after');
+  expect(manager.listSessions().map(session => session.id)).toEqual(
+    stage === 'before' ? [source.id] : expect.arrayContaining([source.id, targetId]));
+  if (stage === 'after') {
+    expect(store.readSnapshot(targetId)).toMatchObject({
+      session: { parentSession: source.id, turns: [{ role: 'user', content: 'copied question' }] },
+      state: { thread: { activeLeafId: expect.any(String) } },
+    });
+  }
+  expect(manager.readCurrentSessionSelection(root)?.sessionId).toBe(source.id);
+  if (stage === 'before') {
+    expect(manager.fork(source.id, root, { sessionId: targetId, activate: false }).turns)
+      .toMatchObject([{ role: 'user', content: 'copied question' }]);
+    expect(manager.readCurrentSessionSelection(root)?.sessionId).toBe(source.id);
+  }
+}, 15_000);
+
+it('preserves a competing current selection published while a complete fork was staged', () => {
+  const manager = new SessionManager(), store = new SessionStoreAccess();
+  const source = manager.createNew(root);
+  const other = manager.createNew(root, { activate: false });
+  const target = 'sess_fork_with_competing_selection';
+  const rename = fs.renameSync;
+  vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+    if (to === path.join(store.sessionsDir, target)) {
+      expect(manager.sessionExists(target)).toBe(false);
+      manager.setCurrentSessionForProject(root, other.id);
+    }
+    rename(from, to);
+  });
+  syncBuiltinESMExports();
+  expect(() => manager.fork(source.id, root, { sessionId: target })).toThrow(SessionForkError);
+  expect(manager.getSession(target)?.parentSession).toBe(source.id);
+  expect(manager.readCurrentSessionSelection(root)?.sessionId).toBe(other.id);
 });
 
 it('rejects an obsolete fork source version before creating any session', () => {

@@ -6,10 +6,10 @@ import { isSessionContextMessage } from '../schema/sessionMessage.js';
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { buildSessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { projectBranchMessages, readTranscriptSnapshot, readTranscriptSnapshotAsync } from "../transcript/sessionTranscript.js";
-import { createTranscriptHeader, type TranscriptEvent } from "../sessionEventCodec.js";
+import type { TranscriptEvent } from "../sessionEventCodec.js";
 import { sessionThreadPath } from "../schema/sessionThread.js";
-import { reserveSessionLayout, type SessionFileLayout, type SessionStoreLayout } from "./sessionFileLayout.js";
-import { readStateSnapshotRequired, writeSessionState } from "./sessionStateStore.js";
+import type { SessionFileLayout } from "./sessionFileLayout.js";
+import { readStateSnapshotRequired } from "./sessionStateStore.js";
 import { projectSessionAnnotations } from '../context/projection.js';
 import { identifyPromptFile, PromptPublicationError, promptIntentPath, readPromptIntent } from './prompt/intent.js';
 import { pathIdentity } from '../../core/workspace/files.js';
@@ -20,68 +20,12 @@ import { projectLoadedSession } from './projection.js';
 import { readSessionSnapshot, readSessionSnapshotAsync, SessionSnapshotConflict, type SessionSnapshotLimits } from './snapshot.js';
 import { activationMetadataText } from './prompt/activation.js';
 import { isResumeCommitted, readSessionRegistryStore } from './currentSessionRegistry.js';
-import { writeSessionMetadataRecord } from './metadata.js';
 
 export { readSessionMetadataRecord } from './snapshot.js';
 export { writeSessionMetadataRecord } from './metadata.js';
 
 export function sessionExistsAtLayout(layout: Pick<SessionFileLayout, "sessionDir">): boolean {
   return fs.existsSync(layout.sessionDir);
-}
-
-export class SessionCreationUnverifiedError extends Error {
-  constructor(readonly sessionId: string, cause: unknown) {
-    super(`Creation of session ${sessionId} is unverified.`, { cause });
-    this.name = 'SessionCreationUnverifiedError';
-  }
-}
-
-export function createSessionRecord(session: Session, store: SessionStoreLayout): void {
-  const layout = reserveSessionLayout(store, session.id);
-  try {
-    writeSessionFiles({ session, layout }, 'exclusive');
-  } catch (error) {
-    // Preserve the reservation and any files already published so the same ID cannot be retried over them.
-    throw new SessionCreationUnverifiedError(session.id, error);
-  }
-}
-
-interface SessionRecordWrite {
-  readonly session: Session;
-  readonly layout: SessionFileLayout;
-}
-
-export function writeSessionRecord(input: SessionRecordWrite): void {
-  if (!fs.existsSync(input.layout.sessionDir)) {
-    fs.mkdirSync(input.layout.sessionDir, { recursive: true });
-  }
-  writeSessionFiles(input, 'existing');
-}
-
-function writeSessionFiles(input: SessionRecordWrite, mode: 'exclusive' | 'existing'): void {
-  if (mode === 'exclusive' || !fs.existsSync(input.layout.transcriptPath)) {
-    // The header goes in at the moment the file comes into being, while it is
-    // still empty. That is what keeps it compatible with append-only: a header
-    // has to be the first line, and writing it to a file with nothing in it is
-    // not a rewrite of anything. Appending never touches it afterwards.
-    fs.writeFileSync(
-      input.layout.transcriptPath,
-      `${JSON.stringify(
-        createTranscriptHeader({
-          sessionId: input.session.id,
-          timestamp: input.session.createdAt,
-          cwd: input.session.projectRoot,
-        }),
-      )}\n`,
-      { encoding: 'utf8', flag: mode === 'exclusive' ? 'wx' : 'w' },
-    );
-  }
-
-  writeSessionMetadataRecord(input);
-  writeSessionState({
-    session: input.session,
-    layout: input.layout,
-  });
 }
 
 export function deleteSessionRecord(input: {

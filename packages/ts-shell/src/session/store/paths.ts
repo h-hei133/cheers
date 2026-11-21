@@ -1,5 +1,6 @@
 import {
   createSessionId,
+  createSessionStoreLayout,
   ensureSessionStoreLayout,
   locateExistingSessionLayout,
   projectSessionFileLayout,
@@ -10,7 +11,7 @@ import {
 
 /** All path queries resolve against the store identity captured at construction. */
 export class SessionStorePaths {
-  constructor(protected readonly storeLayout: SessionStoreLayout) {}
+  constructor(protected readonly storeLayout: SessionStoreLayout = createSessionStoreLayout()) {}
 
   /** Directory that holds session directories; the reentry index lives beside them. */
   get sessionsDir(): string { return this.storeLayout.sessionsDir; }

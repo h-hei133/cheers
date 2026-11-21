@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import { profileSearchDirs, userDataSearchDirsFor, userDataDirFor, userHomeDir } from "../../core/paths/userHome.js";
 import * as path from "node:path";
 import { assertProfileIdentity, currentProfile, profilePath, type ProfileContext } from '../../core/paths/profile/context.js';
+import { withFileLock } from './sessionFileStore.js';
 
 export interface SessionStoreLayout {
   readonly profile?: ProfileContext;
@@ -96,31 +97,43 @@ export function projectSessionFileLayout(input: {
   };
 }
 
-/** Claim the current layout once, after checking for an occupied legacy ID. */
-export function reserveSessionLayout(layout: SessionStoreLayout, sessionId: string): SessionFileLayout {
+export function sessionCreationDirectory(layout: SessionStoreLayout): string {
+  const directory = path.join(path.dirname(layout.sessionsDir), '.session-create');
+  assertSessionStoreProfile(layout, directory);
+  return directory;
+}
+
+/** Serialize publication of the same ID by ordinary and staged creators. */
+export function reserveSessionLayout(layout: SessionStoreLayout, sessionId: string,
+  publish?: (target: SessionFileLayout) => void): SessionFileLayout {
   const id = validateSessionId(sessionId);
   assertSessionStoreProfile(layout, layout.sessionsDir);
-  for (const sessionsDir of layout.sessionsSearchDirs) {
-    if (sessionsDir === layout.sessionsDir) continue;
-    const candidate = projectSessionFileLayout({ sessionsDir, sessionId: id });
-    assertSessionStoreProfile(layout, candidate.sessionDir);
-    let existing: fs.Stats | undefined;
-    try {
-      existing = fs.lstatSync(candidate.sessionDir, { throwIfNoEntry: false });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOTDIR') throw error;
-    }
-    if (existing) throw new Error(`Session ${id} already exists`);
-  }
   const reserved = projectSessionFileLayout({ sessionsDir: layout.sessionsDir, sessionId: id });
-  for (const target of Object.values(reserved)) assertSessionStoreProfile(layout, target);
-  try {
-    fs.mkdirSync(reserved.sessionDir);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error(`Session ${id} already exists`);
-    throw error;
-  }
-  return reserved;
+  if (id === '.' || id === '..') throw new Error(`Session ${id} already exists`);
+  const lock = path.join(sessionCreationDirectory(layout), 'locks', id);
+  assertSessionStoreProfile(layout, lock);
+  return withFileLock(lock, () => {
+    for (const sessionsDir of layout.sessionsSearchDirs) {
+      const candidate = projectSessionFileLayout({ sessionsDir, sessionId: id });
+      assertSessionStoreProfile(layout, candidate.sessionDir);
+      let existing: fs.Stats | undefined;
+      try {
+        existing = fs.lstatSync(candidate.sessionDir, { throwIfNoEntry: false });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOTDIR') throw error;
+      }
+      if (existing) throw new Error(`Session ${id} already exists`);
+    }
+    for (const target of Object.values(reserved)) assertSessionStoreProfile(layout, target);
+    try {
+      if (publish) publish(reserved);
+      else fs.mkdirSync(reserved.sessionDir);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error(`Session ${id} already exists`);
+      throw error;
+    }
+    return reserved;
+  }, { recovery: 'local-dead' });
 }
 
 /**

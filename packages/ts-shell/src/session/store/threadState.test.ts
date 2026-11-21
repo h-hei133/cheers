@@ -10,7 +10,8 @@ import {
   projectSessionFileLayout,
   type SessionFileLayout,
 } from "./sessionFileLayout.js";
-import { loadSessionRecord, writeSessionRecord } from "./sessionStore.js";
+import { loadSessionRecord } from "./sessionStore.js";
+import { writeSessionRecord } from "./create.js";
 import {
   appendTranscriptEvent,
   projectBranchMessages,

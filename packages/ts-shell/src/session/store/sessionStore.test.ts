@@ -11,8 +11,8 @@ import {
 import {
   loadSessionRecord,
   sessionExistsAtLayout,
-  writeSessionRecord,
 } from "./sessionStore.js";
+import { writeSessionRecord } from "./create.js";
 
 describe("sessionStore", () => {
   it("writes and loads metadata, state, and transcript without schema drift", () => {

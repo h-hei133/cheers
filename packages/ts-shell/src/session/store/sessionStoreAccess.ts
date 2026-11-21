@@ -23,12 +23,12 @@ import { writeJsonFileAtomic } from "./sessionFileStore.js";
 import { SessionFiles } from './files.js';
 import { SessionStorePaths } from './paths.js';
 import { prepareSessionActivationRecord, writeSessionMetadataRecord } from './metadata.js';
+import { createSessionRecord, type InitialSessionRecord } from './create.js';
 import {
   SessionCatalog,
   type SessionCatalogDiagnostic,
 } from './catalog/index.js';
 import {
-  createSessionRecord,
   deleteSessionRecord,
   loadSessionRecord,
   previewPendingSessionRecord,
@@ -94,8 +94,8 @@ export class SessionStoreAccess extends SessionStorePaths {
     });
   }
 
-  writeSession(session: Session): void {
-    createSessionRecord(session, this.storeLayout);
+  writeSession(session: Session, initial?: InitialSessionRecord): void {
+    createSessionRecord(session, this.storeLayout, initial);
   }
 
   writeSessionMetadata(session: Session, requireHeld?: boolean): void {

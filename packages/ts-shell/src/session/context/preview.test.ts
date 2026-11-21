@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { projectSessionFileLayout } from '../store/sessionFileLayout.js';
-import { writeSessionRecord } from '../store/sessionStore.js';
+import { writeSessionRecord } from '../store/create.js';
 import type { Session } from '../schema/sessionRecord.js';
 import { readPromptPreview } from './preview.js';
 

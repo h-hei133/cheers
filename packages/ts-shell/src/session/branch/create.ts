@@ -1,11 +1,14 @@
-import { appendTranscriptEvent, readTranscriptEvents } from '../transcript/sessionTranscript.js';
+import { randomUUID } from 'node:crypto';
 import { sessionRootEntryId, buildLinearSessionThreadSnapshot, sessionThreadPath } from '../schema/sessionThread.js';
 import { createSession, createSessionWithId } from '../store/sessionCreation.js';
 import { readSessionFileVersion } from '../store/version.js';
 import type { SessionStoreAccess } from '../store/sessionStoreAccess.js';
 import { sameValue } from '../../config/values.js';
 import { forkThread, forkTranscriptEvents } from './fork.js';
-import { decodeSessionModel, readSessionModelEdit, writeSessionModel } from '../model/state.js';
+import { decodeSessionModel } from '../model/state.js';
+import { buildSessionStateSnapshot } from '../schema/sessionStateSnapshot.js';
+import type { Session } from '../schema/sessionRecord.js';
+import { SessionCreationUnverifiedError } from '../store/create.js';
 
 export interface SessionForkOptions {
   readonly activate?: boolean;
@@ -16,7 +19,7 @@ export interface SessionForkOptions {
 
 export class SessionForkError extends Error {
   constructor(readonly sessionId: string) {
-    super(`Fork ${sessionId} was created but completion is unverified. Inspect its saved history before continuing; it was not activated or retried.`);
+    super(`Completion of fork ${sessionId} is unverified. Inspect its saved history and current selection before continuing.`);
     this.name = 'SessionForkError';
   }
 }
@@ -36,12 +39,10 @@ export function forkSession(input: {
   if (options?.expectedVersion !== undefined && options.expectedVersion !== version) {
     throw new Error('Cannot fork: source history changed after selection. Reopen its tree.');
   }
-  const source = store.load(sourceId);
-  const sourceState = store.readStateSnapshotRequired(store.statePath(sourceId));
+  const { session: source, state: sourceState, events } = store.readSnapshot(sourceId);
   const selection = decodeSessionModel(sourceState.modelSelection);
   if (sourceState.modelSelection !== undefined && !selection) throw new Error('Cannot fork: source model selection is unavailable.');
   const thread = sourceState.thread ?? buildLinearSessionThreadSnapshot(source);
-  const events = readTranscriptEvents(store.transcriptPath(sourceId));
   if (readSessionFileVersion(layout) !== version) throw new Error('Cannot fork: source history changed. Reopen its tree.');
   if (!sessionThreadPath(thread).resolved) throw new Error('Cannot fork: session ancestry is unavailable.');
   let forkLeaf = thread.activeLeafId;
@@ -55,26 +56,44 @@ export function forkSession(input: {
     // The selected question is an editable draft, so the active path ends before it.
     forkLeaf = entry.parentId;
   }
-  const creation = { callbacks: { ...callbacks, setCurrentSessionForProject: () => {} }, projectRoot: projectRoot ?? source.projectRoot,
+  const destination = projectRoot ?? source.projectRoot;
+  const guard = options?.activate === false ? undefined : {
+    source: { projectRoot: source.projectRoot, expected: store.readCurrentSessionSelection(source.projectRoot) },
+    destination: store.readCurrentSessionSelection(destination),
+  };
+  const id = callbacks.validateSessionId(options?.sessionId ?? callbacks.createSessionId());
+  const copied = forkThread({ ...thread, activeLeafId: forkLeaf }, source.id, id);
+  if (!sessionThreadPath(copied).resolved) throw new Error('Fork ancestry is unavailable.');
+  const sourceRoot = sessionRootEntryId(source.id), forkRoot = sessionRootEntryId(id);
+  const copiedEvents = forkTranscriptEvents(events, source.id, id).map(event =>
+    event.type === 'command-output' && event.sourceEntryId === sourceRoot ? { ...event, sourceEntryId: forkRoot } : event);
+  const forked = createSessionWithId({ callbacks: {
+    ...callbacks, setCurrentSessionForProject: () => {},
+    writeSession: (session: Session) => {
+      const state = buildSessionStateSnapshot(session, undefined, { thread: copied });
+      try {
+        store.writeSession(session, {
+          events: copiedEvents,
+          state: selection ? { ...state, modelSelection: selection, modelRevision: randomUUID() } : state,
+          beforePublish: () => {
+            if (store.sessionDir(sourceId) !== layout.sessionDir || readSessionFileVersion(layout) !== version) {
+              throw new Error('Cannot fork: source history changed. Reopen its tree.');
+            }
+          },
+        });
+      } catch (error) {
+        if (error instanceof SessionCreationUnverifiedError) throw new SessionForkError(session.id);
+        throw error;
+      }
+    },
+  }, sessionId: id, projectRoot: destination,
     options: { ...(!projectRoot || projectRoot === source.projectRoot ? { workspaceRoots: source.workspaceRoots } : {}),
-      ...(source.title ? { title: source.title } : {}), parentSession: source.id } };
-  const forked = options?.sessionId === undefined ? createSession(creation) : createSessionWithId({ ...creation, sessionId: options.sessionId });
+      ...(source.title ? { title: source.title } : {}), parentSession: source.id } });
   try {
-    const transcriptPath = store.transcriptPath(forked.id);
-    for (const event of forkTranscriptEvents(events, source.id, forked.id)) {
-      store.withSessionStateLock(forked.id, () => {
-        appendTranscriptEvent(transcriptPath, event.type === 'command-output' && event.sourceEntryId === sessionRootEntryId(source.id)
-          ? { ...event, sourceEntryId: sessionRootEntryId(forked.id) } : event, undefined, { requireExisting: true });
-      }, { requireExisting: true });
-    }
-    const copied = forkThread({ ...thread, activeLeafId: forkLeaf }, source.id, forked.id);
-    store.writeSessionState(forked, { thread: copied });
-    if (selection) writeSessionModel(forked.id, selection, readSessionModelEdit(forked.id));
-    const saved = store.load(forked.id);
-    const state = store.readStateSnapshotRequired(store.statePath(forked.id));
+    const { session: saved, state } = store.readSnapshot(forked.id, { readOnly: true });
     if (!sameValue(state.thread, copied) || !sameValue(state.modelSelection, selection)
-      || !sessionThreadPath(copied).resolved || saved.parentSession !== source.id) throw new Error('Fork readback failed.');
-    if (options?.activate !== false) callbacks.setCurrentSessionForProject(saved.projectRoot, saved.id);
+      || saved.parentSession !== source.id) throw new Error('Fork readback failed.');
+    if (guard) callbacks.setCurrentSessionForProject(saved.projectRoot, saved.id, { guard });
     return saved;
   } catch { throw new SessionForkError(forked.id); }
 }

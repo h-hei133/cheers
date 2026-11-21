@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../SessionManager.js';
 import { createSessionStoreLayout, projectSessionFileLayout } from './sessionFileLayout.js';
-import { SessionCreationUnverifiedError } from './sessionStore.js';
+import { SessionCreationUnverifiedError } from './create.js';
 import { SessionStoreAccess } from './sessionStoreAccess.js';
 
 const id = 'shared-session';
@@ -30,16 +30,16 @@ afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-function startCreator(project: string, sessionDir: string) {
+function startCreator(project: string, reservation: string) {
   const module = fileURLToPath(new URL('../SessionManager.ts', import.meta.url));
   const release = path.join(project, 'release');
   const child = spawn(process.execPath, [createRequire(import.meta.url).resolve('tsx/cli'), '--eval', `
     const fs = require('node:fs');
     const { syncBuiltinESMExports } = require('node:module');
-    const target = ${JSON.stringify(sessionDir)};
+    const target = ${JSON.stringify(reservation)};
     const release = ${JSON.stringify(release)};
-    const mkdir = fs.mkdirSync;
-    fs.mkdirSync = (name, options) => {
+    const open = fs.openSync;
+    fs.openSync = (name, flags, mode) => {
       if (name === target) {
         fs.writeSync(1, 'ready\\n');
         const cell = new Int32Array(new SharedArrayBuffer(4));
@@ -47,7 +47,7 @@ function startCreator(project: string, sessionDir: string) {
         while (!fs.existsSync(release) && Date.now() < deadline) Atomics.wait(cell, 0, 0, 10);
         if (!fs.existsSync(release)) throw new Error('Reservation release timed out');
       }
-      return mkdir(name, options);
+      return open(name, flags, mode);
     };
     syncBuiltinESMExports();
     const { SessionManager } = require(${JSON.stringify(module)});
@@ -83,8 +83,9 @@ it('allows one first writer when two processes reach the same session reservatio
   const second = path.join(root, 'second');
   fs.mkdirSync(first);
   fs.mkdirSync(second);
-  const one = startCreator(first, layout.sessionDir);
-  const two = startCreator(second, layout.sessionDir);
+  const reservation = path.join(path.dirname(store.sessionsDir), '.session-create', 'locks', id);
+  const one = startCreator(first, reservation);
+  const two = startCreator(second, reservation);
   try {
     await vi.waitFor(() => expect([one.ready(), two.ready()]).toEqual([true, true]), { timeout: 10000 });
     one.go();
