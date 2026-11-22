@@ -1,11 +1,11 @@
 {
   "version": 1,
   "path": ".normproof/completion-gate/cli.mjs",
-  "sha256": "eca24a7f3d3488715d8a78616f97a3f3538ceed1cb3f8f3d7a0bb3fc8d3cb7e3",
+  "sha256": "1b0e6ab5b7d00c05b8e5abb88cb777c3330dde75628340d0d29bb4916efa2cf4",
   "nodeFloor": "20.3.0",
   "provenance": {
     "package": "normproof",
-    "commit": "28732dd15c6ebbdcb58aa6eafe26db9de2ffd028",
+    "commit": "16a994177e67db89c04a72111b11c9ddbccc4275",
     "entry": "src/adapters/completion-gate/hook.ts",
     "bundler": "esbuild@0.28.2",
     "inputs": {
@@ -14,7 +14,7 @@
       "src/adapters/completion-gate/progress.ts": "b8cd62a8f9874e524ecbe949d152b8a882bd5fb7f576eb781b27cce43b3035a4",
       "src/adapters/sidecar-file/capture.ts": "72a5a5feebec50d1b68186e901a1546f90c35fb49c72891f94a4c84a3a3f9ae4",
       "src/adapters/sidecar-file/evidence-collector.ts": "0bba06e0eeaa3734db17a253b4a6689a3299524f89726a4f96e6f9c1d7fca2a8",
-      "src/adapters/sidecar-file/module-graph.ts": "aecf251930a40c7cfef5d9f8b0dc2c5d51bc2d9c4aa86e35b4f627c9ce23c37b",
+      "src/adapters/sidecar-file/module-graph.ts": "b6f4a77dc0736329cf4384bbe98f1215bc7db26159ab6d13f8c27c5e73de4207",
       "src/adapters/sidecar-file/require.ts": "2f7f2cb2edcf68c046814b21a547dfa7b28539746c1c8487dc670fb8bc12023d",
       "src/adapters/sidecar-file/run.ts": "5d928358c371695611dd7bf4f08ea188cbedf5ad82f0e3562dab40a2b74d0b9e",
       "src/adapters/sidecar-file/source-parser.ts": "94cc76c3d7e41b4da4f9c8aba8fc33238b21f1a593eccfc8bf0636d252e48f8e",
