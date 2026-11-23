@@ -205,7 +205,7 @@ Batch 0 的实现与 Linux 本地证据已完成。420/420 聚焦 Vitest、六�
 
 后续核实确认 Batch 0.5 与 Batch 2–4 仍有待实现内容。Batch 1 原审计中的开头消息改写、收尾步骤移除工具和持久历史微压缩三项判断已被当前实现反证。各批的真实代码缺口、现有实现边界和未验证证据见路线图任务记录。
 
-Batch 0 本地提交：待创建。整个 2026-11 目标保持执行中。
+Batch 0 本地提交 `8d310529435445028890a165d67c11fb81b1a2c0`，尚未推送。B0.6 因 workbuddy 本地服务没有监听而保持部分验证。整个 2026-11 目标保持执行中。
 
 
 2026-11-19 当前input子批完成：沿原contribution/SDK/CLI/turn/approval/session owner修transform/handled与legacy veto、inert callback、receipt及保存前后准入；未增加执行、存储或事件bus。实际L；原新普通提交已验收，live steer/followUp另留E.6缺口。20/416、末改144/恢复159、七门/buildcca13a50f2ac、11有效反转/两限定APPROVE、Linux native/floor/installed各15场景7POST及配置1actualPOST200/completed。默认judge容量not_proven保持，功能36/62、26开放。最新用户要求当前批提交后总结并停止，停止后不执行下一批。

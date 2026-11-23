@@ -27,7 +27,7 @@
 - [x] B0.4 重命名复用 session record transaction。RPC 忙时取消且不写入。回归覆盖事务重读与中断恢复。
 - [x] B0.5 `.tmp/` 当前为空，未发现活动进程，不需要删除历史内容。
 - [ ] B0.6 定向模型／连接／会话测试、反转回归及正常 Linux CLI 入口验证通过。使用四个已配置连接做脱敏的真实请求定向验收；网络、provider、认证、路由结果分开记录。
-- [ ] B0.7 复核只含本批文件和明确进度记录，形成一个本地提交。
+- [x] B0.7 本地提交 `8d310529435445028890a165d67c11fb81b1a2c0`，未推送。
 
 ## 后续批次验收条件
 
@@ -43,7 +43,7 @@
 - Linux 验证 420/420 定向 Vitest。`verify:import-cycles`、`check:config-consumers`、`check:declarations`、`check:node-floor`、`check:lint`、`verify:docs-drift:strict`、`npm run build` 和 `npm run build:exe` 全部通过。
 - 生产 `--list-models` 入口只展示配置的 9 个模型。nofx、apikey-casa 和 BaiLu 在隔离临时 workspace 发出请求并完成。workbuddy 连接选择正确，但 `127.0.0.1:7863` 没有监听服务，真实请求归类为 provider/network failure。
 - 测试副作用：第一次真实请求启动时复用了已有 Cheers session，将其模型选择改为 `bailu-2.8`。原选择没有执行前快照，不能安全推定并回写。本机 session ID 是 `sess_ce712b9e215964b0_1795310273004`。
-- 外部临时 workspace 和其中创建的测试 session 已删除。本批本地提交待创建。
+- 外部临时 workspace 和其中创建的测试 session 已删除。本批本地提交 `8d310529435445028890a165d67c11fb81b1a2c0`，未推送。
 
 ## 完成及提交规则
 
