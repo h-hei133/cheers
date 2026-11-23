@@ -10,7 +10,7 @@
               "protocolVersion": 2,
               "workerProtocol": 1,
               "path": ".normproof/write-gate/cli.mjs",
-              "sha256": "f2cc9adb1f7e3b973db085d739dd39a604206a7b000c007ded63c17adbf08ea6",
+              "sha256": "74ec2989a21a1e731850f3f0b384c833c4a418a9795454e5fb46ea8e5cf13a98",
               "nodeFloor": "20.3.0"
             },
             "timeoutMs": 15000
@@ -25,7 +25,7 @@
             "completionGate": {
               "version": 1,
               "path": ".normproof/completion-gate/cli.mjs",
-              "sha256": "4d5d4e565e279376a03119a3902a3316deaf71932811f738fcfcdf983b9a2a8b",
+              "sha256": "9f41d44a3d13d300be5c924289e33e8840afac5c1f5c0c1f26d0a565c28fd424",
               "nodeFloor": "20.3.0"
             },
             "timeoutMs": 20000
