@@ -25,6 +25,9 @@ This file is the curated, compact index of reusable engineering pitfalls, enviro
 - **Root Cause**: WSL2 bounded RAM triggers the Linux OOM-Killer under concurrent TypeScript/Vitest workers.
 - **Rule**: Chain heavy commands serially with `&&`, run Tier-1 sub-second static gates first, batch multiple Vitest targets into one invocation, and never invoke `build`/`vitest`/`normproof` inside delegated subagents.
 
+### Keep Byte Budget Fixtures Small On Node 20.3.0
+Long wrapped Unicode lines can spend over 30 seconds in terminal layout on Node 20.3.0. Cross the byte ceiling with fewer multibyte graphemes for truncation checks. Use short rows for cumulative ANSI and newline accounting.
+
 ---
 
 ## 2. NormProof & Structural Gates

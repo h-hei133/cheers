@@ -501,35 +501,42 @@ describe("table cell semantics", () => {
     expect(rows.join("\n")).toContain("c0");
   });
 
-  it("bounds the raw fallback when a table exceeds the structured budget", () => {
+  function rawTable(body: readonly string[]): string {
     const columns = 20;
     const header = "|" + Array.from({ length: columns }, (_, index) => `c${index}`).join("|") + "|";
     const rule = "|" + Array.from({ length: columns }, () => "---").join("|") + "|";
-    const body = Array.from({ length: 500 }, (_, row) => "|" + Array.from({ length: columns }, (_, column) => `${row}-${column}`).join("|") + "|");
-    const rows = renderMarkdown([header, rule, ...body].join("\n"), 80);
+    return [header, rule, ...body].join("\n");
+  }
+
+  it("bounds the raw fallback when a table exceeds the structured budget", () => {
+    const body = Array.from({ length: 500 }, (_, row) => "|" + Array.from({ length: 20 }, (_, column) => `${row}-${column}`).join("|") + "|");
+    const rows = renderMarkdown(rawTable(body), 80);
     expect(rows.length).toBeLessThanOrEqual(401);
     expect(plain(rows)).toContain("table truncated");
   });
 
   it("uses UTF-8 bytes rather than code units when bounding a raw table", () => {
-    const columns = 20;
-    const header = "|" + Array.from({ length: columns }, (_, index) => `c${index}`).join("|") + "|";
-    const rule = "|" + Array.from({ length: columns }, () => "---").join("|") + "|";
-    const rows = renderMarkdown(`${header}\n${rule}\n|${"🙂".repeat(20000)}|`, 80);
-    const text = plain(rows);
+    const grapheme = "👨‍👩‍👧‍👦";
+    const body = `|${grapheme.repeat(Math.ceil(64 * 1024 / Buffer.byteLength(grapheme)))}|`;
+    const rendered = renderMarkdownWithSources(rawTable([body]), 80);
+    const text = plain(rendered.rows);
+    expect(text).toContain(grapheme);
+    expect(text).toContain("table truncated");
     expect(text).not.toContain("\ufffd");
+    expect(text.replaceAll(grapheme, "")).not.toContain("\u200d");
     expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(64 * 1024);
+    expect(rendered.sources.some(source => source?.text === body)).toBe(false);
   });
 
   it("counts ANSI bytes and row separators in the raw-table budget", () => {
     const base = getDefaultTheme();
     defaultTheme.apply(base, "truecolor");
     try {
-      const columns = 20;
-      const header = "|" + Array.from({ length: columns }, (_, index) => `c${index}`).join("|") + "|";
-      const rule = "|" + Array.from({ length: columns }, () => "---").join("|") + "|";
-      const rows = renderMarkdown(`${header}\n${rule}\n|${"🙂".repeat(20000)}|`, 80);
-      expect(Buffer.byteLength(rows.join("\n"), "utf8")).toBeLessThanOrEqual(64 * 1024);
+      const source = rawTable(Array<string>(350).fill(`|${"x".repeat(178)}|`));
+      const text = renderMarkdown(source, 192).join("\n");
+      expect(text).toContain("\x1b[");
+      expect(text).toContain("table truncated");
+      expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(64 * 1024);
     } finally {
       defaultTheme.apply(base, "none");
     }
