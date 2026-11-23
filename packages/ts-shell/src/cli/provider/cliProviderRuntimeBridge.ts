@@ -81,11 +81,16 @@ export function createCliProviderRuntimeBridge(input: {
   readonly options: Pick<CliOptions, "provider" | "apiKey" | "model" | "thinking">;
   readonly env?: NodeJS.ProcessEnv;
   readonly sessionId?: () => string | undefined;
+  readonly resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ProviderCredentialResolution;
 }): CliProviderRuntimeBridge {
   const env = input.env ?? process.env;
   return {
     resolveCredentialSnapshot: () => {
-      return resolveCliCredential(input.runtimeConfig(), input.options, env, input.sessionId?.());
+      const config = input.runtimeConfig();
+      const sessionId = input.sessionId?.();
+      return input.resolveConfigTarget
+        ? input.resolveConfigTarget(config, sessionId)
+        : resolveCliCredential(config, input.options, env, sessionId);
     },
     providerModeEnv: () => env.CHEERS_PROVIDER_MODE,
     realProviderSmokeOptIn: () =>

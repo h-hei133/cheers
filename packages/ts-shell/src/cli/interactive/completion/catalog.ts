@@ -53,7 +53,7 @@ async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gate
   if (kind === "model" || kind === "provider") {
     const { catalog, config } = context.configuration.current;
     const models = sessionModelCatalog(context.cwd, context.session.id, catalog);
-    const ordinary = modelCatalog(kind, catalog, models.virtual);
+    const ordinary = modelCatalog(kind, catalog, models.virtual, { config });
     if (kind === 'provider') return ordinary;
     const target = context.resolveConfigTarget?.(config, context.session.id) ?? resolveProviderCredential({ runtimeConfig: config });
     const provider = sessionProviderScope(context.cwd, context.session.id, catalog, target).registration;

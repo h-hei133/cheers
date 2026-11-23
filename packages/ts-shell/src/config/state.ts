@@ -5,10 +5,16 @@ import { configRestartRequired, type ConfigReloadResult } from './application.js
 import { CONFIG_FIELDS } from './runtimeConfig.js';
 import { displayOrigins } from './provenance/projection.js';
 import { composeOrigin, origin } from './provenance/model.js';
-import type { CatalogProvider } from '../core/models/catalog.js';
+import { copyUserConfiguredModels, type CatalogProvider } from '../core/models/catalog.js';
 import type { ConfigInputs } from './inputs/model.js';
 
 export type { ConfigReloadResult } from './application.js';
+
+function cloneCatalog(catalog: readonly CatalogProvider[]): CatalogProvider[] {
+  const clone = [...structuredClone(catalog)];
+  catalog.forEach((provider, index) => copyUserConfiguredModels(provider, clone[index]!));
+  return clone;
+}
 
 export interface ConfigBinding {
   readonly workspaceRoot: string;
@@ -59,7 +65,7 @@ export class ConfigState {
   private publication: ConfigPublication;
 
   constructor(config: RuntimeConfig, binding: ConfigBinding, catalog: readonly CatalogProvider[] = [], catalogDiagnostics: readonly string[] = []) {
-    this.publication = freezeDeep({ revision: 0, config, requested: config, catalog: structuredClone(catalog), binding: structuredClone(binding),
+    this.publication = freezeDeep({ revision: 0, config, requested: config, catalog: cloneCatalog(catalog), binding: structuredClone(binding),
       catalogDiagnostics: [...catalogDiagnostics],
       admissionBlocked: config.configValidation.securityBlocked || config.configValidation.constraintsBlocked === true,
       modelConstraintsOnly: !config.configValidation.securityBlocked && config.configValidation.modelConstraintsBlocked === true,
@@ -114,7 +120,7 @@ export class ConfigState {
     }
     const config = projectAccepted(this.publication.config, candidate);
     if (this.publication.config.configScopes?.revision !== config.configScopes?.revision) this.transition(actual);
-    this.publication = freezeDeep({ revision: this.publication.revision + 1, config, requested: candidate, catalog: structuredClone(catalog),
+    this.publication = freezeDeep({ revision: this.publication.revision + 1, config, requested: candidate, catalog: cloneCatalog(catalog),
       catalogDiagnostics: [...catalogDiagnostics],
       binding: structuredClone(actual), admissionBlocked: false, modelConstraintsOnly: false, diagnostics: candidate.configDiagnostics });
     return this.result('applied', before);

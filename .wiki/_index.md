@@ -2,7 +2,7 @@
 
 > Compiled knowledge base for the TypeScript monorepo autonomous coding agent architecture, proof grounding, and reference models.
 
-Last updated: 2026-11-21
+Last updated: 2026-11-23
 
 ## Statistics
 
@@ -55,6 +55,8 @@ Last updated: 2026-11-21
 - [Topics](wiki/topics/_index.md)
 - [References](wiki/references/_index.md)
 - [运行时升级复核与修复证据](wiki/references/runtime-upgrade-review-2026-11.md)
+- [Codex / OMP / Claude Code Mode / DeepSeek 深度对比审计（2026-11-23）](wiki/references/codex-and-frontier-gap-audit-2026-11.md)
+- [Cheers 下一阶段演进路线图（Batch 0–4，2026-11-23）](wiki/references/cheers-next-phase-roadmap-2026-11.md)
 - [Theses](wiki/theses/_index.md)
 - [Outputs](output/_index.md)
 
@@ -79,6 +81,7 @@ Last updated: 2026-11-21
 
 ## Recent Activity
 
+- 2026-11-23: Completed comparative audit against Codex (`4210c08def`), OMP (`e1a9f4b41d`), Claude Code `Code Mode`, and DeepSeek Harness (`2e39e70496`) / `dsh-superagent-prototype` (`8c32a9dc`), diagnosing `/model` 9,197-row bloat, `models.json` multi-connection lockout, YAML 1.2 CST config format migration, 10 prompt-caching bugs, and `codemode` security/UX gaps (`codex-and-frontier-gap-audit-2026-11.md`), and compiled the Batch 0–4 next-phase roadmap (`cheers-next-phase-roadmap-2026-11.md`).
 - 2026-11-13: Ingested and compiled strict evidence-backed architectural and implementation gap audit against Pi (`pi-vs-cheers-deep-gap-analysis-2026-11.md`).
 - 2026-11-13: Ingested and compiled full-monorepo strict comparative audit against Pi (`pi-vs-cheers-full-audit-2026-11.md`).
 - 2026-11-13: Compiled prioritized Pi parity execution roadmap (`pi-parity-prioritized-roadmap-2026-11.md`).

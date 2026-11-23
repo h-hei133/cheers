@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, getUserRuntimeConfigPath } from './runtimeConfig.js';
 import { ConfigState, type ConfigBinding } from './state.js';
 import { configRestartRequired, describeConfigChanges } from './application.js';
+import { isUserConfiguredModel, mergeProviders } from '../core/models/catalog.js';
 
 let root: string;
 let file: string;
@@ -27,6 +28,29 @@ it('retains accepted catalogue notices on rejection and replaces them only with 
   fs.writeFileSync(file, '{}');
   expect(state.publish(state.begin(binding), load(), binding, undefined, [], []).status).toBe('applied');
   expect(state.current.catalogDiagnostics).toEqual([]);
+});
+
+it('preserves private model provenance through accepted catalogue cloning', () => {
+  const source = mergeProviders([{ id: 'openai', label: 'OpenAI', runtime: 'openai' as const, auth: 'api-key' as const,
+    models: [{ id: 'public-model' }] }], [{ id: 'openai', models: [{ id: 'public-model' }, { id: 'user-model' }] }], { origin: 'user' });
+  const state = new ConfigState(load(), binding, source);
+  const initial = state.current.catalog.find(provider => provider.id === 'openai')!;
+  expect(isUserConfiguredModel(initial, 'user-model')).toBe(true);
+  expect(isUserConfiguredModel(initial, 'public-model')).toBe(true);
+
+  const sourceProvider = source.find(provider => provider.id === 'openai')!;
+  Object.assign(sourceProvider, { models: [...sourceProvider.models, { id: 'later-model' }] });
+  expect(initial.models.some(model => model.id === 'later-model')).toBe(false);
+  expect(isUserConfiguredModel(initial, 'later-model')).toBe(false);
+
+  expect(state.publish(state.begin(binding), load(), binding, undefined, source).status).toBe('applied');
+  const published = state.current.catalog.find(provider => provider.id === 'openai')!;
+  expect(published.models.some(model => model.id === 'later-model')).toBe(true);
+  expect(isUserConfiguredModel(published, 'user-model')).toBe(true);
+  expect(isUserConfiguredModel(published, 'later-model')).toBe(false);
+
+  Object.assign(sourceProvider, { label: 'Changed source' });
+  expect(published.label).toBe('OpenAI');
 });
 
 it('separates harmless warnings from invalid candidates without parsing diagnostic strings', () => {

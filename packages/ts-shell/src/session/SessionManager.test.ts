@@ -4387,6 +4387,46 @@ describe("fork", () => {
     expect(manager.resume(source.id).parentSession).toBeUndefined();
   });
 
+  it("commits a renamed session as a recoverable record update", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    const renamed = manager.renameSession(session.id, "  durable title  ");
+
+    expect(renamed.title).toBe("durable title");
+
+    const reloaded = new SessionManager().getSession(session.id)!;
+    expect(reloaded.title).toBe("durable title");
+    expect(reloaded.updatedAt).toBe(renamed.updatedAt);
+  });
+
+  it("recovers a rename interrupted after metadata publication", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    const layout = new SessionStoreAccess().stateLayout(session.id);
+    const restoreRename = failSessionRename(destination => destination === layout.metadataPath,
+      new Error("metadata publication acknowledgement unavailable"), true);
+    try {
+      expect(() => manager.renameSession(session.id, "recoverable title")).toThrow(/persistence is unknown/i);
+    } finally {
+      restoreRename();
+    }
+
+    expect(fs.existsSync(promptIntentPath(layout))).toBe(true);
+    expect(new SessionManager().getSession(session.id)!.title).toBe("recoverable title");
+    expect(fs.existsSync(promptIntentPath(layout))).toBe(false);
+  });
+
+  it("clears a session title through the record transaction", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    manager.renameSession(session.id, "named session");
+
+    const renamed = manager.renameSession(session.id, "  ");
+
+    expect(renamed.title).toBeUndefined();
+    expect(new SessionManager().getSession(session.id)!.title).toBeUndefined();
+  });
+
   it("refuses to fork a session that does not exist", () => {
     const manager = new SessionManager();
     expect(() => manager.fork("sess_missing")).toThrow(/not exist/i);

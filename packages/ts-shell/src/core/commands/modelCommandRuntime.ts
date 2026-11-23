@@ -12,7 +12,7 @@ import { parseModelArgs, modelSyntax } from "./model/syntax.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import { projectSessionModel } from "../../session/model/projection.js";
 import { loadCatalogSnapshot, ensureUserCatalog, userCatalogPath } from "../models/catalogStore.js";
-import { catalogProvider } from '../models/catalog.js';
+import { catalogProvider, isUserConfiguredModel } from '../models/catalog.js';
 import { refreshCatalog, type RefreshResult } from "../models/catalogRefresh.js";
 import { renderCatalog } from "../models/catalogSurface.js";
 import { availabilitySnapshot, catalogAvailabilitySnapshot, type AvailabilitySnapshot } from "../models/availability.js";
@@ -114,8 +114,14 @@ function modelConfiguration(context: CommandContext) {
 
 function renderCatalogView(context: CommandContext): string {
   const { config, catalog, active, catalogDiagnostics } = modelConfiguration(context);
-  const physical = renderCatalog({ providers: catalog, configPath: userCatalogPath(), diagnostics: catalogDiagnostics,
-    availability: modelCatalogAvailability(context, { config, catalog, active }) });
+  const availability = modelCatalogAvailability(context, { config, catalog, active });
+  const visible = catalog.flatMap(provider => {
+    const ready = availability.some(entry => entry.id === provider.id && entry.state === 'ready');
+    const models = provider.models.filter(model => ready || isUserConfiguredModel(provider, model.id));
+    return models.length || ready || provider.custom && provider.models.length === 0 ? [{ ...provider, models }] : [];
+  });
+  const physical = renderCatalog({ providers: visible, configPath: userCatalogPath(), diagnostics: catalogDiagnostics,
+    availability: availability.filter(entry => visible.some(provider => provider.id === entry.id)) });
   const virtual = context.sessionId ? sessionModelCatalog(context.cwd, context.sessionId, catalog).virtual : [];
   const extension = context.sessionId && sessionProviderScope(context.cwd, context.sessionId, catalog, active).registration;
   return [physical,
@@ -451,7 +457,8 @@ async function listModels(args: string[], refresh: boolean, context: CommandCont
   }
   const { catalog, active, catalogDiagnostics } = snapshot;
   const provider = requested ?? active.provider;
-  const binding = catalogProvider(catalog, provider, provider === active.provider ? providerCredentialBaseUrl(catalog, active) : undefined);
+  const binding = catalogProvider(catalog, provider,
+    !requested && provider === active.provider ? providerCredentialBaseUrl(catalog, active) : undefined);
   if (binding.ambiguous) return [notice, ...catalogDiagnostics, 'Model list unavailable: multiple catalogue entries claim the active endpoint.']
     .filter(line => line !== undefined).join('\n');
   const entry = binding.entry;

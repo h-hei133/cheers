@@ -4,7 +4,7 @@ import type { Session } from "../../session/schema/sessionRecord.js";
 import type { ResumeResult } from "../../session/SessionManager.js";
 import type { WorkspaceRootMode } from "../../session/SessionManager.js";
 import type { RuntimeConfigOverrides, RuntimeConfig } from "../../config/runtimeConfig.js";
-import type { ProviderCredentialResolution } from './providerCredentials.js';
+import type { CommandTargetResolver } from '../commands/types.js';
 import type { WorkflowGitContext } from "../workspace/git.js";
 import {
   createShellRuntimeContext,
@@ -110,7 +110,7 @@ interface ShellBootstrapInput {
   launchCwd?: string;
   runtimeConfig: RuntimeConfig;
   runtimeConfigOverrides?: RuntimeConfigOverrides;
-  resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ProviderCredentialResolution;
+  resolveConfigTarget?: CommandTargetResolver;
   deferredModel?: () => boolean;
   /** How this run was asked to load skills; carried into the runtime context. */
   skillOptions?: {

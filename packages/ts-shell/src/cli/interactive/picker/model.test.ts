@@ -276,6 +276,9 @@ it.each([false, true])('browses unconfigured models through real overlay keys (a
   const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected probe'));
   const overlay = new OverlayHost(() => {}); overlay.open(picker);
   await new Promise(resolve => setTimeout(resolve, 0));
+  overlay.handleKey(parseKeyEvent('\x1b[D'), vi.fn());
+  overlay.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+  overlay.handleKey(parseKeyEvent('\x1b[C'), vi.fn());
   overlay.handlePaste('missing');
   overlay.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
   const visible = stripAnsi(overlay.render(100, 24).join('\n'));
@@ -547,6 +550,9 @@ it('searches a named role and rejects it after the preset owner changes', async 
   const overlay = new OverlayHost(() => {});
   overlay.open(picker);
   await new Promise(resolve => setTimeout(resolve, 0));
+  overlay.handleKey(parseKeyEvent('\x1b[D'), vi.fn());
+  overlay.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
+  overlay.handleKey(parseKeyEvent('\x1b[C'), vi.fn());
   overlay.handlePaste('Preset: work / review');
   expect(stripAnsi(overlay.render(120, 30).join('\n'))).toContain('Preset: work / review');
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUILTIN_PROVIDERS, catalogModel, mergeProviders, providerEndpoint } from "./catalog.js";
+import { BUILTIN_PROVIDERS, catalogModel, isUserConfiguredModel, mergeProviders, providerEndpoint } from "./catalog.js";
 import { resolveRequestShape } from "./requestShape.js";
 
 it('keeps a price schedule as one source while unrelated model patches preserve it', () => {
@@ -10,6 +10,40 @@ it('keeps a price schedule as one source while unrelated model patches preserve 
   const flat = { promptPerMTok: 5 };
   expect(catalogModel(mergeProviders(base, [{ id: 'fixture', models: [{ id: 'meter', cost: flat }] }]), 'fixture', 'meter')?.cost).toEqual(flat);
   expect(catalogModel(mergeProviders(base, [{ id: 'fixture', models: [{ id: 'meter', cost: flat }] }]), 'fixture', 'meter')?.cost).not.toHaveProperty('tiers');
+});
+
+it('tracks model-level user catalogue declarations without trusting provider properties', () => {
+  const labelled = mergeProviders(BUILTIN_PROVIDERS, [{ id: 'openai', label: 'My OpenAI proxy' }], { origin: 'user' });
+  const provider = labelled.find(entry => entry.id === 'openai')!;
+  expect(isUserConfiguredModel(provider, 'gpt-5.3')).toBe(false);
+  expect(isUserConfiguredModel(provider, 'o4-mini')).toBe(false);
+
+  const forged = { id: 'openai', custom: false, configuredModels: ['o4-mini'],
+    models: [{ id: 'gpt-5.3' }, { id: 'private-model' }] };
+  const configured = mergeProviders(labelled, [forged], { origin: 'user' });
+  const configuredProvider = configured.find(entry => entry.id === 'openai')!;
+  expect(isUserConfiguredModel(configuredProvider, 'gpt-5.3')).toBe(true);
+  expect(isUserConfiguredModel(configuredProvider, 'private-model')).toBe(true);
+  expect(isUserConfiguredModel(configuredProvider, 'o4-mini')).toBe(false);
+
+  const refreshed = mergeProviders(configured, [{ id: 'openai', models: [{ id: 'refreshed-only' }] }], {
+    preserveExplicitCapabilities: true,
+    origin: 'refresh',
+  });
+  const refreshedProvider = refreshed.find(entry => entry.id === 'openai')!;
+  expect(isUserConfiguredModel(refreshedProvider, 'gpt-5.3')).toBe(true);
+  expect(isUserConfiguredModel(refreshedProvider, 'private-model')).toBe(true);
+  expect(isUserConfiguredModel(refreshedProvider, 'refreshed-only')).toBe(false);
+
+  const refreshedPrivate = mergeProviders(labelled, [{ id: 'openai', models: [{ id: 'will-be-user-configured' }] }], {
+    preserveExplicitCapabilities: true,
+    origin: 'refresh',
+  });
+  const selectedByUser = mergeProviders(refreshedPrivate, [{ id: 'openai', models: [{ id: 'will-be-user-configured' }] }], { origin: 'user' });
+  expect(isUserConfiguredModel(selectedByUser.find(entry => entry.id === 'openai')!, 'will-be-user-configured')).toBe(true);
+
+  const relabelled = mergeProviders(refreshed, [{ id: 'openai', label: 'Still OpenAI' }], { origin: 'user' });
+  expect(isUserConfiguredModel(relabelled.find(entry => entry.id === 'openai')!, 'private-model')).toBe(true);
 });
 
 /**

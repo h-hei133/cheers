@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { startupEligible } from "../cli/interactive/startup/eligibility.js";
 import { scanCliArgs } from "../cli/options/argv.js";
 import { resolveCliCredential } from "../cli/provider/cliProviderRuntimeBridge.js";
-import { getRuntimeConfig } from "../config/runtimeConfig.js";
+import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from "../config/runtimeConfig.js";
+import { userCatalogPath, writeCatalogCache } from "../core/models/catalogStore.js";
 import { bootstrapShellRuntime } from "../core/shell/bootstrap.js";
 import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import { SessionManager } from "../session/SessionManager.js";
@@ -33,11 +34,30 @@ afterEach(() => {
 });
 
 describe("CLI model and session selection", () => {
-  it("lists and fuzzy-filters catalog models for --list-models", () => {
-    const table = formatCliModelList("gpt");
+  it("lists and fuzzy-filters only ready or user-configured models for --list-models", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-list-models-home-'));
+    tempRoots.push(home);
+    process.env.HOME = home;
+    process.env.USERPROFILE = home;
+    process.env.CHEERS_TEST_ROOT = home;
+    fs.mkdirSync(path.join(home, '.cheers'));
+    const configPath = getUserRuntimeConfigPath();
+    const edit = readRuntimeConfigEditAt(configPath);
+    writeUserRuntimeConfigFile({ ...edit.values, provider: 'openai', activeProviderConnectionId: 'fixture', providerConnections: [{
+      id: 'fixture', provider: 'openai', authType: 'api-key', apiKey: 'synthetic-key', model: 'gpt-fixture', status: 'connected',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    }] }, edit);
+    fs.writeFileSync(userCatalogPath(), JSON.stringify({ providers: {
+      openai: { models: [{ id: 'gpt-fixture', contextWindow: 1000 }] },
+    } }));
+    writeCatalogCache([{ id: 'public-fixture', runtime: 'openai-compatible', baseUrl: 'https://public.invalid/v1', models: [{ id: 'public-model' }] }]);
+
+    const table = formatCliModelList(undefined, home);
     expect(table).toContain("provider");
-    expect(table.toLowerCase()).toContain("gpt");
-    expect(formatCliModelList("nonexistent-xyz-999")).toContain("No models found");
+    expect(table).toContain('gpt-fixture');
+    expect(table).not.toContain('public-model');
+    expect(formatCliModelList("gpt", home)).toContain('gpt-fixture');
+    expect(formatCliModelList("nonexistent-xyz-999", home)).toContain("No models found");
   });
 
   it("resolves provider/model:thinking shorthand and --thinking override", () => {

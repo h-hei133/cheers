@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { catalogCachePath, loadCatalog, loadCatalogSnapshot, userCatalogPath, writeCatalogCache } from './catalogStore.js';
+import { isUserConfiguredModel } from './catalog.js';
 
 let root: string;
 beforeEach(() => {
@@ -68,4 +69,21 @@ it('ignores nested owner keys and key-like text while keeping refreshed entries 
   const recovered = loadCatalogSnapshot();
   expect(recovered.providers.find(provider => provider.id === 'openai')!.models.some(model => model.id === 'user-only')).toBe(true);
   expect(recovered.diagnostics).toEqual(['models-cache.json could not be parsed; its catalogue entries were ignored.']);
+});
+
+it('tracks only model IDs authored in the user catalogue after refreshed and built-in merges', () => {
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'refreshed-only' }] }]);
+  fs.writeFileSync(userCatalogPath(), JSON.stringify({ providers: {
+    openai: { label: 'Configured gateway', configuredModels: ['o4-mini'], models: [{ id: 'gpt-5.3' }, { id: 'user-model' }] },
+    mine: { runtime: 'openai-compatible', auth: 'api-key', models: [{ id: 'mine-model' }] },
+  } }));
+
+  const snapshot = loadCatalogSnapshot();
+  const openai = snapshot.providers.find(provider => provider.id === 'openai')!;
+  const mine = snapshot.providers.find(provider => provider.id === 'mine')!;
+  expect(isUserConfiguredModel(openai, 'gpt-5.3')).toBe(true);
+  expect(isUserConfiguredModel(openai, 'user-model')).toBe(true);
+  expect(isUserConfiguredModel(openai, 'o4-mini')).toBe(false);
+  expect(isUserConfiguredModel(openai, 'refreshed-only')).toBe(false);
+  expect(isUserConfiguredModel(mine, 'mine-model')).toBe(true);
 });

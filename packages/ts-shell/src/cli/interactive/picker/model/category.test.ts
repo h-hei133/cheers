@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile,
   type RuntimeConfig } from '../../../../config/runtimeConfig.js';
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
+import { BUILTIN_PROVIDERS, mergeProviders } from '../../../../core/models/catalog.js';
 import { defaultHookDispatcher } from '../../../../core/hooks/hookDispatcher.js';
 import { resolveProviderCredential } from '../../../../core/shell/providerCredentials.js';
 import { selectPooledConnection } from '../../../../core/auth/account/pool.js';
@@ -99,6 +100,9 @@ it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['direct', 'keyboa
     let work: Promise<PickerOutcome | undefined> | undefined;
     try {
       expect(host.render(110, 28).map(stripAnsi).join('\n')).toContain('▸ shared');
+      host.handleKey(parseKeyEvent('\t'), () => { throw new Error('Browsing must not activate a model.'); });
+      host.handleKey(parseKeyEvent('\x1b[B'), () => { throw new Error('Browsing must not activate a model.'); });
+      host.handleKey(parseKeyEvent('\x1b[C'), () => { throw new Error('Browsing must not activate a model.'); });
       host.handleKey(parseKeyEvent('\x1b[A'), () => { throw new Error('Browsing must not activate a model.'); });
       expect(host.render(110, 28).map(stripAnsi).join('\n')).toContain('▸ next');
       expect(readSessionModelEdit(sessionId)).toEqual(baseline);
@@ -325,6 +329,46 @@ it('orders the exact configured relay before unconfigured categories sharing its
   ]));
 });
 
+it('defaults to the connection model and searches the complete catalogue only in Registry', async () => {
+  writeCatalogCache([{ id: 'openai', label: 'OpenAI', runtime: 'openai', auth: 'api-key',
+    models: [{ id: 'shared' }, { id: 'catalog-only' }] }]);
+  const picker = modelPicker(commands());
+  await picker.load();
+  const navigation = picker.navigation!;
+  const bound = `model:${JSON.stringify(['ready', 'openai', 'shared'])}`;
+  const catalogueOnly = `model:${JSON.stringify(['ready', 'openai', 'catalog-only'])}`;
+
+  expect(navigation.active).toBe('ready');
+  expect(navigation.items.filter(item => item.id === 'ready' || item.id === 'all').map(item => [item.id, item.label])).toEqual([
+    ['ready', 'Ready / Configured'], ['all', 'Registry'],
+  ]);
+  expect(navigation.project('').map(row => row.id)).toContain(bound);
+  expect(navigation.project('').map(row => row.id)).not.toContain(catalogueOnly);
+  expect(navigation.project('catalog-only').map(row => row.id)).toEqual([]);
+
+  const registry = navigation.select('all')!;
+  expect(registry.options.map(row => row.id)).toContain(catalogueOnly);
+  expect(navigation.project('catalog-only').map(row => row.id)).toEqual([catalogueOnly]);
+});
+
+it('uses model-level bindings instead of treating a customized canonical provider as wholly configured', async () => {
+  const base = getRuntimeConfig(root);
+  const config = { ...base, provider: 'openai' as const, activeProviderConnectionId: undefined, providerConnections: [],
+    providerCredentials: { ...base.providerCredentials, openai: { ...base.providerCredentials?.openai, model: 'shared' } } };
+  const catalog = mergeProviders(BUILTIN_PROVIDERS, [
+    { id: 'openai', label: 'OpenAI', models: [{ id: 'shared' }] },
+    { id: 'my-relay', label: 'My relay', runtime: 'openai', auth: 'api-key',
+      baseUrl: 'https://relay.invalid/v1', models: [{ id: 'relay-model' }] },
+  ], { origin: 'user' });
+  const picker = modelPicker({ ...commands(), readConfiguration: () => ({ config, catalog }) });
+  await picker.load();
+
+  const rows = picker.navigation!.project('').map(row => row.id);
+  expect(rows).toContain(`model:${JSON.stringify([null, 'openai', 'shared'])}`);
+  expect(rows).not.toContain(`model:${JSON.stringify([null, 'openai', 'catalog-only'])}`);
+  expect(rows).toContain(`model:${JSON.stringify([null, 'my-relay', 'relay-model'])}`);
+});
+
 it('marks only the exact relay target active instead of its canonical alias', async () => {
   writeCatalogCache([{ id: 'openai', runtime: 'openai', models: [{ id: 'shared' }] }, ...catalogue()]);
   writeSessionModel(sessionId, { connectionScope: 'session', connectionId: 'ready', provider: 'openai', model: 'shared' },
@@ -473,14 +517,14 @@ it('keeps ambiguous exact-address categories unavailable even with a configured 
   }
 });
 
-it('marks an exact category unavailable when its configured models cannot accept the current effort', async () => {
+it('keeps a configured model available when its current effort falls back to automatic', async () => {
   writeSessionModel(sessionId, { connectionId: 'ready', provider: 'openai', model: 'shared', thinkingEffort: 'high' }, readSessionModelEdit(sessionId));
   writeCatalogCache(catalogue().map(provider => provider.id === 'relay-ready'
     ? { ...provider, models: [{ id: 'shared', contextWindow: 32000, reasoning: true, thinkingLevelMap: { high: null } }] } : provider));
   const picker = modelPicker(commands()); const rows = await picker.load();
-  expect(picker.navigation!.items.find(item => item.id === 'relay-ready')?.note).toBe('○');
-  expect(rows.find(row => row.id === target('relay-ready', 'ready'))).toMatchObject({ disabled: true, focusable: true });
-  expect(picker.detail!(target('relay-ready', 'ready'))).toContain('reasoning effort unsupported');
+  expect(picker.navigation!.items.find(item => item.id === 'relay-ready')?.note).toBeUndefined();
+  expect(rows.find(row => row.id === target('relay-ready', 'ready'))).toMatchObject({ note: 'active' });
+  expect(picker.detail!(target('relay-ready', 'ready')).join('\n')).toContain('Reasoning effort: auto');
   const details = (await picker.inspect!(target('relay-ready', 'ready')))!.next!;
   expect((await details.load()).map(row => row.id)).toContain('effort');
 });
@@ -542,23 +586,24 @@ it.each([40, 80, 120])('sorts exact provider and model groups, skips the not-rea
   const picker = modelPicker({ ...commands(), readConfiguration: () => ({ config: getRuntimeConfig(root), catalog, revision: 1 }) });
   const rows = await picker.load(), navigation = picker.navigation!;
   expect(navigation.items.map(item => item.label)).toEqual([
-    'Roles', 'All models', 'Alpha ready', 'Zulu ready', 'Not ready', 'Beta offline', 'Omega offline',
+    'Roles', 'Ready / Configured', 'Registry', 'Alpha ready', 'Zulu ready', 'Not ready', 'Beta offline', 'Omega offline', 'openai',
   ]);
   const heading = navigation.items.find(item => item.disabled)!;
   expect(heading.label).toBe('Not ready'); expect(navigation.select(heading.id)).toBeUndefined();
   expect(rows[0]?.id).toBe('model:current');
-  const labels = ['sort-alpha', 'sort-beta', 'sort-delta', 'sort-zulu', 'sort-aardvark', 'sort-gamma', 'sort-omega', 'sort-zed'];
+  const labels = ['sort-beta', 'sort-delta', 'sort-alpha', 'sort-zulu', 'sort-aardvark', 'sort-omega', 'sort-gamma', 'sort-zed'];
   expect(rows.filter(row => row.label.startsWith('sort-')).map(row => row.label)).toEqual(labels);
+  navigation.select('all');
   expect(picker.filterOptions!('sort-', rows).map(row => row.label)).toEqual(labels);
+  navigation.select('ready');
   expect(rows.filter(row => row.id.startsWith('role:')).map(row => row.id))
     .toEqual(['role:default', 'role:subagent', 'role:summary', 'role:advisor']);
   const before = readSessionModelEdit(sessionId), global = fs.readFileSync(getUserRuntimeConfigPath());
   const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected probe'));
   const overlay = new OverlayHost(() => {}); overlay.open(picker); await settle(); const apply = vi.fn();
-  overlay.handleKey(parseKeyEvent('\t'), apply);
-  for (let step = 0; step < navigation.items.length && navigation.active !== 'sort-first'; step++) overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
+  navigation.select('sort-first');
   expect(navigation.active).toBe('sort-first');
-  overlay.handleKey(parseKeyEvent('\x1b[B'), apply); expect(navigation.active).toBe('sort-zlast');
+  navigation.select('sort-zlast'); expect(navigation.active).toBe('sort-zlast');
   const frame = overlay.render(width, 30).map(stripAnsi);
   const row = frame.findIndex(text => text.split('│')[0]?.includes('Not ready'));
   expect(row).toBeGreaterThan(0);

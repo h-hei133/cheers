@@ -46,6 +46,13 @@ export type CommandComposition = {
   prepare(args: readonly string[], prose: string): { readonly args: readonly string[] } | { readonly error: string };
 };
 
+/** The CLI may inspect an explicit target without its startup model override, then release that override after the write settles. */
+export type CommandTargetResolver = ((config: RuntimeConfig, sessionId?: string) => ProviderCredentialResolution) & {
+  readonly resolveModelTarget?: (config: RuntimeConfig, sessionId?: string,
+    target?: import('../../session/model/contract.js').SessionModelTarget) => ProviderCredentialResolution;
+  readonly releaseModelOverride?: () => void;
+};
+
 export interface CommandContext {
   /** Validated user methods for one native workflow; this conveys no tool authority. */
   readonly composedPrompt?: {
@@ -179,7 +186,7 @@ export interface CommandContext {
    */
   readonly runtimeConfig?: RuntimeConfig
   /** Resolve the request provider using the host's explicit selection inputs. */
-  readonly resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ProviderCredentialResolution
+  readonly resolveConfigTarget?: CommandTargetResolver
   /** Read the configuration and catalogue from one accepted publication. */
   readonly readConfiguration?: () => { readonly config: RuntimeConfig; readonly catalog: readonly CatalogProvider[]; readonly catalogDiagnostics?: readonly string[]; readonly revision?: number; readonly binding?: import('../../config/state.js').ConfigBinding }
   readonly admission?: () => string | undefined

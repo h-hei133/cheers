@@ -1,4 +1,7 @@
 import { loadCatalog } from "../core/models/catalogStore.js";
+import { getRuntimeConfig } from "../config/runtimeConfig.js";
+import { availabilitySnapshot, matchesCatalog } from "../core/models/availability.js";
+import { isUserConfiguredModel } from "../core/models/catalog.js";
 import { modelSupportsVision } from "../core/models/modalities.js";
 import { fuzzyFilter } from "../presentation/tui/text/search.js";
 
@@ -18,17 +21,23 @@ function formatTokenCount(count: number | undefined): string {
   return `${count}`;
 }
 
-export function formatCliModelList(pattern?: string): string {
-  const all = loadCatalog().flatMap((provider) =>
-    provider.models.map((model) => ({
+export function formatCliModelList(pattern?: string, workspaceRoot = process.cwd()): string {
+  const catalog = loadCatalog();
+  const config = getRuntimeConfig(workspaceRoot);
+  const availability = availabilitySnapshot({ config, catalog });
+  const all = catalog.flatMap((provider) => {
+    const entry = availability.providers.find(candidate => candidate.provider === provider.runtime);
+    const ready = Boolean(entry?.connections.some(connection => connection.state === 'ready'
+      && matchesCatalog(provider, connection, config.providerConnections, catalog)));
+    return provider.models.filter(model => ready || isUserConfiguredModel(provider, model.id)).map((model) => ({
       provider: provider.id,
       id: model.id,
       contextWindow: model.contextWindow,
       maxTokens: model.maxTokens,
       reasoning: model.reasoning === false ? "no" : "yes",
       images: modelSupportsVision(model) ? "yes" : "no",
-    })),
-  );
+    }));
+  });
 
   const filtered = pattern?.trim()
     ? fuzzyFilter(all, pattern.trim(), (m) => `${m.provider} ${m.id}`)

@@ -200,12 +200,18 @@ export class SessionManager extends SessionReentrySurface {
   }
 
   renameSession(sessionId: string, title: string): Session {
-    const session = this.host.store.load(sessionId);
     const normalized = title.trim();
-    session.title = normalized.length > 0 ? normalized : undefined;
-    session.updatedAt = new Date().toISOString();
-    this.host.store.writeSessionMetadata(session);
-    return session;
+    return commitSessionRecordTransaction(
+      this.host.store.stateLayout(sessionId),
+      sessionId,
+      (session, timestamp) => ({
+        session: {
+          ...session,
+          title: normalized.length > 0 ? normalized : undefined,
+          updatedAt: timestamp,
+        },
+      }),
+    );
   }
 
   /** Preview or explicitly apply a transcript format change for this saved session. */

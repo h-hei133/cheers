@@ -78,6 +78,24 @@ it('runs the production shell RPC through the native gate and persists its resul
     && event.event.success === true)).toBe(true);
 });
 
+it('renames the saved session while idle and cancels the rename while it is busy', async () => {
+  const test = fixture();
+  const idle = await handleRpcCommand({ type: 'set_session_name', name: 'Saved session' }, test.host);
+  expect(idle).toMatchObject({ success: true, data: { sessionId: test.context.session.id, name: 'Saved session' } });
+  expect(new SessionManager().getSession(test.context.session.id)!.title).toBe('Saved session');
+
+  let release!: () => void;
+  const active = test.runtime.commands.run(() => new Promise<void>(resolve => { release = resolve; }));
+  await Promise.resolve();
+  try {
+    expect(test.runtime.isRunning()).toBe(true);
+    const busy = await handleRpcCommand({ type: 'set_session_name', name: 'Must not be saved' }, test.host);
+    expect(busy).toMatchObject({ success: true, data: { cancelled: true } });
+    expect(new SessionManager().getSession(test.context.session.id)!.title).toBe('Saved session');
+    expect(test.context.session.title).toBe('Saved session');
+  } finally { release(); await active; }
+});
+
 it('retains excluded output as a branch report without adding it to model history, including after reopen and fork', async () => {
   const test = fixture();
   const result = await handleRpcCommand({ type: 'bash', command: 'printf RPC_EXCLUDED', excludeFromContext: true }, test.host);

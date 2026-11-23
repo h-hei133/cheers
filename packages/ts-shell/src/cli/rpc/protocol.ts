@@ -177,7 +177,9 @@ export interface RpcHost {
   readonly getState?: () => RpcSessionState;
   readonly newSession?: (parentSession?: string) => Promise<{ readonly cancelled: boolean; readonly sessionId?: string }>;
   readonly switchSession?: (sessionPath: string) => Promise<{ readonly cancelled: boolean; readonly sessionId?: string }>;
-  readonly setSessionName?: (name: string) => Promise<{ readonly sessionId: string; readonly name: string }>;
+  readonly setSessionName?: (name: string) => Promise<
+    { readonly cancelled: true } | { readonly sessionId: string; readonly name: string }
+  >;
   readonly getSessionStats?: () => Record<string, unknown>;
   readonly getLastAssistantText?: () => string | null;
   readonly setModel?: (provider: string, modelId: string) => Promise<Record<string, unknown>>;

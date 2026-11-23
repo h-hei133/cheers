@@ -101,7 +101,7 @@ export async function runCliProcess(
   if (parsed.ok === false) { input.writeError(parsed.error.message); input.exit(parsed.error.exitCode); return; }
   if (parsed.args.options.listModels !== undefined) {
     const pattern = typeof parsed.args.options.listModels === "string" ? parsed.args.options.listModels : undefined;
-    input.writeOutput(formatCliModelList(pattern));
+    input.writeOutput(formatCliModelList(pattern, input.launchCwd));
     return;
   }
   const handoff = input.process.env?.CHEERS_PROFILE_HANDOFF;
@@ -223,6 +223,7 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
       runtimeConfig: () => runtimeContext.runtimeConfig,
       options,
       sessionId: () => runtimeContext.session.id,
+      resolveConfigTarget: runtimeContext.resolveConfigTarget,
     });
     // The configured theme has to be applied to the shared palette before any
     // surface renders, or the first frame is drawn in the default and never

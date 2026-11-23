@@ -47,6 +47,7 @@ export function sessionHost(options: RuntimeRpcHostOptions, manager: SessionMana
         prepare: check => { check(); const current = manager.getSession(targetId); if (!current) throw new Error('The selected session is unavailable.'); return current; } });
     },
     setSessionName: async (name) => {
+      if (busy()) return { cancelled: true };
       const updated = manager.renameSession(runtimeContext.session.id, name);
       runtimeContext.session = updated;
       return { sessionId: updated.id, name: updated.title ?? "" };

@@ -17,7 +17,7 @@ import { globalModelFailure } from './outcome.js';
 import { effortCapability } from '../../models/capability.js';
 import { endpointShape } from '../../../provider/endpoints/index.js';
 import { effortOutputFailure } from '../../../provider/endpoints/effort.js';
-import { catalogBaseUrl, catalogModel, catalogProvider } from '../../models/catalog.js';
+import { catalogBaseUrl, catalogModel, catalogProvider, type CatalogProvider } from '../../models/catalog.js';
 import type { ThinkingPreference } from '../../models/effort.js';
 import type { CommandContext } from '../types.js';
 import { connectionIdentity, credentialIdentity } from './identity.js';
@@ -30,6 +30,7 @@ import { sessionVirtualModels } from '../../catalog/models.js';
 import { parseModelSelection } from '../../models/virtual/selection.js';
 import { setVirtualModel } from './virtual.js';
 import { EXTENSION_MODEL_PREFIX, extensionModelReference, sessionProviderScope, sessionProviders } from '../../catalog/providers.js';
+import { matchesCatalog } from '../../models/availability.js';
 
 interface ExactSelection { readonly target: SessionModelTarget; readonly baseline?: SessionModelEdit; readonly roles?: SessionModelPolicy;
   readonly resolution?: string }
@@ -85,6 +86,13 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   if (!target && requestedEffort === undefined) {
     return "Usage: /model use <provider>/<model>, or /model use <model> to keep the current provider.";
   }
+  const explicitModelSelection = Boolean(exact?.target.model ?? args[0]?.trim());
+  const startupResolver = context.resolveConfigTarget;
+  const resolveModelTarget = startupResolver?.resolveModelTarget;
+  if (!global && exact?.target && resolveModelTarget) {
+    context = { ...context, resolveConfigTarget: (config, sessionId) =>
+      resolveModelTarget(config, sessionId, exact!.target) };
+  }
   // A `provider/model` target names both; a bare name keeps the active provider.
   // Model ids can themselves contain slashes, so only a leading segment that is a
   // known provider is read as one.
@@ -112,6 +120,16 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   const effective = context.readConfiguration?.().config ?? context.runtimeConfig ?? projected;
   const actual = modelRequest(context, effective);
   const catalog = physical;
+  if (!exact && namedProvider && !global) {
+    if (!loaded.configValidation.valid) return 'Model switch blocked: the stored configuration is invalid. Correct it and reload before selecting a model.';
+    const resolved = resolveNamedConnection(context, loaded, catalog, namedProvider, model!, resolveModelTarget);
+    if (typeof resolved === 'string') return resolved;
+    exact = resolved;
+    if (resolveModelTarget) {
+      context = { ...context, resolveConfigTarget: (candidate, sessionId) =>
+        resolveModelTarget(candidate, sessionId, exact!.target) };
+    }
+  }
   const providerSlot = exact ? exact.target.connectionId === undefined
     : !projected.activeProviderConnectionId && !actual.credential?.connectionId;
   if (!exact && (actual.blocked || (!actual.credential && (!providerSlot || !providerBindingAvailable(catalog, actual))))) {
@@ -150,7 +168,9 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   const extensionScope = extension && context.sessionId ? sessionProviderScope(context.cwd, context.sessionId, catalog, scopeRequest, extension) : undefined;
   const extensionRefusal = extensionScope?.admission?.();
   if (extensionRefusal) return `Model switch blocked: ${extensionRefusal}`;
-  if (namedProvider && namedProvider.id !== namedProvider.runtime && catalogProvider(catalog, provider, baseUrl).entry?.id !== namedProvider.id) {
+  const binding = catalogProvider(catalog, provider, baseUrl);
+  if (binding.ambiguous) return 'Model switch blocked: multiple catalogue entries claim this endpoint.';
+  if (namedProvider && namedProvider.id !== namedProvider.runtime && binding.entry?.id !== namedProvider.id) {
     return `Model switch blocked: the ${namedProvider.id} alias does not match the configured endpoint.`;
   }
   const modelCatalog = extensionScope?.catalog ?? catalog;
@@ -306,6 +326,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     } catch (error) {
       return sessionFailure(error);
     }
+    if (!global && explicitModelSelection) startupResolver?.releaseModelOverride?.();
     // A different model is a different tokenizer: the previous prompt count no
     // longer describes what the next request will carry.
     invalidatePromptMeasurement(context.sessionId);
@@ -320,7 +341,9 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     }
   }
   const applicationNotice = configurationApplicationNotice(context);
-  if (applicationNotice) return [`Model preference saved for ${model}; reasoning effort: ${thinkingEffort ?? "auto (provider decides)"}.`, capabilityNotice, applicationNotice].filter(Boolean).join("\n");
+  if (applicationNotice) {
+    return [`Model preference saved for ${model}; reasoning effort: ${thinkingEffort ?? "auto (provider decides)"}.`, capabilityNotice, applicationNotice].filter(Boolean).join("\n");
+  }
 
   // Dispatch PostModelSwitch Hook
   await hooks.dispatch({
@@ -350,6 +373,32 @@ function sessionFailure(error: unknown): string {
 function matchesRequestProvider(context: CommandContext, config: RuntimeConfig, provider: string): boolean {
   return !context.resolveConfigTarget || context.resolveConfigTarget(config).provider === provider;
 }
+
+/** An explicit provider/model may select one ready configured connection for this session. */
+function resolveNamedConnection(context: CommandContext, config: RuntimeConfig, catalog: readonly CatalogProvider[],
+  provider: CatalogProvider, model: string,
+  resolveModelTarget?: NonNullable<CommandContext['resolveConfigTarget']>['resolveModelTarget']): ExactSelection | string {
+  const candidates = config.providerConnections.flatMap(connection => {
+    if (connection.provider !== provider.runtime
+      || !matchesCatalog(provider, { connectionId: connection.id, provider: connection.provider }, config.providerConnections, catalog)) return [];
+    const target: SessionModelTarget = { connectionId: connection.id, provider: connection.provider, model };
+    const targetContext = resolveModelTarget ? { ...context,
+      resolveConfigTarget: (candidate: RuntimeConfig, sessionId?: string) => resolveModelTarget(candidate, sessionId, target) } : context;
+    return exactTargetMatches(targetContext, config, target, catalog) ? [target] : [];
+  });
+  if (candidates.length === 0) {
+    return `Model switch blocked: ${provider.id}/${model} has no ready configured connection. Select a connection with /connect use, then choose the model by id.`;
+  }
+  if (candidates.length > 1) {
+    return `Model switch blocked: ${provider.id}/${model} matches multiple ready connections. Select one with /connect use, then choose the model by id.`;
+  }
+  if (!context.sessionId) return 'Model switch blocked: selecting a configured connection requires an active session.';
+  const target = candidates[0]!;
+  const targetContext = resolveModelTarget ? { ...context,
+    resolveConfigTarget: (candidate: RuntimeConfig, sessionId?: string) => resolveModelTarget(candidate, sessionId, target) } : context;
+  return { target, resolution: targetResolutionIdentity(targetContext, config, target) };
+}
+
 /**
  * A connection does not own the provider-level default: both layers are stored
  * side by side and the connection wins at request time, so an existing

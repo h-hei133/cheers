@@ -1,14 +1,13 @@
 import { type ConfigState, type ConfigReloadResult } from '../../config/state.js';
 import { configurationBinding, initialConfiguration, refreshConfiguration } from './configuration.js';
 import type { RuntimeConfig, RuntimeConfigOverrides } from '../../config/runtimeConfig.js'
-import type { ProviderCredentialResolution } from './providerCredentials.js';
 import type { Session, WorkspaceRootMode } from '../../session/SessionManager.js'
 import type { WorkflowGitContext } from '../workspace/git.js'
 import path from 'node:path'
 import { forgetSessionTodos, replayTodosFromMessages } from '../commands/todoCommandRuntime.js'
 import { restoreSessionUsage } from '../../observability/usageTelemetry.js'
 import { selectModelContext } from '../../session/context/selection.js';
-import type { CommandContext } from '../commands/types.js'
+import type { CommandContext, CommandTargetResolver } from '../commands/types.js'
 import type { ContextEntry } from '../../context/attachment/entry.js';
 import { currentProfile } from '../paths/profile/context.js';
 import type { PromptIdentitySnapshot } from '../../observability/usage/model.js';
@@ -67,7 +66,7 @@ export interface ShellRuntimeContext {
   readonly configuration: ConfigState
   /** Explicit launch flags must survive settings reloads and session switches. */
   readonly runtimeConfigOverrides?: RuntimeConfigOverrides
-  readonly resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ProviderCredentialResolution
+  readonly resolveConfigTarget?: CommandTargetResolver
   /** Startup waits for extension registrations before resolving an explicit logical choice. */
   readonly deferredModel?: () => boolean
   /**
@@ -145,7 +144,7 @@ export function createShellRuntimeContext(input: {
   rootBindingDiagnostics?: readonly RootBindingDiagnostic[]
   runtimeConfig: RuntimeConfig
   runtimeConfigOverrides?: RuntimeConfigOverrides
-  resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ProviderCredentialResolution
+  resolveConfigTarget?: CommandTargetResolver
   deferredModel?: () => boolean
   skillOptions?: {
     readonly skillPaths?: readonly string[]

@@ -13,6 +13,8 @@ import {
   writeUserRuntimeConfigFile,
 } from "../../config/runtimeConfig.js";
 import { selectPooledConnection } from "../../core/auth/account/pool.js";
+import { projectModelSelection } from '../../session/model/projection.js';
+import type { CommandTargetResolver } from '../../core/commands/types.js';
 import { StartupSurface } from '../interactive/startup.js';
 import { RecordingTerminal, ManualScheduler } from '../../test-utils/terminalDouble.js';
 import {
@@ -109,6 +111,36 @@ it("resolves a pooled target with the bootstrapped session identity", () => {
   expect(resolveConfigTarget?.(config, session.id)).toMatchObject({
     credential: { connectionId: "second", apiKey: "synthetic-second" },
   });
+});
+
+it('resolves an explicit model target without the startup model and releases only that override', () => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const active = { id: 'primary-model', provider: 'openai' as const, authType: 'api-key' as const,
+    apiKey: 'SYNTHETIC_TARGET_KEY', model: 'gpt-5.3', status: 'connected' as const,
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
+  const target = { ...active, id: 'alternate-model' };
+  const selectedTarget = { connectionId: target.id, provider: target.provider, model: 'gpt-5.3' };
+  writeUserRuntimeConfigFile({ ...edit.values, provider: 'openai', activeProviderConnectionId: active.id,
+    providerConnections: [active, target] }, edit);
+  const options = { provider: 'openai' as const, model: 'gpt-5.4', apiKey: 'SYNTHETIC_TARGET_KEY' };
+  const rootContext = createCliRootContext({ launchCwd: workspace, options, ...processPorts });
+  const bootstrap = createCliBootstrapRuntimeContext({ launchCwd: workspace, options, rootContext,
+    writeError: vi.fn(), exit: () => { throw new Error('bootstrap unexpectedly exited'); } });
+  const resolver = bootstrap.runtimeContext.resolveConfigTarget as CommandTargetResolver;
+  const session = bootstrap.runtimeContext.session;
+  const config = bootstrap.runtimeContext.runtimeConfig;
+  const candidate = projectModelSelection(config, { connectionId: target.id, connectionScope: 'session',
+    provider: 'openai', model: 'gpt-5.3' });
+
+  expect(resolver(candidate, session.id)).toMatchObject({ model: 'gpt-5.4', provider: 'openai',
+    credential: { connectionId: target.id, apiKey: 'SYNTHETIC_TARGET_KEY' } });
+  expect(resolver.resolveModelTarget?.(candidate, session.id, selectedTarget)).toMatchObject({ model: 'gpt-5.3', provider: 'openai',
+    credential: { connectionId: target.id, apiKey: 'SYNTHETIC_TARGET_KEY' } });
+
+  resolver.releaseModelOverride?.();
+
+  expect(resolver(candidate, session.id)).toMatchObject({ model: 'gpt-5.3', provider: 'openai',
+    credential: { connectionId: target.id, apiKey: 'SYNTHETIC_TARGET_KEY' } });
 });
 
 it("rejects a missing explicit config before bootstrap", () => {

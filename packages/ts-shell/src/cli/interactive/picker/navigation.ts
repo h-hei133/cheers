@@ -6,7 +6,7 @@ export interface NavigationItem {
   /** A display-only heading has no keyboard or pointer selection authority. */
   readonly disabled?: boolean;
 }
-export interface NavigationGroup { readonly category: string; readonly section?: string }
+export interface NavigationGroup { readonly category: string; readonly section?: string; readonly configured?: boolean }
 export interface NavigationUpdate { readonly options: readonly Option[]; readonly focus?: string; readonly query?: string }
 export interface NavigationOrigin { readonly rows: readonly Option[]; readonly crossCategory: boolean }
 export interface PickerNavigation {
@@ -67,12 +67,17 @@ export class CatalogNavigation implements PickerNavigation {
     }
     this.searching = Boolean(query);
     this.projectionQuery = query;
+    const rows = this.rows.filter(row => {
+      if (this.category === 'all') return true;
+      const group = this.groups.get(row.id);
+      return this.category === 'ready' ? group?.configured === true : group?.category === this.category;
+    });
     if (query) {
       this.domain = 'rows';
-      this.projection = this.rows.filter(row => `${row.label} ${row.detail ?? ''} ${row.note ?? ''} ${row.searchText ?? ''}`.toLowerCase().includes(query));
+      const source = this.searchSelection ? rows : this.rows;
+      this.projection = source.filter(row => `${row.label} ${row.detail ?? ''} ${row.note ?? ''} ${row.searchText ?? ''}`.toLowerCase().includes(query));
       return this.projection;
     }
-    const rows = this.rows.filter(row => this.category === 'all' || this.groups.get(row.id)?.category === this.category);
     if (!this.sectionFocus) {
       this.projection = rows;
       return this.projection;

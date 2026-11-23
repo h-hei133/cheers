@@ -9,15 +9,20 @@ export function orderModelCatalog(catalog: readonly CatalogProvider[], rows: Opt
     || (left.label || left.id).localeCompare(right.label || right.id) || left.id.localeCompare(right.id));
   const positions = new Map(providers.map((provider, index) => [provider.id, index]));
   rows.sort((left, right) => Number(!ready.has(groups.get(left.id)?.category)) - Number(!ready.has(groups.get(right.id)?.category))
-    || left.label.localeCompare(right.label)
-    || (positions.get(groups.get(left.id)?.category ?? '') ?? 0) - (positions.get(groups.get(right.id)?.category ?? '') ?? 0));
+    || (positions.get(groups.get(left.id)?.category ?? '') ?? 0) - (positions.get(groups.get(right.id)?.category ?? '') ?? 0)
+    || (groups.get(left.id)?.section ?? '').localeCompare(groups.get(right.id)?.section ?? '')
+    || left.label.localeCompare(right.label));
+  const items: NavigationItem[] = [
+    { id: 'ready', label: 'Ready / Configured' },
+    { id: 'all', label: 'Registry' },
+  ];
   let heading = 'section:not-ready';
   while (positions.has(heading)) heading += ':';
-  const items: NavigationItem[] = [];
   let separated = false;
   for (const provider of providers) {
     if (!ready.has(provider.id) && !separated) {
-      items.push({ id: heading, label: 'Not ready', disabled: true }); separated = true;
+      items.push({ id: heading, label: 'Not ready', disabled: true });
+      separated = true;
     }
     items.push({ id: provider.id, label: provider.label || provider.id, note: ready.has(provider.id) ? undefined : '○' });
   }

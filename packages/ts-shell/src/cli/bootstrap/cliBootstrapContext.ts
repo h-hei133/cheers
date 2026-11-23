@@ -1,6 +1,6 @@
 import type { CoreMcpGateway } from "../../core/mcp/gateway.js";
 import { configurationAdmission, initialConfiguration } from '../../core/shell/configuration.js';
-import { getRuntimeConfig, type RuntimeConfigOverrides } from "../../config/runtimeConfig.js";
+import { getRuntimeConfig, type RuntimeConfig, type RuntimeConfigOverrides } from "../../config/runtimeConfig.js";
 import { createConfigInputs } from '../../config/inputs/selection.js';
 import type { ConfigInputs } from '../../config/inputs/model.js';
 import type {
@@ -23,6 +23,8 @@ import { createCoreToolRegistry } from '../../tools/registry.js';
 import { filterVisibleToolNames } from '../../core/tools/prefilter.js';
 import { createCommandRegistry } from '../../core/commands/registry.js';
 import { sameValue } from '../../config/values.js';
+import { projectModelSelection } from '../../session/model/projection.js';
+import type { SessionModelSelection, SessionModelTarget } from '../../session/model/contract.js';
 import type { CliExtensionArguments } from '../options/extensions.js';
 import { prepareExtensionFiles, type PreparedExtensionFiles } from '../runtime/extensions/files.js';
 import { getWorkflowGitContext } from "../../core/workspace/git.js";
@@ -184,12 +186,21 @@ function bootstrapResources(input: CreateCliBootstrapRuntimeContextInput) {
     const recoveryCandidateSummary = null;
     const recoveryBlockedNotice = null;
     let pendingModel = Boolean(input.options.model);
+    let startupModelActive = pendingModel;
+    const resolveConfigTarget = Object.assign((config: RuntimeConfig, sessionId?: string) =>
+      resolveCliCredential(config, { ...input.options, model: startupModelActive ? input.options.model : undefined }, process.env, sessionId), {
+      resolveModelTarget: (config: RuntimeConfig, sessionId?: string, target?: SessionModelTarget) => {
+        const candidate = target ? projectModelSelection(config, selectionForTarget(target)) : config;
+        return resolveCliCredential(candidate, { ...input.options, model: undefined, thinking: undefined }, process.env, sessionId);
+      },
+      releaseModelOverride: () => { startupModelActive = false; },
+    });
     const shell: Parameters<typeof bootstrapShellRuntime>[0] = {
       cwd: input.rootContext.workspaceRoot,
       launchCwd: input.launchCwd,
       runtimeConfig: input.rootContext.runtimeConfig,
       runtimeConfigOverrides: configOverrides(input.options),
-      resolveConfigTarget: (config, sessionId) => resolveCliCredential(config, input.options, process.env, sessionId),
+      resolveConfigTarget,
       deferredModel: () => pendingModel,
       ...(input.options.skillPaths || input.options.noSkills ? {
         skillOptions: {
@@ -240,6 +251,10 @@ function bootstrapResources(input: CreateCliBootstrapRuntimeContextInput) {
     if (!input.output) output?.restore();
     throw error;
   }
+}
+
+function selectionForTarget(target: SessionModelTarget): SessionModelSelection {
+  return 'connectionScope' in target ? target : { ...target, connectionScope: 'session' };
 }
 
 export interface LogCliBootstrapSessionInitializedInput {

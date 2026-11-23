@@ -228,6 +228,20 @@ export interface CatalogProvider {
   readonly custom?: boolean;
 }
 
+const userConfiguredModels = new WeakMap<CatalogProvider, ReadonlySet<string>>();
+
+/** Whether the user's catalogue explicitly declares this provider/model pair. */
+export function isUserConfiguredModel(provider: CatalogProvider, modelId: string): boolean {
+  return userConfiguredModels.get(provider)?.has(modelId) ?? false;
+}
+
+/** Carry private source metadata across an accepted catalogue snapshot clone. */
+export function copyUserConfiguredModels(source: CatalogProvider, target: CatalogProvider): void {
+  const configured = userConfiguredModels.get(source);
+  if (configured) userConfiguredModels.set(target, new Set(configured));
+  else userConfiguredModels.delete(target);
+}
+
 const OPENAI_COMPATIBLE: RuntimeProvider = "openai-compatible";
 
 /**
@@ -644,14 +658,20 @@ export function mergeProviders(
     readonly origin?: "user" | "refresh";
   } = {},
 ): CatalogProvider[] {
-  const merged = base.map((provider) => ({ ...provider }));
+  const merged = base.map((provider) => {
+    const copy = { ...provider };
+    const configured = userConfiguredModels.get(provider);
+    if (configured) userConfiguredModels.set(copy, configured);
+    return copy;
+  });
   const custom = options.origin !== "refresh";
+  const userOrigin = options.origin === "user";
   for (const patch of overlay) {
     if (!patch.id) continue;
     const models = patch.models?.map(sanitizeModelLimits);
     const index = merged.findIndex((provider) => provider.id === patch.id);
     if (index < 0) {
-      merged.push({
+      const added: CatalogProvider = {
         id: patch.id,
         label: patch.label ?? patch.id,
         runtime: patch.runtime ?? "openai-compatible",
@@ -664,11 +684,13 @@ export function mergeProviders(
         endpoint: patch.endpoint,
         models: models ?? [],
         custom,
-      });
+      };
+      merged.push(added);
+      if (userOrigin && models?.length) userConfiguredModels.set(added, new Set(models.map(model => model.id)));
       continue;
     }
     const existing = merged[index]!;
-    merged[index] = {
+    const updated: CatalogProvider = {
       ...existing,
       ...patch,
       // A user's models add to what ships rather than replacing it, so patching a
@@ -678,6 +700,13 @@ export function mergeProviders(
         : existing.models,
       custom,
     };
+    merged[index] = updated;
+    const prior = userConfiguredModels.get(existing);
+    if (userOrigin && models?.length) {
+      userConfiguredModels.set(updated, new Set([...(prior ?? []), ...models.map(model => model.id)]));
+    } else if (prior) {
+      userConfiguredModels.set(updated, prior);
+    }
   }
   return merged;
 }

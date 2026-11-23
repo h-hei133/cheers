@@ -13,6 +13,13 @@ import { ownedConnectionCredential } from '../auth/account/presence.js';
 import { noteCredentialRateLimit, resetCredentialBackoffForTests } from '../auth/account/backoff.js';
 import { loadCatalogSnapshot, userCatalogPath } from '../models/catalogStore.js';
 import { resolveProviderCredential } from '../shell/providerCredentials.js';
+import type { CatalogProvider } from '../models/catalog.js';
+import { SessionManager } from '../../session/SessionManager.js';
+import { readSessionModel } from '../../session/model/state.js';
+import { projectModelSelection, projectSessionModel } from '../../session/model/projection.js';
+import { exactTargetMatches } from './model/target.js';
+import type { CommandTargetResolver } from './types.js';
+import type { SessionModelTarget } from '../../session/model/contract.js';
 
 describe("model command runtime", () => {
   const originalHome = process.env.USERPROFILE;
@@ -69,6 +76,19 @@ describe("model command runtime", () => {
     expect(help.output).toContain('user profile only');
     expect(help.output).toContain('inside the existing providers object');
     expect(fs.readFileSync(userCatalogPath(), 'utf8')).toBe('{}');
+  });
+
+  it('keeps bare model discovery to ready or user-configured providers', async () => {
+    const catalog: CatalogProvider[] = [
+      { id: 'openai', label: 'OpenAI', runtime: 'openai', auth: 'api-key', models: [{ id: 'ready-model' }] },
+      { id: 'public-fixture', label: 'Public fixture', runtime: 'openai-compatible', auth: 'api-key',
+        baseUrl: 'https://public.invalid/v1', models: [{ id: 'public-model' }] },
+    ];
+    const result = await runModelCommand([], { cwd: workspaceRoot,
+      readConfiguration: () => ({ config: getRuntimeConfig(workspaceRoot), catalog }) });
+
+    expect(result.output).toContain('ready-model');
+    expect(result.output).not.toContain('public-model');
   });
 
   it("shows model status", async () => {
@@ -331,6 +351,26 @@ describe("model command runtime", () => {
     expect(result.output).toContain("--base-url <url> --model <model>");
   });
 
+  it('keeps an explicitly listed provider bound to its catalogue address', async () => {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, provider: 'openai-compatible', activeProviderConnectionId: 'nofx',
+      providerConnections: [{ id: 'nofx', provider: 'openai-compatible', authType: 'api-key', apiKey: 'synthetic-key',
+        baseUrl: 'https://nofx.invalid/v1', status: 'connected', createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z' }] }, edit);
+    const catalog: readonly CatalogProvider[] = [
+      { id: 'openai-compatible', label: 'BaiLu', runtime: 'openai-compatible', auth: 'api-key',
+        baseUrl: 'https://bailu.invalid/v1', custom: true, models: [{ id: 'bailu-model' }] },
+      { id: 'nofx', label: 'Nofx', runtime: 'openai-compatible', auth: 'api-key',
+        baseUrl: 'https://nofx.invalid/v1', custom: true, models: [{ id: 'nofx-model' }] },
+    ];
+    const result = await runModelCommand(['list', 'openai-compatible'], {
+      cwd: workspaceRoot, readConfiguration: () => ({ config: getRuntimeConfig(workspaceRoot), catalog }),
+    });
+
+    expect(result.output).toContain('bailu-model');
+    expect(result.output).not.toContain('nofx-model');
+  });
+
   it("explains pending and error connection states", async () => {
     writeUserRuntimeConfigFile({
       provider: "openai",
@@ -443,14 +483,13 @@ describe("model command runtime", () => {
       .toMatchObject({ model: 'gpt-5.4', thinkingEffort: 'high', credential: { source: 'config', apiKey: credential.apiKey } });
   });
 
-  it("answers a bare /model with the catalogue, grouped by provider", async () => {
+  it("limits bare /model discovery to providers ready for the current request", async () => {
     const result = await runModelCommand([], { cwd: workspaceRoot });
 
     expect(result.output).toContain("### Providers and models");
-    expect(result.output).toContain("**Anthropic**");
-    expect(result.output).toContain("**SiliconFlow**");
-    // Grouping is the point: the same model name can appear under two providers,
-    // so a row is only meaningful with its provider attached.
+    expect(result.output).toContain("**OpenAI**");
+    expect(result.output).not.toContain("**Anthropic**");
+    expect(result.output).not.toContain("**SiliconFlow**");
     expect(result.output).toContain("`/model use <provider>/<model>`");
   });
 
@@ -460,5 +499,234 @@ describe("model command runtime", () => {
     });
 
     expect(result.output).toMatch(/openrouter|No active connection/);
+  });
+
+  it('selects the unique ready connection named by a provider/model target for this session', async () => {
+    const endpoint = 'https://relay.example.invalid/v1';
+    await runConnectCommand(['login', 'openai-compatible', '--api-key', 'SYNTHETIC_RELAY_KEY',
+      '--base-url', endpoint, '--model', 'configured-model'], { cwd: workspaceRoot }, undefined, { activate: false });
+    fs.mkdirSync(path.dirname(userCatalogPath()), { recursive: true });
+    fs.writeFileSync(userCatalogPath(), JSON.stringify({ providers: { 'relay-models': {
+      runtime: 'openai-compatible', auth: 'api-key', baseUrl: endpoint, models: [{ id: 'target-model' }],
+    } } }));
+    const targetConnection = getRuntimeConfig(workspaceRoot).providerConnections.find(connection => connection.provider === 'openai-compatible')!;
+    const sessionId = new SessionManager().createNew(workspaceRoot).id;
+
+    const result = await runModelCommand(['use', 'relay-models/target-model'], {
+      cwd: workspaceRoot, projectRoot: workspaceRoot, sessionId,
+    });
+
+    expect(result.output).toContain('Model switched to target-model');
+    expect(result.output).toContain(`Connection: ${targetConnection.id}`);
+    expect(readSessionModel(sessionId)).toMatchObject({
+      connectionId: targetConnection.id, connectionScope: 'session', provider: 'openai-compatible', model: 'target-model',
+    });
+    expect(resolveProviderCredential({ runtimeConfig: projectSessionModel(getRuntimeConfig(workspaceRoot), sessionId),
+      env: {}, pool: { sessionId } })).toMatchObject({
+      provider: 'openai-compatible', model: 'target-model', credential: { connectionId: targetConnection.id },
+    });
+  });
+
+  it('refuses provider/model targets with multiple ready configured connections', async () => {
+    const endpoint = 'https://relay.example.invalid/v1';
+    for (const apiKey of ['SYNTHETIC_RELAY_KEY_A', 'SYNTHETIC_RELAY_KEY_B']) {
+      await runConnectCommand(['login', 'openai-compatible', '--api-key', apiKey,
+        '--base-url', endpoint, '--model', 'configured-model'], { cwd: workspaceRoot }, undefined, { activate: false });
+    }
+    fs.mkdirSync(path.dirname(userCatalogPath()), { recursive: true });
+    fs.writeFileSync(userCatalogPath(), JSON.stringify({ providers: { 'relay-models': {
+      runtime: 'openai-compatible', auth: 'api-key', baseUrl: endpoint, models: [{ id: 'target-model' }],
+    } } }));
+    const sessionId = new SessionManager().createNew(workspaceRoot).id;
+
+    const result = await runModelCommand(['use', 'relay-models/target-model'], {
+      cwd: workspaceRoot, projectRoot: workspaceRoot, sessionId,
+    });
+
+    expect(result.output).toContain('matches multiple ready connections');
+    expect(readSessionModel(sessionId)).toBeUndefined();
+  });
+
+  it('does not use a configured connection when a CLI credential override rejects its binding', async () => {
+    const endpoint = 'https://relay.example.invalid/v1';
+    await runConnectCommand(['login', 'openai-compatible', '--api-key', 'SYNTHETIC_RELAY_KEY',
+      '--base-url', endpoint, '--model', 'configured-model'], { cwd: workspaceRoot }, undefined, { activate: false });
+    fs.mkdirSync(path.dirname(userCatalogPath()), { recursive: true });
+    fs.writeFileSync(userCatalogPath(), JSON.stringify({ providers: { 'relay-models': {
+      runtime: 'openai-compatible', auth: 'api-key', baseUrl: endpoint, models: [{ id: 'target-model' }],
+    } } }));
+    const sessionId = new SessionManager().createNew(workspaceRoot).id;
+    const context = {
+      cwd: workspaceRoot, projectRoot: workspaceRoot, sessionId,
+      resolveConfigTarget: (config: ReturnType<typeof getRuntimeConfig>) => resolveProviderCredential({
+        runtimeConfig: config, env: {}, cliProvider: 'openai-compatible', cliApiKey: 'SYNTHETIC_CLI_OVERRIDE',
+        cliBaseUrl: endpoint, cliModel: 'target-model', pool: { sessionId },
+      }),
+    };
+
+    const result = await runModelCommand(['use', 'relay-models/target-model'], context);
+
+    expect(result.output).toContain('no ready configured connection');
+    expect(readSessionModel(sessionId)).toBeUndefined();
+  });
+
+  it('refuses an explicit target when its configured endpoint becomes ambiguous', async () => {
+    const endpoint = 'https://relay.example.invalid/v1';
+    await runConnectCommand(['login', 'openai-compatible', '--api-key', 'SYNTHETIC_RELAY_KEY',
+      '--base-url', endpoint, '--model', 'configured-model'], { cwd: workspaceRoot }, undefined, { activate: false });
+    fs.mkdirSync(path.dirname(userCatalogPath()), { recursive: true });
+    fs.writeFileSync(userCatalogPath(), JSON.stringify({ providers: { 'relay-models': {
+      runtime: 'openai-compatible', auth: 'api-key', baseUrl: endpoint, models: [{ id: 'target-model' }],
+    }, 'alternate-relay': {
+      runtime: 'openai-compatible', auth: 'api-key', baseUrl: endpoint, models: [{ id: 'target-model' }],
+    } } }));
+    const sessionId = new SessionManager().createNew(workspaceRoot).id;
+
+    const result = await runModelCommand(['use', 'relay-models/target-model'], {
+      cwd: workspaceRoot, projectRoot: workspaceRoot, sessionId,
+    });
+
+    expect(result.output).toContain('multiple catalogue entries claim this endpoint');
+    expect(readSessionModel(sessionId)).toBeUndefined();
+  });
+
+  it('refuses an explicit target when its connection changes during the selection hook', async () => {
+    const endpoint = 'https://relay.example.invalid/v1';
+    await runConnectCommand(['login', 'openai-compatible', '--api-key', 'SYNTHETIC_RELAY_KEY',
+      '--base-url', endpoint, '--model', 'configured-model'], { cwd: workspaceRoot }, undefined, { activate: false });
+    fs.mkdirSync(path.dirname(userCatalogPath()), { recursive: true });
+    fs.writeFileSync(userCatalogPath(), JSON.stringify({ providers: { 'relay-models': {
+      runtime: 'openai-compatible', auth: 'api-key', baseUrl: endpoint, models: [{ id: 'target-model' }],
+    } } }));
+    const sessionId = new SessionManager().createNew(workspaceRoot).id;
+    const before = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    const targetId = before.values.providerConnections!.find(connection => connection.provider === 'openai-compatible')!.id;
+    vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+      if (event.eventName === 'PreModelSwitch') {
+        const current = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+        writeUserRuntimeConfigFile({ ...current.values,
+          providerConnections: current.values.providerConnections!.map(connection => connection.id === targetId
+            ? { ...connection, baseUrl: 'https://changed.example.invalid/v1' } : connection),
+        }, current);
+      }
+      return undefined;
+    });
+
+    const result = await runModelCommand(['use', 'relay-models/target-model'], {
+      cwd: workspaceRoot, projectRoot: workspaceRoot, sessionId,
+    });
+
+    expect(result.output).toContain('conflict');
+    expect(readSessionModel(sessionId)).toBeUndefined();
+  });
+
+  it('releases only the startup model override after an alternate connection is persisted', async () => {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    const active = edit.values.providerConnections!.find(connection => connection.id === edit.values.activeProviderConnectionId)!;
+    const targetConnection = { ...active, id: 'model-target', apiKey: 'SYNTHETIC_TARGET_KEY', model: 'gpt-5.3' };
+    writeUserRuntimeConfigFile({ ...edit.values, providerConnections: [...edit.values.providerConnections!, targetConnection] }, edit);
+    const sessionId = new SessionManager().createNew(workspaceRoot).id;
+    let startupModel: string | undefined = 'gpt-5.4';
+    const resolve = (config: ReturnType<typeof getRuntimeConfig>, requestedSessionId?: string, includeModel = true,
+      selectedTarget?: SessionModelTarget) => resolveProviderCredential({
+        runtimeConfig: selectedTarget ? projectModelSelection(config, 'connectionScope' in selectedTarget
+          ? selectedTarget : { ...selectedTarget, connectionScope: 'session' }) : config,
+        env: {}, cliProvider: 'openai', cliApiKey: 'SYNTHETIC_TARGET_KEY',
+        cliBaseUrl: active.baseUrl, ...(includeModel && startupModel ? { cliModel: startupModel } : {}),
+        ...(requestedSessionId ? { pool: { sessionId: requestedSessionId } } : {}) });
+    const releaseModelOverride = vi.fn(() => { startupModel = undefined; });
+    const resolveConfigTarget: CommandTargetResolver = Object.assign(
+      (config: ReturnType<typeof getRuntimeConfig>, requestedSessionId?: string) => resolve(config, requestedSessionId),
+      { resolveModelTarget: (config: ReturnType<typeof getRuntimeConfig>, requestedSessionId?: string, selectedTarget?: SessionModelTarget) =>
+          resolve(config, requestedSessionId, false, selectedTarget),
+        releaseModelOverride },
+    );
+    const config = getRuntimeConfig(workspaceRoot);
+    const target = { connectionId: targetConnection.id, provider: 'openai' as const, model: 'gpt-5.3' };
+    const selection = { ...target, connectionScope: 'session' as const };
+    const candidate = projectModelSelection(config, selection);
+    expect(resolveConfigTarget(config, sessionId).model).toBe('gpt-5.4');
+    expect(resolveConfigTarget(candidate, sessionId).model).toBe('gpt-5.4');
+    expect(exactTargetMatches({ cwd: workspaceRoot, projectRoot: workspaceRoot, sessionId, resolveConfigTarget },
+      candidate, target)).toBe(false);
+    expect(resolveConfigTarget.resolveModelTarget!(candidate, sessionId, target)).toMatchObject({
+      model: 'gpt-5.3', credential: { connectionId: targetConnection.id, apiKey: 'SYNTHETIC_TARGET_KEY' },
+    });
+
+    const result = await runModelCommand(['use', 'openai/gpt-5.3'], {
+      cwd: workspaceRoot, projectRoot: workspaceRoot, sessionId, resolveConfigTarget,
+    });
+
+    expect(result.output).toContain('Model switched to gpt-5.3');
+    expect(readSessionModel(sessionId)).toMatchObject({ connectionId: targetConnection.id, model: 'gpt-5.3', provider: 'openai' });
+    expect(releaseModelOverride).toHaveBeenCalledOnce();
+    expect(resolveConfigTarget(projectSessionModel(getRuntimeConfig(workspaceRoot), sessionId), sessionId)).toMatchObject({
+      model: 'gpt-5.3', provider: 'openai', credential: { connectionId: targetConnection.id, apiKey: 'SYNTHETIC_TARGET_KEY' },
+    });
+  });
+
+  it('keeps the startup model override after a refused explicit selection', async () => {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    const active = edit.values.providerConnections!.find(connection => connection.id === edit.values.activeProviderConnectionId)!;
+    const targetConnection = { ...active, id: 'model-target', apiKey: 'SYNTHETIC_TARGET_KEY', model: 'gpt-5.3' };
+    writeUserRuntimeConfigFile({ ...edit.values, providerConnections: [...edit.values.providerConnections!, targetConnection] }, edit);
+    const sessionId = new SessionManager().createNew(workspaceRoot).id;
+    const resolveConfigTarget = Object.assign(
+      (config: ReturnType<typeof getRuntimeConfig>, requestedSessionId?: string) => resolveProviderCredential({
+        runtimeConfig: config, env: {}, cliProvider: 'openai', cliApiKey: 'SYNTHETIC_TARGET_KEY', cliBaseUrl: active.baseUrl,
+        cliModel: 'gpt-5.4', ...(requestedSessionId ? { pool: { sessionId: requestedSessionId } } : {}),
+      }),
+      { resolveModelTarget: (config: ReturnType<typeof getRuntimeConfig>, requestedSessionId?: string, selectedTarget?: SessionModelTarget) => resolveProviderCredential({
+        runtimeConfig: selectedTarget ? projectModelSelection(config, 'connectionScope' in selectedTarget
+          ? selectedTarget : { ...selectedTarget, connectionScope: 'session' }) : config,
+        env: {}, cliProvider: 'openai', cliApiKey: 'SYNTHETIC_TARGET_KEY', cliBaseUrl: active.baseUrl,
+        ...(requestedSessionId ? { pool: { sessionId: requestedSessionId } } : {}),
+      }), releaseModelOverride: vi.fn() },
+    );
+
+    const result = await runModelCommand(['use', 'openai/gpt-5.3'], {
+      cwd: workspaceRoot, projectRoot: workspaceRoot, sessionId, resolveConfigTarget,
+      modelHooks: { dispatch: async event => event.eventName === 'PreModelSwitch' ? { decision: 'block' } : undefined },
+    });
+
+    expect(result.output).toContain('blocked by hook policy');
+    expect(readSessionModel(sessionId)).toBeUndefined();
+    expect(resolveConfigTarget.releaseModelOverride).not.toHaveBeenCalled();
+    expect(resolveConfigTarget(getRuntimeConfig(workspaceRoot), sessionId).model).toBe('gpt-5.4');
+  });
+
+  it('releases the startup model after persistence even if the post-switch hook fails', async () => {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    const active = edit.values.providerConnections!.find(connection => connection.id === edit.values.activeProviderConnectionId)!;
+    const targetConnection = { ...active, id: 'model-target', apiKey: 'SYNTHETIC_TARGET_KEY', model: 'gpt-5.3' };
+    writeUserRuntimeConfigFile({ ...edit.values, providerConnections: [...edit.values.providerConnections!, targetConnection] }, edit);
+    const sessionId = new SessionManager().createNew(workspaceRoot).id;
+    let startupModel: string | undefined = 'gpt-5.4';
+    const resolveConfigTarget: CommandTargetResolver = Object.assign(
+      (config: ReturnType<typeof getRuntimeConfig>, requestedSessionId?: string) => resolveProviderCredential({
+        runtimeConfig: config, env: {}, cliProvider: 'openai', cliApiKey: 'SYNTHETIC_TARGET_KEY', cliBaseUrl: active.baseUrl,
+        ...(startupModel ? { cliModel: startupModel } : {}), ...(requestedSessionId ? { pool: { sessionId: requestedSessionId } } : {}),
+      }),
+      { resolveModelTarget: (config: ReturnType<typeof getRuntimeConfig>, requestedSessionId?: string, selectedTarget?: SessionModelTarget) => resolveProviderCredential({
+        runtimeConfig: selectedTarget ? projectModelSelection(config, 'connectionScope' in selectedTarget
+          ? selectedTarget : { ...selectedTarget, connectionScope: 'session' }) : config,
+        env: {}, cliProvider: 'openai', cliApiKey: 'SYNTHETIC_TARGET_KEY', cliBaseUrl: active.baseUrl,
+        ...(requestedSessionId ? { pool: { sessionId: requestedSessionId } } : {}),
+      }),
+        releaseModelOverride: vi.fn(() => { startupModel = undefined; }) },
+    );
+    vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+      if (event.eventName === 'PostModelSwitch') throw new Error('post hook failed');
+      return undefined;
+    });
+
+    const result = await runModelCommand(['use', 'openai/gpt-5.3'], {
+      cwd: workspaceRoot, projectRoot: workspaceRoot, sessionId, resolveConfigTarget,
+    });
+
+    expect(readSessionModel(sessionId)).toMatchObject({ connectionId: targetConnection.id, model: 'gpt-5.3' });
+    expect(resolveConfigTarget.releaseModelOverride).toHaveBeenCalledOnce();
+    expect(resolveConfigTarget(getRuntimeConfig(workspaceRoot), sessionId).model).toBe('gpt-5.3');
+    expect(result.output).toContain('unverified');
   });
 });

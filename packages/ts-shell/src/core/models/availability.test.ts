@@ -1,7 +1,7 @@
 import { afterEach, expect, it } from 'vitest';
-import type { RuntimeConfig } from '../../config/runtimeConfig.js';
+import type { ProviderConnectionConfig, RuntimeConfig } from '../../config/runtimeConfig.js';
 import type { CatalogProvider } from './catalog.js';
-import { availabilitySnapshot, endpointLabel } from './availability.js';
+import { availabilitySnapshot, endpointLabel, matchesCatalog } from './availability.js';
 import { credentialIdentityFor } from '../auth/account/pool.js';
 import { ownedConnectionCredential } from '../auth/account/presence.js';
 import { noteCredentialRateLimit, resetCredentialBackoffForTests } from '../auth/account/backoff.js';
@@ -61,6 +61,20 @@ it('distinguishes two relays of one provider and redacts their endpoints', () =>
     ['first', 'one.example/v1', 'ready'], ['second', 'two.example/v1', 'ready'],
   ]);
   expect(JSON.stringify(snapshot)).not.toMatch(/key-one|key-two|pass|secret/);
+});
+
+it('requires the declared address when a catalogue id matches its runtime', () => {
+  const address = 'https://first.example/v1';
+  const provider: CatalogProvider = { id: 'openai-compatible', label: 'Compatible', runtime: 'openai-compatible',
+    auth: 'api-key', custom: true, baseUrl: address, models: [{ id: 'model-a' }] };
+  const connections = [
+    connection('first', 'openai-compatible', { baseUrl: address }),
+    connection('second', 'openai-compatible', { baseUrl: 'https://second.example/v1' }),
+  ] as ProviderConnectionConfig[];
+  const catalog = [provider];
+
+  expect(matchesCatalog(provider, { connectionId: 'first', provider: 'openai-compatible' }, connections, catalog)).toBe(true);
+  expect(matchesCatalog(provider, { connectionId: 'second', provider: 'openai-compatible' }, connections, catalog)).toBe(false);
 });
 
 it('keeps a catalogue provider without models and an uncatalogued connection visible', () => {

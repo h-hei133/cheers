@@ -22,6 +22,8 @@ function settings() {
 
 const settle = async () => { await Promise.resolve(); await Promise.resolve(); };
 const view = (host: OverlayHost, width = 120) => stripAnsi(host.render(width, 30).join('\n'));
+const emptyModelConfig = () => ({ ...getRuntimeConfig('/tmp/cheers-test'), provider: 'anthropic' as const,
+  activeProviderConnectionId: undefined, providerConnections: [], providerCredentials: {}, sessionConnection: undefined });
 
 it('drops removed row identities from every category while retaining surviving focus', () => {
   const navigation = new CatalogNavigation();
@@ -33,6 +35,33 @@ it('drops removed row identities from every category while retaining surviving f
   navigation.set([rows[1]!], groups, categories);
   expect(navigation.preferred).toBe('b'); navigation.select('first'); expect(navigation.preferred).toBeUndefined();
   navigation.select('all'); expect(navigation.preferred).toBeUndefined();
+});
+
+it('keeps Ready and Registry searches in the selected model view', () => {
+  const navigation = new CatalogNavigation('ready', false, true);
+  const rows = [
+    { id: 'bound', label: 'shared' },
+    { id: 'public', label: 'public-only' },
+  ];
+  const groups = new Map([
+    ['bound', { category: 'relay', section: 'Relay · OpenAI', configured: true }],
+    ['public', { category: 'relay', section: 'Relay · OpenAI', configured: false }],
+  ]);
+  navigation.set(rows, groups, [
+    { id: 'ready', label: 'Ready / Configured' },
+    { id: 'all', label: 'Registry' },
+    { id: 'relay', label: 'Relay' },
+  ]);
+
+  expect(navigation.project('').map(row => row.id)).toEqual(['bound']);
+  expect(navigation.project('public-only')).toEqual([]);
+  expect(navigation.select('all')?.options.map(row => row.id)).toEqual(rows.map(row => row.id));
+  expect(navigation.project('public-only').map(row => row.id)).toEqual(['public']);
+
+  const restored = navigation.key('escape', 'public', 'public-only');
+  expect(restored?.query).toBe('');
+  expect(navigation.active).toBe('relay');
+  expect(restored?.options.map(row => row.id)).toEqual(rows.map(row => row.id));
 });
 
 it('navigates top categories and section/row domains, edits a real number, discards and reopens the exact field', async () => {
@@ -74,7 +103,7 @@ it('navigates top categories and section/row domains, edits a real number, disca
 });
 
 it('browses an unavailable provider through navigation then returns from inspection at narrow and wide sizes', async () => {
-  const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
+  const config = emptyModelConfig();
   const catalog = [{ id: 'fixture', label: 'Fixture provider', runtime: 'anthropic' as const, auth: 'api-key' as const,
     baseUrl: 'https://fixture.example.invalid/v1',
     models: [{ id: 'missing-a' }, { id: 'missing-b' }] }];
@@ -82,7 +111,8 @@ it('browses an unavailable provider through navigation then returns from inspect
   const overlay = new OverlayHost(() => {}); overlay.open(picker); await settle();
   overlay.handleKey(parseKeyEvent('\t'), vi.fn());
   expect(view(overlay, 40)).toContain('Browse');
-  overlay.handleKey(parseKeyEvent('\x1b[B'), vi.fn()); // all -> provider
+  overlay.handleKey(parseKeyEvent('\x1b[B'), vi.fn()); // Ready / Configured -> Registry
+  overlay.handleKey(parseKeyEvent('\x1b[B'), vi.fn()); // Registry -> provider
   expect(view(overlay, 40)).toContain('▸ Fixture provider');
   overlay.handleKey(parseKeyEvent('\r'), vi.fn());
   expect(view(overlay, 40)).toContain('missing-a');
@@ -147,7 +177,7 @@ it('enters the settings section clicked after a category hop and requires Enter 
 });
 
 it('clicks an unconfigured model from category focus then opens its exact inspection after resize', async () => {
-  const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
+  const config = emptyModelConfig();
   const catalog = [{ id: 'fixture', label: 'Fixture provider', runtime: 'anthropic' as const, auth: 'api-key' as const,
     baseUrl: 'https://fixture.example.invalid/v1', models: [{ id: 'missing-a' }, { id: 'missing-b' }] }];
   const picker = modelPicker({ cwd: '/tmp/cheers-test', readConfiguration: () => ({ config, catalog }) });
@@ -276,12 +306,14 @@ it('leaves settings search at the selected result without closing or applying it
 });
 
 it('clears an empty model search before leaving the unconfigured provider', async () => {
-  const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
+  const config = emptyModelConfig();
   const catalog = [{ id: 'fixture', label: 'Fixture provider', runtime: 'anthropic' as const, auth: 'api-key' as const,
     baseUrl: 'https://fixture.example.invalid/v1', models: [{ id: 'missing-a' }, { id: 'missing-b' }] }];
   const picker = modelPicker({ cwd: '/tmp/cheers-test', readConfiguration: () => ({ config, catalog }) });
   const overlay = new OverlayHost(() => {}); const apply = vi.fn(); overlay.open(picker); await settle();
-  overlay.handleKey(parseKeyEvent('\t'), apply); overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
+  overlay.handleKey(parseKeyEvent('\t'), apply);
+  overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
+  overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
   overlay.handleKey(parseKeyEvent('\r'), apply); overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
   expect(view(overlay)).toContain('▸ missing-b');
   overlay.handlePaste('no-such-model'); overlay.handleKey(parseKeyEvent('\x1b'), apply);
@@ -295,12 +327,13 @@ it('clears an empty model search before leaving the unconfigured provider', asyn
 });
 
 it('returns from a model search inspection to the exact content row after searching from the sidebar', async () => {
-  const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
+  const config = emptyModelConfig();
   const catalog = [{ id: 'fixture', label: 'Fixture provider', runtime: 'anthropic' as const, auth: 'api-key' as const,
     baseUrl: 'https://fixture.example.invalid/v1', models: [{ id: 'missing-a' }, { id: 'missing-b' }] }];
   const overlay = new OverlayHost(() => {}); const apply = vi.fn();
   overlay.open(modelPicker({ cwd: '/tmp/cheers-test', readConfiguration: () => ({ config, catalog }) })); await settle();
   overlay.handleKey(parseKeyEvent('\t'), apply); expect(view(overlay, 40)).toContain('Browse');
+  overlay.handleKey(parseKeyEvent('\x1b[B'), apply); // Search the full Registry view.
   overlay.handlePaste('missing-b'); expect(view(overlay, 40)).toContain('▸ missing-b');
   let pending: Promise<unknown> | undefined;
   overlay.handleKey(parseKeyEvent('\r'), (picker, ids) => { pending = picker.apply(ids).then(outcome => {
@@ -322,7 +355,7 @@ it('keeps explicit hierarchy navigation when leaving search and returning models
   overlay.handleKey(parseKeyEvent('\x1b[B'), apply); expect(view(overlay)).toContain('▸ Attention on idle');
   overlay.close(); expect(h.save).not.toHaveBeenCalled();
 
-  const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
+  const config = emptyModelConfig();
   const catalog = [{ id: 'fixture', label: 'Fixture provider', runtime: 'anthropic' as const, auth: 'api-key' as const,
     baseUrl: 'https://fixture.example.invalid/v1', models: [{ id: 'missing-a' }, { id: 'missing-b' }] }];
   const target = `model:${JSON.stringify([null, 'fixture', 'missing-b'])}`;
@@ -336,7 +369,7 @@ it('keeps explicit hierarchy navigation when leaving search and returning models
 });
 
 it('returns a nested model browser directly to its parent even while a search is active', async () => {
-  const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
+  const config = emptyModelConfig();
   const catalog = [{ id: 'fixture', label: 'Fixture provider', runtime: 'anthropic' as const, auth: 'api-key' as const,
     baseUrl: 'https://fixture.example.invalid/v1', models: [{ id: 'missing-a' }] }];
   const parent: Picker = { title: 'Parent', empty: '', load: async () => [{ id: 'return', label: 'Returned' }], apply: vi.fn() };
@@ -348,12 +381,13 @@ it('returns a nested model browser directly to its parent even while a search is
   expect(assigning.assign).not.toHaveBeenCalled(); expect(apply).not.toHaveBeenCalled(); overlay.close();
 });
 
-it('returns from a cross-provider search inspection in the selected model provider', async () => {
-  const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
+it('returns from a cross-provider Registry search to the exact content row', async () => {
+  const config = emptyModelConfig();
   const catalog = ['first', 'second'].map(id => ({ id, label: `${id} provider`, runtime: 'anthropic' as const, auth: 'api-key' as const,
     baseUrl: `https://${id}.example.invalid/v1`, models: [{ id: `${id}-model` }] }));
   const overlay = new OverlayHost(() => {}); const apply = vi.fn();
-  overlay.open(modelPicker({ cwd: '/tmp/cheers-test', readConfiguration: () => ({ config, catalog }) })); await settle();
+  const picker = modelPicker({ cwd: '/tmp/cheers-test', readConfiguration: () => ({ config, catalog }) });
+  overlay.open(picker); await settle();
   overlay.handleKey(parseKeyEvent('\t'), apply); overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
   overlay.handleKey(parseKeyEvent('\r'), apply); expect(view(overlay)).toContain('▸ first-model');
   overlay.handlePaste('second-model'); expect(view(overlay)).toContain('▸ second-model');
@@ -363,6 +397,8 @@ it('returns from a cross-provider search inspection in the selected model provid
   }); });
   await pending; await settle(); expect(view(overlay)).toContain('Configure connection');
   overlay.handleKey(parseKeyEvent('\x1b'), apply); await settle();
-  expect(view(overlay, 40)).toContain('▸ second-model'); expect(view(overlay)).toContain('• second provider');
+  expect(view(overlay, 40)).toContain('▸ second-model');
+  expect(picker.navigation?.active).toBe('all');
+  expect(view(overlay)).toContain('• Registry');
   expect(apply).not.toHaveBeenCalled(); overlay.close();
 });

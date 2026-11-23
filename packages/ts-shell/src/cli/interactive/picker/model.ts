@@ -1,8 +1,8 @@
 import { projectModelSelection } from "../../../session/model/projection.js";
-import { getRuntimeConfig } from "../../../config/runtimeConfig.js";
+import { getRuntimeConfig, type RuntimeConfig } from "../../../config/runtimeConfig.js";
 import { loadCatalogSnapshot } from "../../../core/models/catalogStore.js";
 import { availabilityLabel, availabilitySnapshot, endpointLabel, matchesCatalog, type ConnectionAvailability } from "../../../core/models/availability.js";
-import { catalogProvider, type CatalogProvider } from "../../../core/models/catalog.js";
+import { catalogProvider, isUserConfiguredModel, type CatalogProvider } from "../../../core/models/catalog.js";
 import { providerCredentialBaseUrl } from '../../../core/auth/account/target.js';
 import { effortCapability } from "../../../core/models/capability.js";
 import { resolveProviderCredential } from "../../../core/shell/providerCredentials.js";
@@ -49,7 +49,7 @@ interface RoleSelection {
 }
 
 /** Every actionable row retains its exact target and the inputs used to display it. */
-export function modelPicker(context: CommandContext, focus?: string, navigation = new CatalogNavigation(), assigning?: RoleSelection,
+export function modelPicker(context: CommandContext, focus?: string, navigation = new CatalogNavigation('ready', false, true), assigning?: RoleSelection,
   notice?: string, signIn?: ModelSignIn, parent?: (notice?: string) => Picker,
   focusOrigin?: ModelDetailOrigin): Picker {
   const details = new Map<string, readonly string[]>();
@@ -72,7 +72,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
     title: assigning ? `${assigning.role} model` : "Model",
     form: "panel",
     acceptsOwnership: true,
-    get empty() { return refreshFailed ? refreshFailure : filtering ? 'No matching models.' : 'No providers in the catalogue.'; },
+    get empty() { return refreshFailed ? refreshFailure : filtering ? 'No matching models.'
+      : navigation.active === 'ready' ? 'No ready or configured models. Choose Registry to browse the full catalogue.' : 'No models in this view.'; },
     navigation, fullScreen: true,
     ...(assigning ? { back: assigning.back } : parent ? { back: () => parent(notice) } : {}),
     onOpen() { actionOwner.open(); returnFocus = focus; focusState.reset(); },
@@ -143,31 +144,32 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         for (const connection of providerSlot ? [...connections, undefined] : connections.length ? connections : [undefined]) {
           if (!provider.models.length) {
             const id = rowId(connection?.connectionId, provider.id, '');
-            groups.set(id, { category: provider.id });
+            groups.set(id, { category: provider.id, section: connection
+              ? `${connection.label ?? connection.connectionId} · ${provider.label || provider.id}` : provider.label || provider.id });
             rows.push({ id, label: provider.label, detail: connection?.label ?? connection?.connectionId,
               note: 'no models listed', disabled: true });
             details.set(id, modelDetails(provider, connection));
           }
           for (const model of provider.models) {
             const id = rowId(connection?.connectionId, provider.id, model.id);
-            groups.set(id, { category: provider.id });
             if (seen.has(id)) continue;
             seen.add(id);
             const target: SessionModelTarget = connection ? { connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort }
               : { connectionScope: 'provider', provider: provider.runtime, model: model.id, thinkingEffort };
+            const targetContext = modelTargetContext(inspectionContext, target);
             const candidate = connection || providerSlot ? projectModelSelection(config, scopedModelTarget(target)) : undefined;
-            const resolution = candidate ? !connection && inspectionContext.resolveConfigTarget ? inspectionContext.resolveConfigTarget(candidate)
-              : resolveProviderCredential({ runtimeConfig: candidate }) : undefined;
+            const resolution = candidate ? targetContext.resolveConfigTarget?.(candidate)
+              ?? resolveProviderCredential({ runtimeConfig: candidate }) : undefined;
             const ambientCandidate = !connection && !providerSlot && provider.id === provider.runtime
               ? projectModelSelection(config, scopedModelTarget(target)) : undefined;
             const ambientResolution = ambientCandidate
-              ? inspectionContext.resolveConfigTarget?.(ambientCandidate)
+              ? targetContext.resolveConfigTarget?.(ambientCandidate)
                 ?? resolveProviderCredential({ runtimeConfig: ambientCandidate }) : undefined;
             const namedConnectionRequired = Boolean(ambientResolution && !ambientResolution.blocked
               && ambientResolution.provider === provider.runtime && ambientResolution.credential
               && ambientResolution.credential.connectionId === undefined);
             const effectiveResolution = resolution ?? (namedConnectionRequired ? ambientResolution : undefined);
-            const exact = candidate ? exactTargetMatches(inspectionContext, candidate, target, catalog) : false;
+            const exact = candidate ? exactTargetMatches(targetContext, candidate, target, catalog) : false;
             const resolutionReady = Boolean(resolution && providerBindingAvailable(catalog, resolution));
             const modelAddress = effectiveResolution && providerBindingAvailable(catalog, effectiveResolution) ? providerCredentialBaseUrl(catalog, effectiveResolution)
               : effectiveResolution?.baseUrl ?? config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl ?? provider.baseUrl;
@@ -175,47 +177,61 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             const capability = effortCapability(catalog, provider.runtime, model.id, thinkingEffort, modelAddress);
             const assignedEffort = assigning && capability !== 'supported' ? null : thinkingEffort;
             const unsupported = !assigning && capability === 'unsupported';
+            const selectedEffort = unsupported ? null : thinkingEffort;
+            const selectedTarget = selectedEffort === thinkingEffort ? target : { ...target, thinkingEffort: selectedEffort };
+            const selectedTargetContext = modelTargetContext(inspectionContext, selectedTarget);
+            const configuredModel = connection?.model?.trim()
+              || config.providerCredentials?.[provider.runtime]?.model?.trim()
+              || (providerSlot ? active.model?.trim() : undefined);
             const alias = provider.id === provider.runtime ? catalog.find(candidate => candidate.runtime === provider.runtime
               && candidate.id !== provider.runtime && candidate.baseUrl !== undefined && modelAddress !== undefined
               && candidate.baseUrl.replace(/\/+$/, '') === modelAddress.replace(/\/+$/, '')) : undefined;
             const selected = Boolean(!logical && !selection?.extensionProvider && exact && !ambiguous && !alias && activeReady
               && connection?.connectionId === active.credential?.connectionId && provider.runtime === active.provider && model.id === active.model
               && resolution?.baseUrl === active.baseUrl && sameValue(resolution?.credential, active.credential));
+            const configured = selected || isUserConfiguredModel(provider, model.id) || model.id === configuredModel;
             const reason = namedConnectionRequired ? 'named connection required'
               : assigning && !connection ? 'role assignment requires a configured connection'
               : !connection && !providerSlot ? 'configure a connection' : connection && connection.state !== 'ready' ? availabilityLabel(connection.state)
-              : !resolutionReady ? resolution?.credential ? 'request unavailable' : 'credential unavailable'
+              : !resolutionReady ? resolution?.blocked === 'connection-overridden' ? 'request target mismatch'
+                : resolution?.credential ? 'request unavailable' : 'credential unavailable'
               : !exact ? 'request target mismatch'
               : ambiguous ? 'model catalogue endpoint is ambiguous'
-              : unsupported ? 'reasoning effort unsupported' : !selectionAvailable ? 'saved session unavailable'
+              : !selectionAvailable ? 'saved session unavailable'
               : !choice?.baseline ? 'active session required' : undefined;
+            groups.set(id, { category: provider.id, section: connection
+              ? `${connection.label ?? connection.connectionId} · ${provider.label || provider.id}` : provider.label || provider.id,
+              configured });
             const metadata = listedModelMetadata(catalog, provider, model.id, modelAddress);
             rows.push({ id, label: model.id,
               detail: [connection?.connectionId ?? (effectiveResolution?.credential ? `${effectiveResolution.credential.source} credential` : undefined), connection?.label, provider.label, connection?.endpoint ?? endpointLabel(modelAddress),
                 metadata?.contextWindow ? `${Math.round(metadata.contextWindow / 1000)}k` : undefined].filter(Boolean).join(' · '),
-              note: selected ? 'active' : reason ?? (alias ? `alias: ${alias.label}` : connection ? availabilityLabel(connection.state) : 'ready'),
+              note: selected ? 'active' : unsupported ? 'effort will use auto' : reason ?? (alias ? `alias: ${alias.label}` : connection ? availabilityLabel(connection.state) : 'ready'),
               ...(reason ? { disabled: true, focusable: true } : {}) });
             const displayed = connection?.state === 'ready' && (resolution?.blocked || !resolution?.credential)
               ? { ...connection, state: 'credential-missing' as const, reason: 'This explicit connection needs its own credential.' } : connection;
             const lines = [...modelDetails(provider, displayed, !connection ? effectiveResolution?.credential?.source : undefined),
               ...(!connection && modelAddress ? [`Endpoint: ${endpointLabel(modelAddress)}`] : []),
-              `Reasoning effort: ${assignedEffort ?? 'auto'}`, ...modelMetadataDetails(catalog, provider, model.id, modelAddress), ...(reason ? [reason] : [])];
+              `Reasoning effort: ${assigning ? assignedEffort ?? 'auto' : selectedEffort ?? 'auto'}`,
+              ...modelMetadataDetails(catalog, provider, model.id, modelAddress), ...(reason ? [reason] : [])];
             details.set(id, lines);
             const inspection = () => modelDetailsPicker(detailSourceFor(id, model.id, id));
             const detailActions: ModelDetailAction[] = [];
             const captured = choice;
-            if ((!reason || reason === 'reasoning effort unsupported') && captured) {
-              const resolution = targetResolutionIdentity(inspectionContext, config, target);
+            if (!reason && captured) {
+              const resolution = targetResolutionIdentity(selectedTargetContext, config, selectedTarget);
               detailActions.push({ id: 'effort', label: 'Choose effort', run: (returnTo, inspect) => ({ next: modelEffortPicker({
-                target, current: assignedEffort, catalog, baseUrl: modelAddress, lines, admission: admitInspection,
+                target: selectedTarget, current: assigning ? assignedEffort : selectedEffort, catalog, baseUrl: modelAddress, lines, admission: admitInspection,
                 back: note => note === undefined ? inspect() : returnTo(note), canReturn: () => modelBrowserOwned(context),
                 save: async (effort, stillOwned = () => true) => assigning && connection
                   ? (modelActionAdmission(admitInspection, stillOwned) ?? assigning.assign({ connectionId: connection.connectionId,
                     provider: connection.provider, model: model.id, thinkingEffort: effort }).output)
-                  : setReviewedModelTarget({ ...target, thinkingEffort: effort }, { ...context, admission: () => {
+                  : setReviewedModelTarget({ ...selectedTarget, thinkingEffort: effort }, { ...context, admission: () => {
                     const refusal = admitInspection();
                     return stillOwned && !stillOwned() ? 'Model selection cancelled. Reopen the model picker.' : refusal;
-                  } }, { baseline: captured.baseline, resolution }),
+                  } }, { baseline: captured.baseline, resolution: targetResolutionIdentity(
+                    modelTargetContext(inspectionContext, { ...selectedTarget, thinkingEffort: effort }), config,
+                    { ...selectedTarget, thinkingEffort: effort }) }),
                 done: result => assigning ? assigning.back(result) : parent ? parent(result) : returnTo(result),
               }) }) });
             }
@@ -258,8 +274,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               assignments.set(id, () => assigning.assign({ connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort: assignedEffort }));
             } else if (!reason && choice) {
               const captured = choice;
-              const resolution = targetResolutionIdentity(inspectionContext, config, target);
-              actions.set(id, async stillOwned => modelActionAdmission(captured.admission, stillOwned) ?? setReviewedModelTarget(target,
+              const resolution = targetResolutionIdentity(selectedTargetContext, config, selectedTarget);
+              actions.set(id, async stillOwned => modelActionAdmission(captured.admission, stillOwned) ?? setReviewedModelTarget(selectedTarget,
                 { ...context, admission: () => modelActionAdmission(captured.admission, stillOwned) }, { baseline: captured.baseline, resolution }));
             }
           }
@@ -274,13 +290,15 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         const registration = scope.registration;
         if (registration && choice?.baseline) {
           const captured = choice;
-          categories.push({ id: registration.id, label: registration.label });
+          if (!categories.some(category => category.id === registration.id)) {
+            categories.push({ id: registration.id, label: registration.label });
+          }
           for (const model of registration.models) {
             const id = `${EXTENSION_MODEL_PREFIX}${registration.id}/${model.id}`;
             const selected = selection?.extensionProvider?.id === registration.id && selection.extensionProvider.baseUrl === registration.baseUrl
               && selection.model === model.id && active.model === model.id;
             const unsupported = effortCapability(scope.catalog, active.provider, model.id, thinkingEffort, activeAddress) === 'unsupported';
-            groups.set(id, { category: registration.id });
+            groups.set(id, { category: registration.id, section: registration.label, configured: true });
             rows.push({ id, label: model.id, detail: registration.label, note: selected ? 'active' : unsupported ? 'reasoning effort unsupported' : 'ready' });
             const admission = (stillOwned: () => boolean) => modelActionAdmission(captured.admission, stillOwned) ?? scope.admission?.();
             actions.set(id, async stillOwned => admission(stillOwned) ?? setModel([id], { ...context, admission: () => admission(stillOwned) }, false,
@@ -291,8 +309,10 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         if (selection?.extensionProvider && !rows.some(row => row.id.startsWith(EXTENSION_MODEL_PREFIX) && row.note === 'active')) {
           const { id: provider } = selection.extensionProvider;
           const id = `${EXTENSION_MODEL_PREFIX}${provider}/${selection.model}`;
-          groups.set(id, { category: provider });
-          if (!categories.some(category => category.id === provider)) categories.push({ id: provider, label: provider });
+          if (!categories.some(category => category.id === provider)) {
+            categories.push({ id: provider, label: provider });
+          }
+          groups.set(id, { category: provider, section: provider, configured: true });
           rows.unshift({ id, label: selection.model ?? provider, detail: provider, note: 'active · unavailable', disabled: true, focusable: true });
           details.set(id, ['The selected extension model is unavailable. Reload its extension or choose another model.']);
         }
@@ -302,11 +322,13 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
           const id = `virtual:${JSON.stringify([model.provider, model.id])}`;
           const definition = definitions.find(value => value.provider === model.provider && value.id === model.id)!;
           const selected = logical?.provider === model.provider && logical.model === model.id;
-          groups.set(id, { category: model.provider });
+          if (!categories.some(category => category.id === model.provider)) {
+            categories.push({ id: model.provider, label: model.provider });
+          }
+          groups.set(id, { category: model.provider, section: model.name, configured: Boolean(virtualChoice?.baseline) || selected });
           rows.push({ id, label: model.id, detail: model.name, note: selected ? 'active' : 'virtual',
             ...(!virtualChoice?.baseline ? { disabled: true, focusable: true } : {}) });
           details.set(id, [`Model: ${model.provider}/${model.id}`, `Name: ${model.name}`, 'Physical destination is resolved per request.']);
-          if (!categories.some(category => category.id === model.provider)) categories.push({ id: model.provider, label: model.provider });
           if (virtualChoice?.baseline) {
             const captured = virtualChoice;
             const target = { provider: model.provider, model: model.id,
@@ -327,7 +349,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         }
         if (logical && !virtualCatalog.some(model => model.provider === logical.provider && model.id === logical.model)) {
           const id = `virtual:${JSON.stringify([logical.provider, logical.model])}`;
-          groups.set(id, { category: logical.provider });
+          groups.set(id, { category: logical.provider, section: logical.provider, configured: true });
           rows.unshift({ id, label: logical.model, detail: `${logical.provider}/${logical.model}`, note: 'active · unavailable', disabled: true, focusable: true });
           details.set(id, ['The selected virtual model is unavailable. Reload its extension or choose another model.']);
           if (!categories.some(category => category.id === logical.provider)) categories.push({ id: logical.provider, label: logical.provider });
@@ -343,7 +365,10 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
           ? config.sessionConnection?.id ?? config.activeProviderConnectionId : undefined);
       if (selectionAvailable && !logical && !selection?.extensionProvider && currentModel && !rows.some(row => row.note === 'active')) {
         const id = 'model:current';
-        groups.set(id, { category: currentProvider });
+        if (!categories.some(category => category.id === currentProvider)) {
+          categories.push({ id: currentProvider, label: currentProvider });
+        }
+        groups.set(id, { category: currentProvider, section: currentProvider, configured: true });
         const reportAddress = activeReady ? activeAddress : active.baseUrl;
         const endpoint = endpointLabel(reportAddress);
         const note = active.blocked ? 'request blocked' : activeReady ? 'active' : 'credential missing';
@@ -388,13 +413,13 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               ...(role !== 'default' && target ? [`Reasoning effort: ${target.thinkingEffort ?? 'provider decides'}`] : []),
               'Role assignments and presets share the existing session model owner.']);
             if (role === 'default') {
-              inspections.set(id, () => modelPicker(context, undefined, new CatalogNavigation(), undefined, undefined, signIn,
+              inspections.set(id, () => modelPicker(context, undefined, new CatalogNavigation('ready', false, true), undefined, undefined, signIn,
                 note => modelPicker(context, id, navigation, undefined, note, signIn, parent)));
             } else {
               inspections.set(id, () => {
                 const back = (note?: string, fresh = context) => modelPicker(fresh, id, navigation, undefined, note, signIn, parent);
                 return modelRoleEditor(context, role,
-                  (assign, thinkingEffort) => modelPicker(context, undefined, new CatalogNavigation(), { role, assign, back, thinkingEffort }, undefined, signIn), back, notice);
+                  (assign, thinkingEffort) => modelPicker(context, undefined, new CatalogNavigation('ready', false, true), { role, assign, back, thinkingEffort }, undefined, signIn), back, notice);
               });
             }
           }
@@ -437,13 +462,13 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
           rows.push({ id: "preset:unavailable", label: "Model presets unavailable", detail: "The preset library could not be read.", disabled: true });
         }
       }
-      activeFocus = focus ?? (logical ? `virtual:${JSON.stringify([logical.provider, logical.model])}` : rows.find(row => row.note === 'active')?.id);
+      activeFocus = focus ?? (logical ? `virtual:${JSON.stringify([logical.provider, logical.model])}`
+        : rows.find(row => row.note === 'active' && groups.get(row.id)?.configured)?.id);
       const projected = navigation.project('');
       const previousRows = focusFallback?.rows ?? projected;
       const crossCategory = focusFallback?.crossCategory === true;
       focusFallback = undefined;
-      navigation.set(rows, groups, [...(assigning ? [] : [{ id: 'roles', label: 'Roles' }]), { id: 'all', label: 'All models' },
-        ...categories]);
+      navigation.set(rows, groups, [...(assigning ? [] : [{ id: 'roles', label: 'Roles' }]), ...categories]);
       const fallbackOptions = crossCategory ? navigation.all : navigation.project('');
       if (returnFocus) {
         const requested = returnFocus;
@@ -519,6 +544,13 @@ function refreshRoleSelection(context: CommandContext, selection: RoleSelection)
   const edit = prepareModelRole(context, selection.role);
   return { ...selection, assign: edit.assign, thinkingEffort: edit.current?.thinkingEffort ?? null,
     back: (notice?: string, fresh = context) => selection.back(notice, fresh) };
+}
+
+function modelTargetContext(context: CommandContext, target: SessionModelTarget): CommandContext {
+  const resolveModelTarget = context.resolveConfigTarget?.resolveModelTarget;
+  if (!resolveModelTarget) return context;
+  return { ...context, resolveConfigTarget: (config: RuntimeConfig, sessionId?: string) =>
+    resolveModelTarget(config, sessionId, target) };
 }
 
 function rowId(connection: string | undefined, provider: string, model: string): string {

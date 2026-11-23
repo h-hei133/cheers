@@ -19,6 +19,7 @@
 - [Design and evidence](design.md)：结构事实、参考决策、复用与实施顺序。
 - [Earlier repair evidence](../../wiki/references/runtime-upgrade-review-2026-11.md)：上一轮证据，不能替代本轮任务验收。
 - [Progress summary](summary.md) 记录当前验收、开放任务和仓库门禁结果。
+- [November follow-on roadmap](roadmap-tasks.md)：独立追踪 2026-11-23 用户指定的模型、配置、缓存、安全、交互与发布任务；不计入下方既有 62 项。
 
 ## Current status
 
@@ -193,6 +194,18 @@ F2.4当前遥测：实际L，结构复用检查10/10，无新依赖、执行或�
 F2.5更新：原profile/store/commands/logger owner贯通，普通logger捕获session/workspace不信callerfield，六files39tests/七门0monoliths、6有效反转/11restore、build088efb、compiledpublicSDK/inputhook/actualregistrytracecommand两组原生读取及physicalprofile409passed，独立review已启动。功能仍32/62，不勾F2.5。F2.3草稿33tests/strictNodeNextpassed，标准meta和实际annotationtarget保留；fullwrappedcore3384passed/108主动准入拒绝（remote/customdialect），schema生产尚未变。各价格source55hash未动，原a395native保留其source，不代表新tracebuild全部验证。
 
 F2.3当前草稿后续33tests及strictNodeNext passed，新增official/实际default-reference保持旧验证语义，先两实际红后修。rootbaseline显示旧Ajv允许validdefaultref/拒unknownref，不为更易测试而删特性；wrapper3372→3384核心控制通过，余108外部资源/customdialect主动refusal保留。Next独立source推广需等pricing审查提交界限，或隔离combinedbuild后分批stage；不将draft验收当production完成。
+
+## 2026-11 follow-on roadmap execution
+
+用户在 2026-11-23 明确要求执行 `.wiki/wiki/references/` 中的新审计和 Batch 0–4 路线图。本任务由 [roadmap execution record](roadmap-tasks.md) 单独跟踪，不改动既有 62 项任务计数。
+
+Batch 0 的实现与 Linux 本地证据已完成。420/420 聚焦 Vitest、六项静态门禁、源码构建、Linux `build:exe` 和生产 `--list-models` 入口均通过。三个实际模型请求在隔离临时 workspace 成功。workbuddy 路由正确，但本机 `127.0.0.1:7863` 无监听服务，真实 provider 请求失败，B0.6 保持部分验证。
+
+真实请求测试曾误复用已有 Cheers session `sess_ce712b9e215964b0_1795310273004`，并将 session 模型绑定写为 `bailu-2.8`。执行前未捕获原绑定，不能安全恢复推测值。此副作用在 `roadmap-tasks.md` 保留准确记录，供用户核对。
+
+后续核实确认 Batch 0.5 与 Batch 2–4 仍有待实现内容。Batch 1 原审计中的开头消息改写、收尾步骤移除工具和持久历史微压缩三项判断已被当前实现反证。各批的真实代码缺口、现有实现边界和未验证证据见路线图任务记录。
+
+Batch 0 本地提交：待创建。整个 2026-11 目标保持执行中。
 
 
 2026-11-19 当前input子批完成：沿原contribution/SDK/CLI/turn/approval/session owner修transform/handled与legacy veto、inert callback、receipt及保存前后准入；未增加执行、存储或事件bus。实际L；原新普通提交已验收，live steer/followUp另留E.6缺口。20/416、末改144/恢复159、七门/buildcca13a50f2ac、11有效反转/两限定APPROVE、Linux native/floor/installed各15场景7POST及配置1actualPOST200/completed。默认judge容量not_proven保持，功能36/62、26开放。最新用户要求当前批提交后总结并停止，停止后不执行下一批。
