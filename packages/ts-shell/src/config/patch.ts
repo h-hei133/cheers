@@ -1,6 +1,7 @@
 import { applyEdits, createScanner, findNodeAtLocation, modify, parseTree, SyntaxKind, type Edit, type JSONPath } from 'jsonc-parser';
+import { isAlias, isScalar, parseDocument } from 'yaml';
 import { type ConfigSnapshot, serializeConfigDocument } from './document.js';
-import { CONFIG_MAX_BYTES, ConfigDocumentError, configParserText, parseConfigText } from './syntax.js';
+import { CONFIG_MAX_BYTES, ConfigDocumentError, configParserText, parseConfigFileText, parseConfigText } from './syntax.js';
 import { isRecord as record } from '../core/values/record.js';
 import { sameValue, sameArraySlots } from './values.js';
 
@@ -48,12 +49,13 @@ function deletionEdits(text: string, path: JSONPath): Edit[] {
 }
 
 /** Preserve bytes outside intentional edit spans, then prove the resulting value. */
-export function patchConfigDocument(snapshot: ConfigSnapshot | undefined, value: Record<string, unknown>): string {
-  if (!snapshot) return serializeConfigDocument(value);
+export function patchConfigDocument(snapshot: ConfigSnapshot | undefined, value: Record<string, unknown>, format: 'jsonc' | 'yaml' = 'jsonc'): string {
+  if (!snapshot) return serializeConfigDocument(value, format);
   // Canonicalize JSON's absent-property semantics without expanding references.
   const expected: Record<string, unknown> = JSON.parse(JSON.stringify(value));
   const edits: Change[] = [];
   changes(snapshot.values, expected, [], edits);
+  if ((snapshot.format ?? format) === 'yaml') return patchYamlDocument(snapshot, expected, edits);
   let text = snapshot.text;
   let bytes = 0;
   for (const change of edits) {
@@ -71,5 +73,52 @@ export function patchConfigDocument(snapshot: ConfigSnapshot | undefined, value:
     if (Buffer.byteLength(text) > CONFIG_MAX_BYTES) throw new ConfigDocumentError('resource-limit');
   }
   if (!sameValue(parseConfigText(text), expected)) throw new ConfigDocumentError('edit-mismatch');
+  return text;
+}
+
+function patchYamlDocument(snapshot: ConfigSnapshot, expected: Record<string, unknown>, edits: readonly Change[]): string {
+  if (edits.length === 0) return snapshot.text;
+  const bom = snapshot.text.startsWith('\uFEFF') ? '\uFEFF' : '';
+  let document;
+  try {
+    document = parseDocument(snapshot.text.slice(bom.length), {
+      version: '1.2', schema: 'core', resolveKnownTags: false, merge: false,
+      stringKeys: true, uniqueKeys: true,
+    });
+  } catch { throw new ConfigDocumentError('edit-mismatch'); }
+  if (document.errors.length || document.warnings.length || !document.contents) throw new ConfigDocumentError('edit-mismatch');
+  const scalarEdits: Edit[] = [];
+  for (const edit of edits) {
+    if (edit.value === undefined || edit.value !== null && typeof edit.value === 'object') break;
+    const node = document.getIn(edit.path, true);
+    if ((!isScalar(node) && !isAlias(node)) || !node.range || isScalar(node) && (node.anchor || node.tag)) break;
+    const offset = node.range[0] + bom.length;
+    const end = node.range[1] + bom.length;
+    if (/\r|\n/.test(snapshot.text.slice(offset, end))) break;
+    const content = typeof edit.value === 'string' ? JSON.stringify(edit.value) : String(edit.value);
+    scalarEdits.push({ offset, length: end - offset, content });
+  }
+  if (scalarEdits.length === edits.length) {
+    let text = snapshot.text;
+    for (const edit of scalarEdits.sort((left, right) => right.offset - left.offset)) {
+      text = text.slice(0, edit.offset) + edit.content + text.slice(edit.offset + edit.length);
+    }
+    if (Buffer.byteLength(text) > CONFIG_MAX_BYTES || !sameValue(parseConfigFileText('config.yaml', text), expected)) {
+      throw new ConfigDocumentError('edit-mismatch');
+    }
+    return text;
+  }
+  let bytes = Buffer.byteLength(snapshot.text);
+  for (const edit of edits) {
+    bytes += Buffer.byteLength(snapshot.text);
+    if (bytes > MAX_EDIT_BYTES) throw new ConfigDocumentError('resource-limit');
+    try {
+      if (edit.value === undefined) document.deleteIn(edit.path);
+      else document.setIn(edit.path, edit.value);
+    } catch { throw new ConfigDocumentError('edit-mismatch'); }
+  }
+  const text = `${bom}${document.toString({ lineWidth: 0 })}`;
+  if (Buffer.byteLength(text) > CONFIG_MAX_BYTES
+    || !sameValue(parseConfigFileText('config.yaml', text), expected)) throw new ConfigDocumentError('edit-mismatch');
   return text;
 }

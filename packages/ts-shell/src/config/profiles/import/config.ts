@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { CONFIG_FIELDS, type ProviderConnectionConfig, type ProviderCredentialConfig, type RuntimeConfigFile, type RuntimeProvider } from '../../runtimeConfig.js';
-import { parseConfigText } from '../../syntax.js';
+import { parseConfigFileText, parseConfigText } from '../../syntax.js';
 import { serializeConfigDocument } from '../../document.js';
 import type { PathRule } from '../../scope/contract.js';
 import { mergeConfigDocuments } from '../../documents.js';
@@ -19,7 +19,7 @@ export function nonsecretUrl(value: string): string {
 /** Validate raw declared values without resolving any source environment references. */
 export function importConfig(text: string, sourcePath: string, auth?: { readonly content: string; readonly path: string }): string {
   if (!path.isAbsolute(sourcePath)) throw new Error('Imported configuration requires its captured source path.');
-  const settings = parseConfigText(text);
+  const settings = parseConfigFileText(sourcePath, text);
   const credentials = auth ? parseConfigText(auth.content) : {};
   if (auth && !path.isAbsolute(auth.path)) throw new Error('Imported configuration requires its captured source path.');
   for (const document of [settings, credentials]) {

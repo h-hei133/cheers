@@ -145,11 +145,28 @@ describe("os sandbox rules", () => {
     expect(readSandboxRules(workspace).filesystem?.denyRead).toEqual(["/etc"]);
   });
 
-  it("treats a malformed file as no rules rather than failing", () => {
+  it("refuses a malformed selected configuration instead of dropping its rules", () => {
     fs.mkdirSync(path.join(workspace, ".agents"), { recursive: true });
     fs.writeFileSync(path.join(workspace, ".agents", "sandbox.json"), "{ not json", "utf8");
 
-    expect(readSandboxRules(workspace)).toEqual({});
+    expect(() => readSandboxRules(workspace)).toThrow(/sandbox\.json/);
+    expect(planSandboxedCommand({ shell: "sh", shellArgs: ["-c", "true"], workspaceRoot: workspace }))
+      .toMatchObject({ state: 'refused' });
+  });
+
+  it('reads YAML rules and reports their selected path on parse errors', () => {
+    fs.mkdirSync(path.join(workspace, '.agents'), { recursive: true });
+    fs.writeFileSync(path.join(workspace, '.agents', 'sandbox.yaml'), 'enabled: true\nfilesystem:\n  denyRead: [\n');
+    const plan = planSandboxedCommand({ shell: 'sh', shellArgs: ['-c', 'true'], workspaceRoot: workspace });
+    expect(plan).toMatchObject({ state: 'refused' });
+    expect(plan.notice).toContain(path.join(workspace, '.agents', 'sandbox.yaml'));
+  });
+
+  it('refuses YAML whose sandbox fields have the wrong shape', () => {
+    fs.mkdirSync(path.join(workspace, '.agents'), { recursive: true });
+    fs.writeFileSync(path.join(workspace, '.agents', 'sandbox.yaml'), 'enabled: true\nfilesystem:\n  allowWrite: /\n');
+    expect(planSandboxedCommand({ shell: 'sh', shellArgs: ['-c', 'true'], workspaceRoot: workspace }))
+      .toMatchObject({ state: 'refused' });
   });
 
   it("keeps the three outcomes apart", () => {

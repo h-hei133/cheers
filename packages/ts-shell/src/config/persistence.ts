@@ -6,7 +6,7 @@ import { withFileLock, writeTextFileAtomic } from '../session/store/sessionFileS
 import { configSnapshotMatches, readConfigSnapshot, type CapturedConfigSnapshot } from './document.js';
 import { type ConfigFields } from './fields.js';
 import { validateRawConfig } from './layers.js';
-import { ConfigDocumentError } from './syntax.js';
+import { ConfigDocumentError, configFormatForPath } from './syntax.js';
 import { patchConfigDocument } from './patch.js';
 import { mergeConfigEdit } from './conflict.js';
 import { configDocumentPaths, isDeclaredAuthField, mergeConfigDocuments, partitionConfigDocuments, readConfigDocuments, userSettingsPath } from './documents.js';
@@ -62,7 +62,8 @@ function pairRevision(settingsText: string | undefined, authText: string | undef
 function assertSelection(filePath: string, owner: EditOwner): void {
   try {
     const selected = configDocumentPaths(filePath);
-    if (selected.settingsPath !== owner.paths.settingsPath || selected.authPath !== owner.paths.authPath
+    if (selected.settingsPath !== owner.paths.settingsPath || selected.settingsFormat !== owner.paths.settingsFormat
+      || selected.authPath !== owner.paths.authPath
       || owner.settingsCanonical && fs.realpathSync(owner.paths.settingsPath) !== owner.settingsCanonical
       || owner.authCanonical && fs.realpathSync(owner.paths.authPath!) !== owner.authCanonical) throw new Error();
   } catch { throw new ConfigWriteError('conflict', 'unchanged'); }
@@ -124,10 +125,10 @@ export function configEditDocuments(baseline: ConfigEdit<unknown>): readonly { s
 export function readConfigEdit<T>(filePath: string, fields: ConfigFields): ConfigEdit<T> {
   const profile = currentProfile();
   const paths = configDocumentPaths(filePath);
-  const { settingsPath, authPath } = paths;
+  const { settingsPath, settingsFormat, authPath } = paths;
   assertOwner(settingsPath, profile);
   if (authPath) assertOwner(authPath, profile);
-  const settings = readConfigSnapshot(settingsPath);
+  const settings = readConfigSnapshot(settingsPath, { format: settingsFormat });
   const auth = authPath ? readConfigSnapshot(authPath) : undefined;
   // The credential document is read second, so a field it holds wins. That order
   // is what makes the migration invisible: a pre-split file still carries its
@@ -161,7 +162,7 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
   let savedRevision: string | undefined;
   try {
     const owner = owners.get(baseline)!;
-    const { profile, paths: { settingsPath, authPath } } = owner;
+    const { profile, paths: { settingsPath, settingsFormat, authPath } } = owner;
     assertSelection(filePath, owner);
     if (!profile && currentProfile()) throw new ConfigWriteError('conflict', 'unchanged');
     const settingsTarget = owner.settingsCanonical ?? settingsPath;
@@ -194,8 +195,9 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
       if (authPath) assertOwner(authPath, profile);
       code = 'invalid-document';
       assertSelection(filePath, owner);
-      const documents = authPath ? readConfigDocuments(settingsPath, authPath)
-        : { settings: readConfigSnapshot(settingsPath), auth: undefined, values: {} };
+      const settingsOptions = { format: settingsFormat };
+      const documents = authPath ? readConfigDocuments(settingsPath, authPath, settingsFormat)
+        : { settings: readConfigSnapshot(settingsPath, settingsOptions), auth: undefined, values: {} };
       const { settings, auth } = documents;
       // Disjoint edits can merge, but removing an acquired document is a reset:
       // an old edit must not resurrect it, even when its fields were untouched.
@@ -212,11 +214,11 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
       // Each document is patched against its own bytes, so comments and unknown
       // fields survive exactly as they did when there was one file.
       const split = authPath ? partitionConfigDocuments(merged, documents) : { settings: merged, auth: {} };
-      const settingsText = documentText(settings, split.settings);
-      const authText = authPath ? documentText(auth, split.auth) : undefined;
+      const settingsText = documentText(settings, split.settings, settingsPath);
+      const authText = authPath ? documentText(auth, split.auth, authPath) : undefined;
       // Also guard absence and exact trivia. No CAS claim against an editor
       // that changes a path between this check and the atomic rename.
-      if (readConfigSnapshot(settingsPath)?.text !== settings?.text || !configSnapshotMatches(settingsPath, settings)
+      if (readConfigSnapshot(settingsPath, settingsOptions)?.text !== settings?.text || !configSnapshotMatches(settingsPath, settings)
         || authPath && (readConfigSnapshot(authPath)?.text !== auth?.text || !configSnapshotMatches(authPath, auth))) {
         throw new ConfigWriteError('conflict', 'unchanged');
       }
@@ -241,7 +243,7 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
         state = 'unknown'; code = 'write-failed';
         writeTextFileAtomic(target, text!, kind === 'auth' || holdsCredentialMaterial(split.settings) ? CREDENTIAL_FILE_MODE : undefined);
         code = 'verification-failed';
-        const saved = readConfigSnapshot(selected);
+        const saved = readConfigSnapshot(selected, kind === 'settings' ? settingsOptions : undefined);
         if (saved?.text !== text) throw new ConfigWriteError('verification-failed', 'unknown');
         if (kind === 'auth') expectedAuth = saved; else expectedSettings = saved;
         wrote = true;
@@ -253,7 +255,7 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
       if (authPath) {
         const staged = stagePreferences(split.auth, { ...(settings?.values ?? {}), ...(auth?.values ?? {}) });
         if (auth?.values[PREFERENCE_FIELD] !== undefined) staged[PREFERENCE_FIELD] = auth.values[PREFERENCE_FIELD];
-        publish('auth', settingsText === settings?.text ? authText : documentText(auth, staged));
+        publish('auth', settingsText === settings?.text ? authText : documentText(auth, staged, authPath!));
       }
       publish('settings', settingsText);
       if (authPath) publish('auth', authText);
@@ -266,7 +268,7 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
       }
       if (settings && settingsText === settings.text && holdsCredentialMaterial(settings.values)) {
         narrowCredentialFile(settingsTarget);
-        const narrowed = readConfigSnapshot(settingsPath);
+        const narrowed = readConfigSnapshot(settingsPath, settingsOptions);
         if (narrowed?.text !== expectedSettings?.text) throw new ConfigWriteError('conflict', state);
         expectedSettings = narrowed;
       }
@@ -275,7 +277,7 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
         assertOwner(settingsPath, profile);
         if (authPath) assertOwner(authPath, profile);
         code = 'verification-failed';
-        if (readConfigSnapshot(settingsPath)?.text !== settingsText
+        if (readConfigSnapshot(settingsPath, settingsOptions)?.text !== settingsText
           || (authPath && !configSnapshotMatches(authPath, expectedAuth))) {
           throw new ConfigWriteError('verification-failed', 'unknown');
         }
@@ -300,6 +302,7 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
 }
 
 /** A save does not create an absent document that has no owned fields. */
-function documentText(snapshot: CapturedConfigSnapshot | undefined, values: Record<string, unknown>): string | undefined {
-  return !snapshot && Object.keys(values).length === 0 ? undefined : patchConfigDocument(snapshot, values);
+function documentText(snapshot: CapturedConfigSnapshot | undefined, values: Record<string, unknown>, filePath: string): string | undefined {
+  return !snapshot && Object.keys(values).length === 0 ? undefined
+    : patchConfigDocument(snapshot, values, snapshot?.format ?? configFormatForPath(filePath));
 }

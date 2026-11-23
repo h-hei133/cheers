@@ -24,7 +24,7 @@ export function modelKind(before: readonly string[], current: string, after: rea
 
 /**
  * Slash completion has no explicit Registry selector, so it suggests only ready
- * targets and providers the user explicitly added to models.json. The interactive
+ * targets and providers the user explicitly added to their model catalogue. The interactive
  * model browser remains the path to the full catalogue.
  */
 export function modelCatalog(kind: "model" | "provider", catalog: readonly CatalogProvider[] = loadCatalog(),

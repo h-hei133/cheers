@@ -1,4 +1,6 @@
 import { EventEmitter } from "node:events";
+import fs from 'node:fs';
+import path from 'node:path';
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
@@ -538,6 +540,30 @@ it.each([true, false])('runs the standalone plugin installer with an exact termi
     expect(runInteractiveLoop).not.toHaveBeenCalled();
     expect(closeExtensionsFor).toHaveBeenCalledOnce();
   } finally { fixture.dispose(); }
+});
+
+it('runs configuration migration as a standalone Linux command without bootstrapping a session', async () => {
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  const home = fs.mkdtempSync('/tmp/cheers-test/config-command-');
+  const previousHome = process.env.HOME;
+  const previousProfile = process.env.USERPROFILE;
+  fs.mkdirSync(path.join(home, '.cheers'), { recursive: true });
+  fs.writeFileSync(path.join(home, '.cheers', 'config.json'), '{"maxTurns":9}');
+  fs.mkdirSync(projectRoot, { recursive: true });
+  vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home);
+  const fixture = outputFixture({ args: ['config', 'migrate'] });
+  try {
+    await fixture.run();
+    expect(fixture.writeOutput).toHaveBeenCalledWith(expect.stringContaining('config.yaml: complete'));
+    expect(fs.readFileSync(path.join(home, '.cheers', 'config.yaml'), 'utf8')).toContain('maxTurns: 9');
+    expect(createCliRootContext).not.toHaveBeenCalled();
+    expect(createCliBootstrapRuntimeContext).not.toHaveBeenCalled();
+  } finally {
+    fixture.dispose(); vi.unstubAllEnvs();
+    if (previousHome === undefined) delete process.env.HOME; else process.env.HOME = previousHome;
+    if (previousProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = previousProfile;
+    fs.rmSync(home, { recursive: true, force: true });
+  }
 });
 
 it.each([

@@ -1,5 +1,6 @@
 import { projectTrust } from '../core/security/trust/store.js';
 import { userAuthPath } from './documents.js';
+import { readConfigSnapshot } from './document.js';
 import { readRuntimeConfigEditAt } from "./runtimeConfig.js";
 import fs from 'node:fs';
 import os from 'node:os';
@@ -139,7 +140,7 @@ describe('configuration validation boundary', () => {
     writeUserRuntimeConfigFile({ theme: 'custom' } as RuntimeConfigFile, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     // The credential moved to its own document on the first save; the unknown
     // field and the reference stayed where they were, and the setting was added.
-    expect(JSON.parse(fs.readFileSync(userPath, 'utf8'))).toEqual({ unknown: { retained: true }, theme: 'custom' });
+    expect(readConfigSnapshot(userPath)?.values).toEqual({ unknown: { retained: true }, theme: 'custom' });
     expect(JSON.parse(fs.readFileSync(userAuthPath(), 'utf8'))).toEqual({ providerCredentials: { openai: { apiKey: '${CONFIG_TEST_MISSING}' } } });
     const before = fs.readFileSync(userPath, 'utf8');
     expect(() => writeUserRuntimeConfigFile({ providerConnections: 'secret-value' } as unknown as RuntimeConfigFile, readRuntimeConfigEditAt(getUserRuntimeConfigPath()))).toThrow();

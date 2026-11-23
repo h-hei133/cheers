@@ -7,12 +7,14 @@ import { captureToolScope, assertScopeToolAllowed, toolScopeBinding } from '../.
 import { createProfile } from '../context.js';
 import { importRequest, planImport } from './plan.js';
 import { applyImport } from './runtime.js';
+import { readConfigSnapshot } from '../../document.js';
 
 let home: string;
 let workspace: string;
 
 beforeEach(() => {
-  home = fs.mkdtempSync(path.join(process.cwd(), '.profile-scope-'));
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  home = fs.mkdtempSync('/tmp/cheers-test/profile-scope-');
   workspace = path.join(home, 'workspace');
   fs.mkdirSync(workspace);
   vi.stubEnv('CHEERS_MAX_TURNS', '');
@@ -36,7 +38,7 @@ it.each(['default', 'named', 'legacy'])('preserves %s configuration rule targets
   fs.writeFileSync(file, original);
 
   const plan = planImport(importRequest({ source: source.id, target: target.id, homeDir: home, workspace, categories: ['config'] }));
-  expect(fs.existsSync(path.join(target.root, 'config.json'))).toBe(false);
+  expect(fs.existsSync(path.join(target.root, 'config.yaml'))).toBe(false);
   expect(plan.sources.some(item => item.path === file)).toBe(true);
   expect(applyImport(plan, plan.digest).status).toBe('complete');
   withProfile(target, () => {
@@ -46,7 +48,7 @@ it.each(['default', 'named', 'legacy'])('preserves %s configuration rule targets
     expect(scope.settings.allowedTools).toEqual([]);
     expect(() => assertScopeToolAllowed(scope.settings, 'read')).toThrow('disabled');
   });
-  const imported = JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8'));
+  const imported = readConfigSnapshot(path.join(target.root, 'config.yaml'))!.values;
   expect(imported.pathRules.map((rule: { path: string }) => rule.path)).toEqual([workspace, workspace]);
   expect(fs.readFileSync(file, 'utf8')).toBe(original);
 });
@@ -59,5 +61,5 @@ it('rejects a changed rule target after preview without publishing the old trans
   const plan = planImport(importRequest({ source: source.id, target: target.id, homeDir: home, workspace, categories: ['config'] }));
   fs.writeFileSync(file, JSON.stringify({ pathRules: [{ path: '../elsewhere', settings: { allowedTools: [] } }] }));
   expect(applyImport(plan, plan.digest).status).toBe('rejected');
-  expect(fs.existsSync(path.join(target.root, 'config.json'))).toBe(false);
+  expect(fs.existsSync(path.join(target.root, 'config.yaml'))).toBe(false);
 });

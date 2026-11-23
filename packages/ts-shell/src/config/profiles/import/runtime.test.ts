@@ -15,6 +15,7 @@ import { joinPreferences } from '../../preferences/documents.js';
 import type { RuntimeConfigFile } from '../../runtimeConfig.js';
 import { loadCatalog } from '../../../core/models/catalogStore.js';
 import { catalogModel } from '../../../core/models/catalog.js';
+import { readConfigSnapshot } from '../../document.js';
 
 let home: string; let workspace: string; let source: ProfileContext; let target: ProfileContext;
 beforeEach(() => {
@@ -32,8 +33,8 @@ function preview(categories?: Parameters<typeof importRequest>[0]['categories'])
 }
 function importedConfig() {
   const auth = JSON.parse(fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8'));
-  const settingsPath = path.join(target.root, 'config.json');
-  return joinPreferences({ ...(fs.existsSync(settingsPath) ? JSON.parse(fs.readFileSync(settingsPath, 'utf8')) : {}), ...auth }) as RuntimeConfigFile;
+  const settingsPath = path.join(target.root, 'config.yaml');
+  return joinPreferences({ ...(readConfigSnapshot(settingsPath)?.values ?? {}), ...auth }) as RuntimeConfigFile;
 }
 
 it('opens existing profiles without creating missing roots or changing the active owner', () => {
@@ -73,8 +74,10 @@ it('previews without writes, excludes live credentials and imports inactive nati
   const config = importedConfig();
   expect(config.providerConnections[0]).toMatchObject({ id: 'same-id', status: 'pending', model: 'test-model' });
   for (const secret of ['synthetic-access', 'synthetic-refresh', 'synthetic-key', 'synthetic-legacy', 'do-not-import']) expect(configText).not.toContain(secret);
-  expect(fs.readFileSync(path.join(target.root, 'models.json'), 'utf8')).not.toContain('do-not-import');
-  expect(JSON.parse(fs.readFileSync(path.join(target.root, 'models.json'), 'utf8')).providers.openai.models[0].compat.reasoningSummary).toBe(false);
+  expect(fs.readFileSync(path.join(target.root, 'models.yaml'), 'utf8')).not.toContain('do-not-import');
+  expect(readConfigSnapshot(path.join(target.root, 'models.yaml'))?.values.providers).toMatchObject({
+    openai: { models: [{ compat: { reasoningSummary: false } }] },
+  });
   expect(fs.existsSync(path.join(target.root, 'trust.json'))).toBe(false);
   expect(fs.existsSync(path.join(target.root, 'mcp-auth.json'))).toBe(false);
   expect(fs.existsSync(path.join(target.root, 'skills/test/run.sh'))).toBe(false);
@@ -135,7 +138,7 @@ it('imports split auth connection metadata without secrets and preserves its sel
   expect(plan.sources.map(file => path.basename(file.path))).toEqual(['auth.json', 'config.json']);
   expect(fs.readdirSync(target.root)).toEqual([]);
   expect(applyImport(plan, plan.digest).status).toBe('complete');
-  expect(JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8'))).toEqual({ maxTurns: 17,
+  expect(readConfigSnapshot(path.join(target.root, 'config.yaml'))?.values).toEqual({ maxTurns: 17,
     modelPreferences: { connections: [{ id: 'relay', provider: 'openai', model: 'owned-model' }] },
   });
   const stored = fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8');
@@ -156,7 +159,7 @@ it('imports an auth-only profile and fences an auth edit after preview', () => {
   expect(fs.existsSync(path.join(target.root, 'auth.json'))).toBe(false);
   const fresh = preview(['config']);
   expect(applyImport(fresh, fresh.digest).status).toBe('complete');
-  expect(fs.existsSync(path.join(target.root, 'config.json'))).toBe(false);
+  expect(fs.existsSync(path.join(target.root, 'config.yaml'))).toBe(false);
   expect(JSON.parse(fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8')).providerConnections[0]).toMatchObject({ id: 'other', status: 'pending' });
 });
 
@@ -169,7 +172,7 @@ it('retains independent provider fallback preferences alongside a pending named 
   const plan = preview(['config']); expect(applyImport(plan, plan.digest).status).toBe('complete');
   expect(importedConfig().providerCredentials?.openai).toEqual({ model: 'provider-default', thinkingEffort: 'high', serviceTier: 'flex' });
   expect(importedConfig().providerConnections?.[0]).toMatchObject({ id: 'relay', status: 'pending', thinkingEffort: null });
-  const settings = fs.readFileSync(path.join(target.root, 'config.json'), 'utf8');
+  const settings = fs.readFileSync(path.join(target.root, 'config.yaml'), 'utf8');
   const auth = JSON.parse(fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8'));
   expect(auth.providerCredentials).toEqual({ openai: {} });
   expect(auth.providerConnections[0]).not.toHaveProperty('thinkingEffort');
@@ -196,7 +199,7 @@ it('anchors an auth-owned path rule to its actual source directory', () => {
   fs.writeFileSync(path.join(legacy, 'auth.json'), JSON.stringify({ pathRules: [{ path: '../workspace', settings: { allowedTools: [] } }] }));
   const plan = preview(['config']);
   expect(applyImport(plan, plan.digest).status).toBe('complete');
-  const imported = JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8'));
+  const imported = readConfigSnapshot(path.join(target.root, 'config.yaml'))!.values;
   expect(imported.pathRules[0].path).toBe(path.resolve(legacy, '../workspace'));
 });
 
@@ -246,9 +249,9 @@ it.each(['before', 'partial', 'complete'])('never overwrites conflicts %s public
     expect(applyImport(plan, plan.digest).status).toBe('unknown'); fault.mockRestore();
   }
   if (phase === 'complete') expect(applyImport(plan, plan.digest).status).toBe('complete');
-  write('config.json', 'retain target bytes', target);
+  write('config.yaml', 'retain target bytes', target);
   expect(applyImport(plan, plan.digest).status).toBe('conflict');
-  expect(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8')).toBe('retain target bytes');
+  expect(fs.readFileSync(path.join(target.root, 'config.yaml'), 'utf8')).toBe('retain target bytes');
   expect(fs.readFileSync(path.join(source.root, 'config.json'), 'utf8')).toBe('{"maxTurns":13}');
 });
 
@@ -256,17 +259,17 @@ it('preserves a competing destination created between inspection and exclusive p
   write('config.json', '{"maxTurns":13}'); const plan = preview(['config']); const mkdir = fs.mkdirSync;
   vi.spyOn(fs, 'mkdirSync').mockImplementation((...args) => {
     const result = mkdir(...args);
-    if (String(args[0]) === target.root) fs.writeFileSync(path.join(target.root, 'config.json'), 'concurrent target owner');
+    if (String(args[0]) === target.root) fs.writeFileSync(path.join(target.root, 'config.yaml'), 'concurrent target owner');
     return result;
   });
   expect(applyImport(plan, plan.digest).status).toBe('conflict');
-  expect(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8')).toBe('concurrent target owner');
+  expect(fs.readFileSync(path.join(target.root, 'config.yaml'), 'utf8')).toBe('concurrent target owner');
 });
 
 it('rejects stale source revisions and replaced roots before consumer effects', () => {
   write('config.json', '{"maxTurns":13}'); let plan = preview();
   write('config.json', '{"maxTurns":14}'); expect(applyImport(plan, plan.digest).status).toBe('rejected');
-  expect(fs.existsSync(path.join(target.root, 'config.json'))).toBe(false);
+  expect(fs.existsSync(path.join(target.root, 'config.yaml'))).toBe(false);
   plan = preview(); fs.renameSync(target.root, `${target.root}-old`); fs.mkdirSync(target.root);
   expect(applyImport(plan, plan.digest).status).toBe('rejected'); expect(fs.readdirSync(target.root)).toEqual([]);
 });
@@ -276,7 +279,7 @@ it('rejects source and destination links and bounded acquisition failures', () =
   fs.symlinkSync(external, path.join(source.root, 'config.json'));
   expect(() => preview(['config'])).toThrow('symbolic'); fs.unlinkSync(path.join(source.root, 'config.json'));
   write('config.json', '{"maxTurns":13}'); const plan = preview(['config']);
-  fs.symlinkSync(external, path.join(target.root, 'config.json'));
+  fs.symlinkSync(external, path.join(target.root, 'config.yaml'));
   expect(applyImport(plan, plan.digest).status).toBe('unknown'); expect(fs.readFileSync(external, 'utf8')).toBe('{"maxTurns":12}');
   fs.unlinkSync(path.join(source.root, 'config.json')); write('config.json', 'x'.repeat(IMPORT_LIMITS.fileBytes + 1));
   expect(() => preview(['config'])).toThrow('size limit');
@@ -288,5 +291,5 @@ it('retains unknown on lock release failure and refuses cancelled admission with
   const link = fs.linkSync;
   vi.spyOn(fs, 'linkSync').mockImplementation((...args) => { link(...args); fs.unlinkSync(path.join(target.root, '.profile-import.lock')); });
   expect(applyImport(plan, plan.digest).status).toBe('unknown');
-  expect(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8')).toContain('13');
+  expect(fs.readFileSync(path.join(target.root, 'config.yaml'), 'utf8')).toContain('maxTurns: 13');
 });

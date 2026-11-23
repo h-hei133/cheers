@@ -16,13 +16,14 @@ export function cliHelpText(): string {
 
 Usage:
   cheers [options] [prompt]
+  cheers [--profile <name>] config migrate
   cheers plugin install <source>
   cheers --help
   cheers --version
 
 Options:
   --profile <name>                  Select a profile.
-  --config <file>                   Add a personal JSONC input; repeatable.
+  --config <file>                   Add a personal JSONC or YAML input; repeatable.
   --project, --attach <path>        Select the workspace.
   --session-id <id>                 Resume a specific session.
   --new-session                     Start a separate conversation.

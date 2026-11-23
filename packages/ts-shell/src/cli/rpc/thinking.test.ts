@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, getUserRuntimeConfigPath } from '../../config/runtimeConfig.js';
+import { readConfigSnapshot } from '../../config/document.js';
 import { registerCatalogContribution } from '../../core/catalog/contributions.js';
 import { userCatalogPath } from '../../core/models/catalogStore.js';
 import { ShellCommandRuntime } from '../../core/shell/command.js';
@@ -90,7 +91,7 @@ it('publishes the saved effort to the same running host before the next cycle', 
 });
 
 it('does not cycle into explicit effort when the endpoint output budget cannot support it', async () => {
-  const file = getUserRuntimeConfigPath(); const settings = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const file = getUserRuntimeConfigPath(); const settings = readConfigSnapshot(file)!.values;
   fs.writeFileSync(file, JSON.stringify({ ...settings, maxOutputTokens: 1024 }));
   const { host, context } = fixture({ reasoning: true }, 'anthropic-messages');
   expect(context.configuration.current.admissionBlocked).toBe(false);

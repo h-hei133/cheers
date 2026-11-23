@@ -1,7 +1,6 @@
-import path from 'node:path';
 import { sameValue } from '../../../config/values.js';
 import { readBoundSessionState } from '../../../session/store/bound.js';
-import { readWorkflow, type WorkflowFile } from '../../../core/workflow/definition.js';
+import { readWorkflow, workflowNameForPath, type WorkflowFile } from '../../../core/workflow/definition.js';
 import { projectTrust } from '../../../core/security/projectTrust.js';
 import { loadHookDeclarations } from '../../../core/hooks/config.js';
 import { createCoreToolRegistry } from '../../../core/tools/registry.js';
@@ -27,7 +26,7 @@ export function captureDagRuntime(host: JobsComposition, definition: WorkflowFil
   const parent = readBoundSessionState(host.manager, host.session);
   const captured = captureWorkspaceRoot(host.context.cwd, parent.scope.workspace.path, 'read');
   const directory = expectedDirectory ?? { path: captured.path, identity: captured.identity };
-  const name = path.basename(definition.source, '.json');
+  const name = workflowNameForPath(definition.source);
   const admission = () => {
     const refused = parentAdmission(); if (refused) return refused;
     try {

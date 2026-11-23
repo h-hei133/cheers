@@ -1,4 +1,5 @@
 import { readRuntimeConfigEditAt } from "../../config/runtimeConfig.js";
+import { readConfigSnapshot } from '../../config/document.js';
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -123,8 +124,8 @@ it.each((['bedrock', 'vertex'] as const).flatMap(provider => [false, true].map(s
     expect((await runModelCommand(['use', 'next-model', '--global'], command)).output).toContain('Global default stored at');
     expect((await runThinkingCommand(['high', '--global'], command)).output).toContain('Reasoning effort: high.');
     expect(readUserRuntimeConfigFile().providerCredentials?.[provider]).toMatchObject({ model: 'next-model', thinkingEffort: 'high' });
-    const settings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
-    expect(settings.modelPreferences.providers[provider]).toMatchObject({ model: 'next-model', thinkingEffort: 'high' });
+    const settings = readConfigSnapshot(getUserRuntimeConfigPath())!.values;
+    expect(settings.modelPreferences).toMatchObject({ providers: { [provider]: { model: 'next-model', thinkingEffort: 'high' } } });
     expect(fs.readFileSync(getUserAuthPath())).toEqual(auth);
     expect(fetch).not.toHaveBeenCalled();
     if (session) expect(readSessionModel(session.id)).toEqual({ connectionScope: 'provider', provider, model: 'next-model', thinkingEffort: 'high' });
@@ -176,7 +177,7 @@ it.each(['openai', 'nonsigner', 'missing-address', 'blocked'] as const)(
     expect(configBytes()).toEqual(original); expect(readSessionModelEdit(session.id)).toEqual(before);
   });
 
-it.each(['/model new', '/model openai/new --global', '/model google/new', '/thinking high --global'])(
+it.each(['/model new', '/model openai/new --global', '/thinking high --global'])(
   'rejects a different request provider before hooks or writes through the command bridge: %s', async prompt => {
     addAlternateConnection();
     const session = manager.createNew(home);
@@ -198,15 +199,16 @@ it.each(['/model new', '/model openai/new --global', '/model google/new', '/thin
     expect(fs.readFileSync(statePath)).toEqual(state);
   });
 
-it('allows an explicit request provider after selecting its matching saved connection', async () => {
-  addAlternateConnection(true);
+it.each([false, true])('selects the matching saved connection for an explicit request provider (already active: %s)', async active => {
+  addAlternateConnection(active);
   const session = manager.createNew(home);
   const runtimeConfig = getRuntimeConfig(home);
   const resolveConfigTarget = (config: typeof runtimeConfig) => resolveCliCredential(config, { provider: 'google' }, {});
-  const result = await runModelCommand(['google/new', '--global'], { cwd: home, projectRoot: home, sessionId: session.id,
+  const result = await runModelCommand(active ? ['google/new', '--global'] : ['use', 'google/new'], { cwd: home, projectRoot: home, sessionId: session.id,
     runtimeConfig, resolveConfigTarget });
   expect(result.output).toContain('Model switched to new');
   const saved = readUserRuntimeConfigFile();
+  expect(saved.activeProviderConnectionId).toBe(active ? 'alternate' : 'fixture');
   expect(saved.providerConnections?.find(item => item.id === 'fixture')?.model).toBe('base-model');
   expect(readSessionModel(session.id)).toMatchObject({ connectionId: 'alternate', provider: 'google', model: 'new' });
   expect(resolveConfigTarget(projectSessionModel(getRuntimeConfig(home), session.id)).model).toBe('new');

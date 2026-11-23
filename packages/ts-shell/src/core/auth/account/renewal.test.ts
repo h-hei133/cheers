@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, type OpenAIAccountAuthConfig, type RuntimeConfigFile } from '../../../config/runtimeConfig.js';
+import { readConfigSnapshot } from '../../../config/document.js';
 import { resolveProviderCredential } from '../../shell/providerCredentials.js';
 import { renewStoredAccount } from './renewal.js';
 import * as store from '../../../session/store/sessionFileStore.js';
@@ -27,8 +28,7 @@ const initial = (): RuntimeConfigFile => ({ provider: 'openai', activeProviderCo
   providerConnections: [connection('a'), connection('b')], providerCredentials: { openai: { accountAuth: { openai: auth() } } } });
 function write(value: RuntimeConfigFile) { fs.writeFileSync(file, JSON.stringify(value), { mode: 0o600 }); }
 function read(): RuntimeConfigFile { return JSON.parse(fs.readFileSync(file, 'utf8')); }
-function settingsFile(): string { return path.join(home, '.cheers', 'config.json'); }
-function readSettings(): { theme?: string } { try { return JSON.parse(fs.readFileSync(settingsFile(), 'utf8')); } catch { return {}; } }
+function settingsFile(): string { return path.join(home, '.cheers', 'config.yaml'); }
 function response(accountId = 'a') { return new Response(JSON.stringify({ access_token: accountToken('fresh-a', accountId), refresh_token: 'rotated-a', expires_in: 3600 }),
   { headers: { 'Content-Type': 'application/json' } }); }
 function request(change: () => void = () => {}) {
@@ -48,7 +48,7 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { recursive: true, force: true }); });
 
 it('reports per-file revisions for renewal while the logical pair keeps its own revision', async () => {
-  fs.writeFileSync(settingsFile(), '{"theme":"dark"}');
+  fs.writeFileSync(settingsFile(), '# preferences\ntheme: dark\n');
   const digest = (name: string) => createHash('sha256').update(fs.readFileSync(name)).digest('hex');
   const previousAuth = digest(file); const previousSettings = digest(settingsFile());
   const result = await renewStoredAccount(request());
@@ -82,14 +82,17 @@ it('renews only the captured account and its exact mirror while preserving other
   const before = read();
   // The concurrent edit touches a setting, which lives in the other document:
   // renewal must leave it alone rather than rewrite the file it is not editing.
-  const input = request(() => fs.writeFileSync(settingsFile(), JSON.stringify({ ...readSettings(), theme: 'light' })));
+  const concurrentSettings = '# preferences\ntheme: light\n';
+  const input = request(() => fs.writeFileSync(settingsFile(), concurrentSettings));
   const result = await renewStoredAccount(input); const saved = read();
   expect(result).toMatchObject({ stored: true, writeState: 'persisted', accountAuth: { accessToken: accountToken('fresh-a', 'a'), refreshToken: 'rotated-a', accountId: 'a' } });
   expect(saved.providerConnections?.[0]?.accountAuth?.openai).toEqual(result.accountAuth);
   expect(saved.providerConnections?.[1]).toEqual(before.providerConnections?.[1]);
   expect(saved.providerConnections?.[0]?.updatedAt).toBe(before.providerConnections?.[0]?.updatedAt);
   expect(saved.providerCredentials?.openai?.accountAuth?.openai).toEqual(result.accountAuth);
-  expect(readSettings().theme).toBe('light'); expect(input.fetchImpl).toHaveBeenCalledOnce();
+  expect(fs.readFileSync(settingsFile(), 'utf8')).toBe(concurrentSettings);
+  expect(readConfigSnapshot(settingsFile())?.values).toEqual({ theme: 'light' });
+  expect(input.fetchImpl).toHaveBeenCalledOnce();
   expect(result.rotation).toMatchObject({ resolution: input.resolution, accountAuth: result.accountAuth,
     storage: { source: settingsFile(), path: settingsFile() } });
   expect(result.rotation!.storage.previousRevision).not.toBe(result.rotation!.storage.revision);

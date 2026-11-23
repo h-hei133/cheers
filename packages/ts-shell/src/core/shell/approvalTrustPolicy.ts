@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { writeTextFileAtomic } from '../../session/store/sessionFileStore.js';
 import { assertProfileStorage, currentProfile } from '../paths/profile/context.js';
 import type { EscalationPrompt } from "./approval/contract.js";
 import {
@@ -267,10 +268,6 @@ export class ApprovalTrustPolicy {
     assertProfileStorage(this.policyFilePath, this.profile);
     ensureParentDir(this.policyFilePath);
     assertProfileStorage(this.policyFilePath, this.profile);
-    fs.writeFileSync(
-      this.policyFilePath,
-      JSON.stringify({ grants: state.grants }, null, 2),
-      "utf8",
-    );
+    writeTextFileAtomic(this.policyFilePath, JSON.stringify({ grants: state.grants }, null, 2), 0o600);
   }
 }

@@ -4,6 +4,8 @@ import { booleanSchema, enumSchema, listSchema, nameSchema, objectSchema, positi
 import { nonsecretUrl } from './config.js';
 import { THINKING_LEVELS } from '../../../core/models/effort.js';
 import { captureCostSchedule, MAX_COST_TIERS } from '../../../core/models/pricing.js';
+import { configFormatForPath, parseConfigFileText } from '../../syntax.js';
+import { serializeConfigDocument } from '../../document.js';
 
 const number = { type: 'number', minimum: 0 };
 const rateFields = { promptPerMTok: number, completionPerMTok: number, cacheReadPerMTok: number, cacheWritePerMTok: number };
@@ -50,9 +52,10 @@ function declared(value: unknown, schema: Record<string, unknown>): unknown {
 }
 
 /** Copy declared catalog data only; arbitrary nested credential containers are discarded. */
-export function importCatalog(text: string): string {
+export function importCatalog(text: string, sourcePath = 'models.json'): string {
   let value: unknown;
-  try { value = JSON.parse(text); } catch { throw new Error('Imported catalog requires valid JSON.'); }
+  try { value = configFormatForPath(sourcePath) === 'yaml' ? parseConfigFileText(sourcePath, text) : JSON.parse(text); }
+  catch { throw new Error('Imported catalog requires a valid configuration object.'); }
   value = declared(value, catalogSchema);
   if (!validate(value)) throw new Error('Imported catalog contains invalid declared data.');
   const providers = (value as { providers: Record<string, { baseUrl?: string; models?: { id: string; cost?: unknown }[] }> }).providers;
@@ -61,5 +64,5 @@ export function importCatalog(text: string): string {
     if (patch.models && new Set(patch.models.map(item => item.id)).size !== patch.models.length) throw new Error('Imported model identities are ambiguous.');
     for (const model of patch.models ?? []) if (model.cost !== undefined) captureCostSchedule(model.cost);
   }
-  return JSON.stringify(value, null, 2) + '\n';
+  return serializeConfigDocument(value, 'yaml');
 }

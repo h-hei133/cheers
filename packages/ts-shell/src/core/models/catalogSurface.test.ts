@@ -11,9 +11,9 @@ import { availabilitySnapshot } from './availability.js';
 let root: string;
 const address = (name: string) => `https://${name}.invalid/v1`;
 const catalog: readonly CatalogProvider[] = [
-  { id: 'openai', label: 'Canonical', runtime: 'openai', auth: 'api-key', baseUrl: address('official'), models: [{ id: 'shared' }] },
+  { id: 'openai', label: 'Canonical', runtime: 'openai', auth: 'api-key', baseUrl: address('official'), custom: true, models: [{ id: 'shared' }] },
   ...['a', 'b'].map(name => ({ id: `relay-${name}`, label: `Relay ${name}`, runtime: 'openai' as const,
-    auth: 'api-key' as const, baseUrl: address(name), models: [{ id: 'shared' }] })),
+    auth: 'api-key' as const, baseUrl: address(name), custom: true, models: [{ id: 'shared' }] })),
 ];
 const connection = (id: string, extra: Partial<ProviderConnectionConfig> = {}): ProviderConnectionConfig => ({
   id, provider: 'openai', authType: 'api-key', baseUrl: address(id), model: 'shared', apiKey: `synthetic-${id}`,
@@ -43,7 +43,7 @@ async function render(overrides: Partial<RuntimeConfig> = {}, providers = catalo
 
 function group(output: string, id: string): string {
   const section = output.split(/\n(?=\*\*)/).find(part => part.startsWith('**') && part.split('\n')[0].includes(`\`${id}\``));
-  expect(section).toBeDefined();
+  expect(section, output).toBeDefined();
   return section!;
 }
 
@@ -51,7 +51,7 @@ function signedCatalog(provider: 'bedrock' | 'vertex') {
   const baseUrl = provider === 'bedrock' ? 'https://bedrock-runtime.us-east-1.amazonaws.com'
     : 'https://us-central1-aiplatform.googleapis.com/v1/projects/synthetic-project/locations/us-central1/publishers/google';
   const providers: readonly CatalogProvider[] = [{ id: provider, label: provider, runtime: provider, auth: 'none', baseUrl,
-    endpoint: provider === 'bedrock' ? 'bedrock-converse-stream' : 'google-vertex', models: [{ id: 'shared' }] }];
+    endpoint: provider === 'bedrock' ? 'bedrock-converse-stream' : 'google-vertex', custom: true, models: [{ id: 'shared' }] }];
   const config: Partial<RuntimeConfig> = { provider, activeProviderConnectionId: undefined, providerConnections: [],
     providerCredentials: { [provider]: { baseUrl, model: 'shared', thinkingEffort: null } } };
   return { providers, config, baseUrl };

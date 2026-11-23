@@ -5,12 +5,17 @@ import { resolveUserDataFile, userDataDir, userHomeDir } from './userHome.js';
 const LEGACY_FILES = { 'config.json': '.cheers.json', 'mcp.json': '.cheers.mcp.json' } as const;
 
 export function projectConfigCandidates(root: string, name: keyof typeof LEGACY_FILES): readonly string[] {
-  const current = path.join(root, '.cheers', name);
+  const names = name === 'config.json' ? ['config.yaml', 'config.yml', 'config.json'] : [name];
+  const current = names.map(file => path.join(root, '.cheers', file));
   const legacy = path.join(root, LEGACY_FILES[name]);
   // Opening HOME (or a profile's parent) must not relabel its personal file as project state.
-  const identity = canonical(current);
-  const personal = [path.join(userDataDir(), name), path.join(userHomeDir(), '.cheers', name), resolveUserDataFile(name)];
-  return personal.some(file => identity === canonical(file)) ? [legacy] : [current, legacy];
+  const currentIdentities = new Set(current.map(canonical));
+  const personal = names.flatMap(file => [
+    path.join(userDataDir(), file),
+    path.join(userHomeDir(), '.cheers', file),
+    resolveUserDataFile(file),
+  ]);
+  return personal.some(file => currentIdentities.has(canonical(file))) ? [legacy] : [...current, legacy];
 }
 
 function canonical(file: string): string {

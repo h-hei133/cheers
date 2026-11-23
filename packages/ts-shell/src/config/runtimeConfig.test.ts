@@ -510,7 +510,19 @@ describe("runtime config", () => {
     // resolves under the current name, not that it is a particular string.
     const candidates = getCandidateConfigPaths(fakeRoot);
     expect(candidates[0]).toContain(".cheers");
-    expect(candidates[1]).toBe(path.join(fakeRoot, ".cheers", "config.json"));
+    expect(candidates[1]).toBe(path.join(fakeRoot, ".cheers", "config.yaml"));
+  });
+
+  it('prefers YAML within the same user directory and keeps an existing JSON owner', () => {
+    const directory = path.dirname(getUserRuntimeConfigPath());
+    fs.mkdirSync(directory, { recursive: true });
+    const legacy = path.join(directory, 'config.json');
+    fs.writeFileSync(legacy, '{"theme":"dark"}');
+    expect(getUserRuntimeConfigPath()).toBe(legacy);
+    const yaml = path.join(directory, 'config.yaml');
+    fs.writeFileSync(yaml, 'theme: light\n');
+    expect(getUserRuntimeConfigPath()).toBe(yaml);
+    expect(getRuntimeConfig(fakeRoot).theme).toBe('light');
   });
 
   it("uses the same user config path for connection writes and runtime reads", () => {

@@ -22,7 +22,8 @@ beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'config-input-publication-'));
   vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_MAX_TURNS', '');
   file = path.join(root, 'overlay.json'); fs.writeFileSync(file, '{"maxTurns":31,"theme":"dark"}');
-  user = getUserRuntimeConfigPath(); authFile = getUserAuthPath(); fs.mkdirSync(path.dirname(user), { recursive: true }); fs.writeFileSync(user, '{/* keep */"maxTurns":11}');
+  user = path.join(path.dirname(getUserRuntimeConfigPath()), 'config.json');
+  authFile = getUserAuthPath(); fs.mkdirSync(path.dirname(user), { recursive: true }); fs.writeFileSync(user, '{/* keep */"maxTurns":11}');
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 function fixture() {
@@ -35,7 +36,7 @@ function fixture() {
 it('publishes catalogue notices with their providers and refreshes notice-only changes', () => {
   fs.writeFileSync(userCatalogPath(), '{PRIVATE_CATALOG_VALUE');
   const shell = fixture(); const before = shell.configuration.current;
-  expect(before.catalogDiagnostics).toEqual(['models.json could not be parsed; its catalogue entries were ignored.']);
+  expect(before.catalogDiagnostics).toEqual([`${path.basename(userCatalogPath())} could not be parsed; its catalogue entries were ignored.`]);
   expect(before.admissionBlocked).toBe(false);
   expect(Object.isFrozen(before.catalogDiagnostics)).toBe(true);
   fs.writeFileSync(userCatalogPath(), '{}');

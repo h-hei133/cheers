@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { inspectWorkspaceFile } from '../workspace/files.js';
+import { resolveConfigFile } from '../paths/config.js';
+import { ConfigDocumentError, parseConfigFileText } from '../../config/syntax.js';
 
 /**
  * Workflow definitions, read from the repository.
@@ -41,14 +43,17 @@ export function workflowsDir(workspaceRoot: string): string {
   return path.join(workspaceRoot, ".agents", "workflows");
 }
 
+export function workflowNameForPath(source: string): string {
+  return path.basename(source, path.extname(source));
+}
+
 /** Names of the workflows present, in alphabetical order. */
 export function listWorkflowNames(workspaceRoot: string): readonly string[] {
   try {
-    return fs
-      .readdirSync(workflowsDir(workspaceRoot))
-      .filter((entry) => entry.endsWith(".json"))
-      .map((entry) => entry.slice(0, -".json".length))
-      .sort();
+    const names = fs.readdirSync(workflowsDir(workspaceRoot))
+      .filter(entry => ['.yaml', '.yml', '.json'].includes(path.extname(entry)))
+      .map(workflowNameForPath);
+    return [...new Set(names)].sort();
   } catch {
     return [];
   }
@@ -66,7 +71,7 @@ export function readWorkflow(
   assertFileAccess?: (absolutePath: string) => void,
 ): { readonly workflow: WorkflowFile } | { readonly error: string } {
   if (!/^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}$/.test(name)) return { error: 'Invalid workflow name.' };
-  const source = path.join(workflowsDir(workspaceRoot), `${name}.json`);
+  const source = resolveConfigFile([workflowsDir(workspaceRoot)], name);
   let raw: string;
   let fingerprint: string;
   try {
@@ -76,43 +81,43 @@ export function readWorkflow(
   } catch {
     return { error: `Workflow "${name}" is unavailable: its source must be stable UTF-8 text, without symlinks, of at most 512 KiB.` };
   }
-  let parsed: unknown;
+  let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    return { error: `${name}.json is not valid JSON: ${err instanceof Error ? err.message : String(err)}` };
+    parsed = parseConfigFileText(source, raw);
+  } catch (error) {
+    const detail = error instanceof ConfigDocumentError
+      ? new ConfigDocumentError(error.code, error.position, source).message
+      : `${source} could not be parsed.`;
+    return { error: detail };
   }
   return build(parsed, name, source, fingerprint);
 }
 
-/** A validated workflow from parsed JSON, or the first thing wrong with it. */
+/** A validated definition, or the first thing wrong with it. */
 function build(
-  parsed: unknown,
+  record: Record<string, unknown>,
   name: string,
   source: string,
   fingerprint: string,
 ): { readonly workflow: WorkflowFile } | { readonly error: string } {
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { error: `${name}.json must hold an object.` };
-  }
-  const record = parsed as Record<string, unknown>;
+  const label = path.basename(source);
   const rawSteps = record.steps;
   if (!Array.isArray(rawSteps) || rawSteps.length === 0 || rawSteps.length > 32) {
-    return { error: `${name}.json needs a non-empty "steps" array.` };
+    return { error: `${label} needs a non-empty "steps" array.` };
   }
   const steps: WorkflowStep[] = [];
   const seen = new Set<string>();
   for (const [index, entry] of rawSteps.entries()) {
     const step = readStep(entry, index);
-    if ("error" in step) return { error: `${name}.json: ${step.error}` };
-    if (seen.has(step.step.id)) return { error: `${name}.json: two steps share the id "${step.step.id}".` };
+    if ("error" in step) return { error: `${label}: ${step.error}` };
+    if (seen.has(step.step.id)) return { error: `${label}: two steps share the id "${step.step.id}".` };
     seen.add(step.step.id);
     steps.push(step.step);
   }
   const concurrency = record.maxConcurrency;
-  if (concurrency !== undefined && (!Number.isSafeInteger(concurrency) || Number(concurrency) < 1 || Number(concurrency) > 16)) return { error: `${name}.json maxConcurrency must be 1–16; native dispatch permits at most two commands.` };
-  if (record.name !== undefined && (typeof record.name !== 'string' || Buffer.byteLength(record.name) > 256)) return { error: `${name}.json name exceeds 256 bytes.` };
-  if (record.description !== undefined && (typeof record.description !== 'string' || Buffer.byteLength(record.description) > 4096)) return { error: `${name}.json description exceeds 4096 bytes.` };
+  if (concurrency !== undefined && (!Number.isSafeInteger(concurrency) || Number(concurrency) < 1 || Number(concurrency) > 16)) return { error: `${label} maxConcurrency must be 1–16; native dispatch permits at most two commands.` };
+  if (record.name !== undefined && (typeof record.name !== 'string' || Buffer.byteLength(record.name) > 256)) return { error: `${label} name exceeds 256 bytes.` };
+  if (record.description !== undefined && (typeof record.description !== 'string' || Buffer.byteLength(record.description) > 4096)) return { error: `${label} description exceeds 4096 bytes.` };
   return {
     workflow: {
       name: typeof record.name === "string" && record.name.length > 0 ? record.name : name,
@@ -163,21 +168,20 @@ function readStep(
 /** The shape a definition file takes, for an error message to point at. */
 export function definitionExample(): string {
   return [
-    "```json",
-    JSON.stringify(
-      {
-        name: "verify",
-        description: "build first, then tests and types together",
-        maxConcurrency: 2,
-        steps: [
-          { id: "build", run: "npm run build" },
-          { id: "test", run: "npm test", needs: ["build"] },
-          { id: "types", run: "npx tsc --noEmit", needs: ["build"], timeoutSeconds: 300 },
-        ],
-      },
-      null,
-      2,
-    ),
+    "```yaml",
+    "name: verify",
+    "description: build first, then tests and types together",
+    "maxConcurrency: 2",
+    "steps:",
+    "  - id: build",
+    "    run: npm run build",
+    "  - id: test",
+    "    run: npm test",
+    "    needs: [build]",
+    "  - id: types",
+    "    run: npx tsc --noEmit",
+    "    needs: [build]",
+    "    timeoutSeconds: 300",
     "```",
   ].join("\n");
 }

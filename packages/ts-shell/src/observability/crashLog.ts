@@ -15,6 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { resolveUserDataFile } from "../core/paths/userHome.js";
 import { assertProfileStorage, currentProfile, type ProfileContext } from '../core/paths/profile/context.js';
+import { writeTextFileAtomic } from '../session/store/sessionFileStore.js';
 
 /** One run that ended badly. */
 export interface CrashRecord {
@@ -171,7 +172,7 @@ export function recordCrash(
     const kept = [...readCrashLog(filePath, profile), record].slice(-MAX_CRASH_RECORDS);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     assertProfileStorage(filePath, profile);
-    fs.writeFileSync(filePath, `${JSON.stringify(kept, null, 2)}\n`, "utf8");
+    writeTextFileAtomic(filePath, `${JSON.stringify(kept, null, 2)}\n`, 0o600);
     return record;
   } catch {
     return undefined;

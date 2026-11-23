@@ -104,7 +104,21 @@ Long wrapped Unicode lines can spend over 30 seconds in terminal layout on Node 
 
 ---
 
-## 6. Extensions, SDK & Replay Discipline
+## 6. Human Configuration Formats
+
+### Format Limits Must Bound The Descriptor Read
+- **Symptom**: A large hand-edited settings, model, hook, keybinding, theme, sandbox, or workflow file reaches the parser before its size limit can stop it.
+- **Root Cause**: Checking `Buffer.byteLength` after `readFileSync` bounds parser work but not input allocation.
+- **Rule**: Open a regular file once, reject an oversized `fstat` before reading, bound descriptor reads, and recheck the captured identity before accepting the document.
+
+### Retire Legacy Configuration Only After Verifying New And Backup Inodes
+- **Symptom**: Migration can mistake a symlink to the source for a valid `.bak` or YAML destination, then unlink the configuration it pointed to.
+- **Root Cause**: Matching bytes through a pathname does not prove the backup or destination is a regular file independently owned by migration.
+- **Rule**: Create destinations exclusively, record and verify regular-file identity, bytes, and required permission bits, preserve source links, and retain the source whenever any readback is uncertain.
+
+---
+
+## 7. Extensions, SDK & Replay Discipline
 
 ### Module Extensions Use The VM Emit Format
 - **Symptom**: A reviewed `.mjs` extension fails with `Unexpected token 'export'` in the compiled runtime.

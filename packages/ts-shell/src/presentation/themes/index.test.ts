@@ -109,6 +109,13 @@ describe("theme discovery", () => {
     expect(loadTheme("sunset", root)?.name).toBe("sunset");
   });
 
+  it('keeps the JSON theme path and parses comments and trailing commas', () => {
+    const directory = path.join(userDataSearchDirsFor(home)[0]!, 'themes');
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(path.join(directory, 'commented.json'), '{\n  // a hand-tuned palette\n  "name": "commented",\n  "colors": {"text": "#123456",},\n}\n');
+    expect(loadTheme('commented', root)?.colors.text).toBe('#123456');
+  });
+
   it("lets a project theme shadow a bundled one of the same name", () => {
     projectTrust.setProjectTrust(root, "session-only");
     // So a user can adjust `dark` without losing the original: deleting their

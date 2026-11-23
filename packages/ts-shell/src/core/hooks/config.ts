@@ -13,12 +13,13 @@
  * it wanted trusted.
  */
 
-import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { HookEventName } from "./types.js";
 import { completionHookCommand, writeHookCommand } from './artifact.js';
 import { resolveUserDataFile, userDataDir, userHomeDir } from "../../core/paths/userHome.js"
+import { ConfigDocumentError } from '../../config/syntax.js';
+import { configSnapshotMatches, readConfigSnapshot } from '../../config/document.js';
 
 /**
  * The events a configuration may name.
@@ -58,6 +59,7 @@ export interface HookDeclaration {
   readonly command: string;
   /** The file it came from, so a prompt can name what it is asking about. */
   readonly sourcePath: string;
+  readonly sourceCurrent?: () => boolean;
 }
 
 export interface HookConfigLoadResult {
@@ -104,29 +106,23 @@ export function loadHookDeclarations(
 
 /** The hooks in one file, or the reason it could not be used. */
 function readOne(configPath: string): HookConfigLoadResult {
-  let raw: string;
+  let snapshot: ReturnType<typeof readConfigSnapshot>;
+  let parsed: Record<string, unknown> | undefined;
   try {
-    raw = fs.readFileSync(configPath, "utf8");
-  } catch {
-    // Absent is the ordinary case, not a problem worth reporting.
-    return { hooks: [], problems: [] };
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
+    snapshot = readConfigSnapshot(configPath);
+    parsed = snapshot?.values;
   } catch (error) {
     // Reported rather than thrown: one malformed file among several should cost
     // its own hooks, not the run.
     return {
       hooks: [],
-      problems: [
-        `${configPath} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-      ],
+      problems: [error instanceof ConfigDocumentError
+        ? error.message
+        : `${configPath} could not be parsed.`],
     };
   }
 
-  if (typeof parsed !== "object" || parsed === null || !("hooks" in parsed)) {
+  if (!parsed || !("hooks" in parsed)) {
     return { hooks: [], problems: [] };
   }
   const declared = parsed.hooks;
@@ -136,6 +132,7 @@ function readOne(configPath: string): HookConfigLoadResult {
 
   const hooks: HookDeclaration[] = [];
   const problems: string[] = [];
+  const sourceCurrent = () => configSnapshotMatches(configPath, snapshot);
 
   for (const [eventName, groups] of Object.entries(declared)) {
     if (!isHookEvent(eventName)) {
@@ -156,7 +153,8 @@ function readOne(configPath: string): HookConfigLoadResult {
         continue;
       }
       for (const command of commands) {
-        hooks.push({ event: eventName, matcher, ...command, sourcePath: configPath });
+        hooks.push({ event: eventName, matcher, ...command, sourcePath: configPath,
+          ...(eventName === 'PostToolUse' || eventName === 'PostToolUseFailure' ? { sourceCurrent } : {}) });
       }
     }
   }

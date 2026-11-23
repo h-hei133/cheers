@@ -58,7 +58,7 @@ export interface ShellRuntimeContext {
    * The settings in force for this session.
    *
    * Mutable because it is read once at startup and a long session outlives the
-   * file it came from: editing `config.json` mid-session would otherwise change
+   * file it came from: editing the selected settings file mid-session would otherwise change
    * nothing until restart, with no indication why. `/reload` re-reads it in place.
    * Everything else this context holds is fixed for the session.
    */

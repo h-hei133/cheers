@@ -24,7 +24,7 @@ function write(name: string, text: string): string {
 
 it('creates a new project configuration in its directory through the existing writer', () => {
   const target = getProjectConfigPath(root);
-  expect(target).toBe(path.join(root, '.cheers', 'config.json'));
+  expect(target).toBe(path.join(root, '.cheers', 'config.yaml'));
   expect(fs.readdirSync(root)).toEqual([]);
   const edit = readRuntimeConfigEditAt(target);
   writeProjectRuntimeConfigFile(root, { maxTurns: 19 }, edit);

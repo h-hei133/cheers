@@ -6,6 +6,7 @@ import { userDataSearchDirs } from "../../core/paths/userHome.js";
 import { assertProfileStorage } from '../../core/paths/profile/context.js';
 import { projectTrust } from "../../core/security/trust/store.js";
 import { identifyProject } from "../../core/security/trust/identity.js";
+import { readConfigSnapshot } from '../../config/document.js';
 
 import { parseTheme, type ThemeConfig } from "./schema.js";
 export type { ThemeConfig } from "./schema.js";
@@ -142,8 +143,7 @@ function readThemeFile(filePath: string): DiscoveredTheme {
   const fallback = path.basename(filePath, ".json");
   let name = fallback;
   try {
-    if (fs.statSync(filePath).size > 256 * 1024) throw new Error("Theme exceeds 256 KiB.");
-    const parsed: unknown = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const parsed = readConfigSnapshot(filePath, { format: 'jsonc', maxBytes: 256 * 1024 })?.values;
     if (parsed && typeof parsed === "object" && "name" in parsed && typeof parsed.name === "string" && parsed.name.trim()) {
       name = parsed.name.trim();
     }

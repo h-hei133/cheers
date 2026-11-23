@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { configFileCandidates } from '../../paths/config.js';
 import { projectConfigCandidates } from '../../paths/project.js';
 
 export function hasSensitiveProjectResources(workspaceRoot: string): boolean {
@@ -15,7 +16,7 @@ export function hasSensitiveProjectResources(workspaceRoot: string): boolean {
       "AGENTS.override.md",
       ...projectConfigCandidates(normalized, 'mcp.json'),
       path.join(".agents", "hooks.json"),
-      path.join(".agents", "sandbox.json"),
+      ...configFileCandidates([path.join(normalized, '.agents')], 'sandbox'),
     ];
     for (const indicator of sensitiveFiles) {
       if (fs.existsSync(path.isAbsolute(indicator) ? indicator : path.join(normalized, indicator))) {

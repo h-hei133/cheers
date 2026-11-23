@@ -8,6 +8,7 @@ import { profileDefinition } from '../../core/commands/profile/registration.js';
 import { runProfileCommand } from './command.js';
 import { openProfile } from './context.js';
 import { SessionManager } from '../../session/SessionManager.js';
+import { readConfigSnapshot } from '../document.js';
 
 let home: string; let source: ProfileContext; let context: CommandContext;
 beforeEach(() => {
@@ -43,7 +44,7 @@ it('keeps preview read-only, requires the exact confirmation, and exposes recove
     expect((await runProfileCommand([...args, '--confirm', 'wrong'], context)).output).toContain('rejected');
     expect(fs.readdirSync(target.root)).toEqual([]);
     expect((await runProfileCommand([...args, '--confirm', digest], context)).output).toContain('stored and read back');
-    expect(JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8')).maxTurns).toBe(19);
+    expect(readConfigSnapshot(path.join(target.root, 'config.yaml'))?.values.maxTurns).toBe(19);
     expect((await runProfileCommand(['recover', digest, '--target', 'target'], context)).output).toContain('Retained import state: complete');
     expect((await runProfileCommand(['recover', digest, '--target', 'target', '--confirm', digest], context)).output).toContain('stored and read back');
     expect((await runProfileCommand(['import', 'missing', '--target', 'target'], context)).output).toContain('could not be verified');
@@ -120,7 +121,7 @@ it('requires explicit private export confirmation and keeps previews and refusal
     expect(result).toContain('stored and read back'); expect(result).toContain('--profile rollback');
     expect(result).not.toContain('synthetic-export-key');
     expect(currentProfile()).toBe(source);
-    expect(fs.readdirSync(target.root)).toEqual(['config.json']);
+    expect(fs.readdirSync(target.root)).toEqual(['config.yaml']);
     expect((await runProfileCommand(['export', 'rollback'], context)).output).toContain('could not be verified');
     expect(profileDefinition().getArgumentCompletions?.('export rollback --confirm ')).toBeNull();
   });

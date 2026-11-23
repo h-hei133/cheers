@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, getProjectConfigPath, getUserRuntimeConfigPath, type RuntimeConfigOverrides } from '../../config/runtimeConfig.js';
 import * as configFiles from '../../config/runtimeConfig.js';
 import { ConfigWriteError } from '../../config/outcome.js';
+import { readConfigSnapshot } from '../../config/document.js';
 import { createShellRuntimeContext, refreshShellRuntimeConfig, applyShellSubstrateTransition, switchActiveSession } from '../../core/shell/runtimeContext.js';
 import { openSettings } from './settings.js';
 import { ComposerPreference } from './tuiSettings.js';
@@ -52,7 +53,7 @@ it('does not mix an original setting write with a successor binding changed by i
   expect(saved.note).toContain('Saved to your user configuration.');
   expect(saved.value).toBeUndefined();
   expect(context.session.id).toBe('settings-successor');
-  expect(JSON.parse(fs.readFileSync(file, 'utf8')).retryEnabled).toBe(false);
+  expect(readConfigSnapshot(file)?.values.retryEnabled).toBe(false);
 });
 
 it.each([
@@ -203,6 +204,8 @@ it('loads the default, project, user and explicit launch notification preference
 });
 
 it('saves and publishes the chosen preference, retaining unrelated concurrent edits and JSONC trivia', async () => {
+  fs.unlinkSync(file);
+  file = path.join(path.dirname(file), 'config.json');
   fs.writeFileSync(file, '// user preferences\n{"offline":false,"maxTurns":12,}\n');
   const context = runtime(); const applied = vi.fn(); const draft = openSettings(context, applied);
   expect(draft.values.attentionOnIdle).toMatchObject({ effective: false, stored: undefined, source: 'default' });
@@ -317,8 +320,8 @@ it('keeps project targeting explicit and reports ordinary user precedence', asyn
   fs.writeFileSync(file, '{"maxTurns":20}'); const context = runtime();
   const draft = openSettings(context, vi.fn(), 'project');
   expect((await draft.save('maxTurns', 10)).note).toContain('follows user policy');
-  expect(JSON.parse(fs.readFileSync(getProjectConfigPath(root), 'utf8')).maxTurns).toBe(10);
-  expect(JSON.parse(fs.readFileSync(file, 'utf8')).maxTurns).toBe(20);
+  expect(readConfigSnapshot(getProjectConfigPath(root))?.values.maxTurns).toBe(10);
+  expect(readConfigSnapshot(file)?.values.maxTurns).toBe(20);
   expect(context.runtimeConfig.maxTurns).toBe(20);
 });
 
@@ -332,11 +335,11 @@ it('shows renderer defaults and accepted display preferences while a restart is 
 });
 
 it('saves one nested display leaf and retains concurrent sibling changes and comments', async () => {
-  fs.writeFileSync(file, '// preferences\n{"tui":{"statusItems":["cost"]}}');
+  fs.writeFileSync(file, '# preferences\ntui:\n  statusItems: [cost]\n');
   const context = runtime(); const draft = openSettings(context, vi.fn());
-  fs.writeFileSync(file, '// preferences\n{"tui":{"statusItems":["model"]}}');
+  fs.writeFileSync(file, '# preferences\ntui:\n  statusItems: [model]\n');
   expect((await draft.save('tui.diagrams', 'off')).note).toContain('Saved to your user');
-  expect(fs.readFileSync(file, 'utf8')).toContain('// preferences');
+  expect(fs.readFileSync(file, 'utf8')).toContain('# preferences');
   expect(configFiles.readUserRuntimeConfigFile().tui).toEqual({ statusItems: ['model'], diagrams: 'off' });
 });
 
@@ -357,7 +360,7 @@ it.each([{ key: 'maxTurns', value: 15 }, { key: 'theme', value: 'dark' }, { key:
   expect(notice).toContain('The project value is not active');
   expect(notice).toContain('trust has not been established');
   expect(notice).not.toMatch(/Applied to|Effective for|Saved default mode/);
-  expect(JSON.parse(fs.readFileSync(getProjectConfigPath(root), 'utf8'))[key]).toBe(value);
+  expect(readConfigSnapshot(getProjectConfigPath(root))?.values[key]).toBe(value);
   expect(openSettings(context, vi.fn(), 'project').values[key].projectTrustNotice).toContain('trust has not been established');
   projectTrust.setProjectTrust(root, 'trusted');
   expect(refreshShellRuntimeConfig(context).status).toBe('applied');
@@ -444,7 +447,7 @@ it('revokes a composer preview after a real external configuration publication',
   const result = await detail.apply(['choice:0']);
   expect(result?.note).toContain('Display preview is unavailable');
   expect(preference.read()).toBe('rail');
-  expect(JSON.parse(fs.readFileSync(file, 'utf8')).tui.composerShape).toBe('rail');
+  expect(readConfigSnapshot(file)?.values.tui).toMatchObject({ composerShape: 'rail' });
 });
 
 it('revokes a status preview after a real external configuration publication', async () => {

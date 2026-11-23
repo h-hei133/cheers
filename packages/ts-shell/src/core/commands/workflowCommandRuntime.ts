@@ -95,7 +95,7 @@ export function renderList(root: string, assertFileAccess?: (absolutePath: strin
       "",
       definitionExample(),
       "",
-      `Save that as \`${path.join(where, "verify.json")}\` and run it with \`/workflow run verify\`.`,
+      `Save that as \`${path.join(where, "verify.yaml")}\` and run it with \`/workflow run verify\`.`,
     ].join("\n");
   }
   const rows = names.map((name) => {

@@ -70,7 +70,7 @@ export function planExport(source: ProfileContext, name: string): ExportPlan {
     || files[0]?.canonical && files[0].canonical === files[1]?.canonical) throw new Error('Export source could not be captured.');
   const values = legacyValues(files);
   validateRawConfig(values, CONFIG_FIELDS);
-  const content = serializeConfigDocument(values);
+  const content = serializeConfigDocument(values, 'yaml');
   const check = () => {
     assertCurrentProfile(source); assertProfileIdentity(target);
     configEditStorage(baseline); verifyConfigFiles(files);

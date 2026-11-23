@@ -211,7 +211,7 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
     detail: id => {
       if (id === undefined || !offered.has(id)) return [];
       if (id === 'settings:model') return ['Browse models, configure connections and assign model roles.', 'Model and role choices apply to the current session and are saved for resume.',
-        'Catalogue: models.json (user profile only); settings: config.json; connections: auth.json.', 'The settings file scope does not change session choices or the connection owner\'s save scope.'];
+        'Catalogue: models.yaml, models.yml or models.json (user profile only); settings: config.yaml, config.yml or config.json; connections: auth.json.', 'The settings file scope does not change session choices or the connection owner\'s save scope.'];
       if (id === 'settings:thinking') return ['Choose reasoning effort for the current request model.', 'Changes apply to the current session and are saved for resume; the settings file scope does not change them.', 'Supported levels follow the exact model and connection.'];
       const capability = CAPABILITY_ENTRIES.find(entry => entry.id === id);
       if (capability) return [capability.detail];
@@ -221,7 +221,7 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
       return [setting.description, `${setting.group} / ${setting.section}`, `Field: ${setting.key}`,
         `Effective: ${compact(value.effective)}`, `Stored: ${compact(value.stored)}`, `Source: ${value.source}`,
         `Save file: ${neutraliseForDisplay(draft.file)} (${scope})`, `Application: ${setting.policy.application}`,
-        ...(setting.group === 'Model' ? ['Model behavior: config.json; catalogue entries: models.json (user profile only).'] : []),
+        ...(setting.group === 'Model' ? ['Model behavior: config.yaml, config.yml or config.json; catalogue entries: models.yaml, models.yml or models.json (user profile only).'] : []),
         ...(value.projectTrustNotice ? [value.projectTrustNotice] : [])];
     },
     async apply(ids): Promise<PickerOutcome | undefined> {

@@ -10,6 +10,7 @@ import { readRuntimeConfigFileAt, readRuntimeConfigEditAt, writeRuntimeConfigFil
 import { getRuntimeConfig } from '../../runtimeConfig.js';
 import { scopedRuntimeConfig } from '../../scope/projection.js';
 import * as store from '../../../session/store/sessionFileStore.js';
+import { readConfigSnapshot } from '../../document.js';
 
 let home: string; let source: ProfileContext; let target: ProfileContext;
 beforeEach(() => {
@@ -24,6 +25,10 @@ function write(name: string, value: unknown, owner = source) {
 }
 function exportCurrent() {
   return withProfile(source, () => { const plan = planExport(source, target.id); return applyExport(plan, plan.digest); });
+}
+
+function exportedConfig(): Record<string, unknown> {
+  return readConfigSnapshot(path.join(target.root, 'config.yaml'))!.values;
 }
 
 it('exports current credentials and embedded defaults without exposing secrets or copying live state', () => {
@@ -42,15 +47,15 @@ it('exports current credentials and embedded defaults without exposing secrets o
     expect(fs.readdirSync(target.root)).toEqual([]);
     expect(applyExport(plan, plan.digest).status).toBe('complete');
   });
-  expect(fs.readdirSync(target.root)).toEqual(['config.json']);
-  const exported = JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8'));
+  expect(fs.readdirSync(target.root)).toEqual(['config.yaml']);
+  const exported = exportedConfig();
   expect(exported.modelPreferences).toBeUndefined();
   expect(exported.providerCredentials.openai).toEqual({ ...auth.providerCredentials.openai, model: 'provider-model', thinkingEffort: null, serviceTier: 'flex' });
   expect(exported.providerConnections[0]).toEqual({ ...auth.providerConnections[0], model: 'named-model', thinkingEffort: null, serviceTier: 'priority' });
   expect(exported.accountPool).toEqual(auth.accountPool); expect(exported.activeProviderConnectionId).toBe('relay');
   expect(exported.unknownAuth).toEqual(auth.unknownAuth); expect(exported.contextWindow).toBe(12000);
   expect(['config.json', 'auth.json'].map(name => fs.readFileSync(path.join(source.root, name)))).toEqual(originals);
-  if (process.platform !== 'win32') expect(fs.statSync(path.join(target.root, 'config.json')).mode & 0o777).toBe(0o600);
+  if (process.platform !== 'win32') expect(fs.statSync(path.join(target.root, 'config.yaml')).mode & 0o777).toBe(0o600);
 });
 
 it('keeps account token records and empty preference ownership intact', () => {
@@ -58,7 +63,7 @@ it('keeps account token records and empty preference ownership intact', () => {
   write('auth.json', { provider: 'google', providerConnections: [{ id: 'native', provider: 'google', authType: 'account-auth', status: 'connected', accountAuth, model: 'old-model', thinkingEffort: 'high' }] });
   write('config.json', { modelPreferences: { connections: [{ id: 'native', provider: 'google' }] } });
   expect(exportCurrent().status).toBe('complete');
-  const exported = JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8'));
+  const exported = exportedConfig();
   expect(exported.providerConnections[0].accountAuth).toEqual(accountAuth);
   expect(exported.providerConnections[0].model).toBeUndefined(); expect(exported.providerConnections[0].thinkingEffort).toBeUndefined();
 });
@@ -69,7 +74,7 @@ it('preserves cumulative restrictions and TUI leaves', () => {
   write('auth.json', { allowedTools: ['read', 'bash'], disabledTools: ['read'], hiddenToolPrefixes: ['two'], denyRules: [{ tool: 'bash' }], enableMcpTools: true,
     tui: { composerShape: 'borderless' } });
   expect(exportCurrent().status).toBe('complete');
-  const value = JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8'));
+  const value = exportedConfig();
   expect(value.allowedTools).toEqual(['read']); expect(value.disabledTools).toEqual(['bash', 'read']);
   expect(value.hiddenToolPrefixes).toEqual(['one', 'two']); expect(value.denyRules).toEqual([{ tool: 'write' }, { tool: 'bash' }]);
   expect(value.enableMcpTools).toBe(false);
@@ -82,7 +87,7 @@ it.each(['config.json', 'auth.json'])('preserves a single %s rule owner and its 
   write(name === 'config.json' ? 'auth.json' : 'config.json', { provider: 'openai' });
   const before = withProfile(source, () => scopedRuntimeConfig(getRuntimeConfig(workspace), workspace).maxTurns);
   expect(before).toBe(3); expect(exportCurrent().status).toBe('complete');
-  const value = JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8'));
+  const value = exportedConfig();
   expect(value.pathRules).toEqual([{ path: workspace, settings: { maxTurns: 3 } }]);
   const after = withProfile(target, () => scopedRuntimeConfig(getRuntimeConfig(workspace), workspace).maxTurns);
   expect(after).toBe(before);
@@ -116,10 +121,10 @@ it('rejects newly created auth, cancelled admission and occupied targets without
     expect(applyExport(plan, plan.digest).status).toBe('rejected'); expect(fs.readdirSync(target.root)).toEqual([]);
     const fresh = planExport(source, target.id);
     expect(applyExport(fresh, fresh.digest, () => 'Cancelled.').status).toBe('rejected');
-    write('config.json', { retained: true }, target);
-    const bytes = fs.readFileSync(path.join(target.root, 'config.json'));
+    write('config.yaml', { retained: true }, target);
+    const bytes = fs.readFileSync(path.join(target.root, 'config.yaml'));
     expect(applyExport(fresh, fresh.digest).status).toBe('rejected');
-    expect(fs.readFileSync(path.join(target.root, 'config.json'))).toEqual(bytes);
+    expect(fs.readFileSync(path.join(target.root, 'config.yaml'))).toEqual(bytes);
     expect(() => planExport(source, source.id)).toThrow();
     expect(() => planExport(source, target.id)).toThrow();
   });
@@ -167,7 +172,7 @@ it('does not remove a stage replaced before readback and reports unknown', () =>
     fs.rmSync(replacement); fs.writeFileSync(replacement, 'external-replacement', { mode: 0o600 });
   });
   expect(exportCurrent().status).toBe('unknown'); expect(fs.readFileSync(replacement, 'utf8')).toBe('external-replacement');
-  expect(fs.existsSync(path.join(target.root, 'config.json'))).toBe(false);
+  expect(fs.existsSync(path.join(target.root, 'config.yaml'))).toBe(false);
 });
 
 it('reports a racing exclusive publication as unverified and retains the competing file', () => {
@@ -175,8 +180,8 @@ it('reports a racing exclusive publication as unverified and retains the competi
   const original = fs.linkSync;
   vi.spyOn(fs, 'linkSync').mockImplementation((stage, destination) => { fs.writeFileSync(destination, 'competing-file'); original(stage, destination); });
   expect(exportCurrent().status).toBe('unknown');
-  expect(fs.readdirSync(target.root)).toEqual(['config.json']);
-  expect(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8')).toBe('competing-file');
+  expect(fs.readdirSync(target.root)).toEqual(['config.yaml']);
+  expect(fs.readFileSync(path.join(target.root, 'config.yaml'), 'utf8')).toBe('competing-file');
 });
 
 it('reports a source change after publication as unknown while preserving the exported file', () => {
@@ -184,8 +189,8 @@ it('reports a source change after publication as unknown while preserving the ex
   const original = fs.linkSync;
   vi.spyOn(fs, 'linkSync').mockImplementation((stage, destination) => { original(stage, destination); write('config.json', { maxTurns: 19 }); });
   expect(exportCurrent().status).toBe('unknown');
-  expect(fs.readdirSync(target.root)).toEqual(['config.json']);
-  expect(JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8')).maxTurns).toBe(17);
+  expect(fs.readdirSync(target.root)).toEqual(['config.yaml']);
+  expect(exportedConfig().maxTurns).toBe(17);
 });
 
 it('never reports completion for a destination replaced with a symlink to its private stage', () => {
@@ -194,8 +199,8 @@ it('never reports completion for a destination replaced with a symlink to its pr
   const original = fs.linkSync;
   vi.spyOn(fs, 'linkSync').mockImplementation((stage, destination) => { original(stage, destination); fs.rmSync(destination); fs.symlinkSync(stage, destination); });
   expect(exportCurrent().status).toBe('unknown');
-  expect(fs.lstatSync(path.join(target.root, 'config.json')).isSymbolicLink()).toBe(true);
-  expect(fs.readdirSync(target.root)).toEqual(['config.json']);
+  expect(fs.lstatSync(path.join(target.root, 'config.yaml')).isSymbolicLink()).toBe(true);
+  expect(fs.readdirSync(target.root)).toEqual(['config.yaml']);
 });
 
 it('does not remove a replaced private stage or report its cleanup as complete', () => {
@@ -207,7 +212,7 @@ it('does not remove a replaced private stage or report its cleanup as complete',
   expect(exportCurrent().status).toBe('unknown');
   const stage = fs.readdirSync(target.root).find(name => name.startsWith('.config-export-'))!;
   expect(fs.readFileSync(path.join(target.root, stage), 'utf8')).toBe('external-replacement');
-  expect(JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8')).maxTurns).toBe(17);
+  expect(exportedConfig().maxTurns).toBe(17);
 });
 
 it('reads and migrates the exported legacy configuration in a fresh current profile', () => {
@@ -215,11 +220,11 @@ it('reads and migrates the exported legacy configuration in a fresh current prof
   write('config.json', { maxTurns: 17, modelPreferences: { providers: { openai: { model: 'export-model', thinkingEffort: null, serviceTier: 'flex' } } } });
   expect(exportCurrent().status).toBe('complete');
   withProfile(target, () => {
-    const file = path.join(target.root, 'config.json');
+    const file = path.join(target.root, 'config.yaml');
     expect(readRuntimeConfigFileAt(file).providerCredentials?.openai).toMatchObject({ model: 'export-model', thinkingEffort: null, serviceTier: 'flex', apiKey: 'synthetic-key' });
     const baseline = readRuntimeConfigEditAt(file); writeRuntimeConfigFileAt(file, { maxTurns: 19 }, baseline);
     expect(readRuntimeConfigFileAt(file).providerCredentials?.openai).toMatchObject({ model: 'export-model', thinkingEffort: null, serviceTier: 'flex' });
-    expect(JSON.parse(fs.readFileSync(file, 'utf8')).providerCredentials).toBeUndefined();
+    expect(readConfigSnapshot(file)?.values.providerCredentials).toBeUndefined();
     expect(JSON.parse(fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8')).providerCredentials.openai.model).toBeUndefined();
   });
 });

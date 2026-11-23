@@ -36,8 +36,8 @@ export function applyExport(plan: ExportPlan, confirmation: string, admission: (
     check(); assertExportTarget(target);
     return withFileLock(lock, () => {
       check(); assertExportTarget(target, lockName);
-      const destination = path.join(target.root, 'config.json');
-      const stage = path.join(target.root, `.config-export-${randomUUID()}`);
+      const destination = path.join(target.root, 'config.yaml');
+      const stage = path.join(target.root, `.config-export-${randomUUID()}.yaml`);
       let staged: fs.Stats | undefined;
       try {
         assertUnlinkedPath(stage);
@@ -58,7 +58,7 @@ export function applyExport(plan: ExportPlan, confirmation: string, admission: (
         const saved = readConfigSnapshot(destination);
         assertPublishedFile(destination, staged);
         if (saved?.text !== content
-          || fs.readdirSync(target.root).some(name => ![lockName, path.basename(stage), 'config.json'].includes(name))) throw new Error('Export readback is unverified.');
+          || fs.readdirSync(target.root).some(name => ![lockName, path.basename(stage), 'config.yaml'].includes(name))) throw new Error('Export readback is unverified.');
       } finally {
         try {
           assertProfileIdentity(target); assertUnlinkedPath(stage);
@@ -67,7 +67,7 @@ export function applyExport(plan: ExportPlan, confirmation: string, admission: (
         } catch { cleanupFailed = true; throw new Error('Export stage cleanup is unverified.'); }
       }
       check(); assertPublishedFile(destination, staged!);
-      if (fs.readdirSync(target.root).some(name => name !== lockName && name !== 'config.json')
+      if (fs.readdirSync(target.root).some(name => name !== lockName && name !== 'config.yaml')
         || readConfigSnapshot(destination)?.text !== content) throw new Error('Export completion is unverified.');
       assertPublishedFile(destination, staged!);
       return { status: 'complete' as const };

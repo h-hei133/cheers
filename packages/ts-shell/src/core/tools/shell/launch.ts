@@ -1,5 +1,5 @@
 import { ShellManager } from '../../shell/platform/shellManager.js';
-import { planSandboxedCommand } from '../../../sandbox/osSandbox.js';
+import { planSandboxedCommand, SandboxConfigError } from '../../../sandbox/osSandbox.js';
 import { workspaceSandboxPolicy } from '../../../sandbox/workspace.js';
 import type { ToolExecutionContext } from '../../../tools/types.js';
 
@@ -33,12 +33,18 @@ export function planCommandLaunch(
   // OS-level isolation, when it has been turned on. The plan says which of the
   // three states applies, and an unavailable launcher is reported on the result
   // rather than quietly downgraded to no isolation.
-  const sandbox = planSandboxedCommand({
-    shell: shellBin,
-    shellArgs,
-    workspaceRoot: context.workspaceRoot,
-    sessionCreated: true,
-    ...workspaceSandboxPolicy(context.workspaceRoot, context.workspaceRoots),
-  })
+  let sandbox: ReturnType<typeof planSandboxedCommand>;
+  try {
+    sandbox = planSandboxedCommand({
+      shell: shellBin,
+      shellArgs,
+      workspaceRoot: context.workspaceRoot,
+      sessionCreated: true,
+      ...workspaceSandboxPolicy(context.workspaceRoot, context.workspaceRoots),
+    });
+  } catch (error) {
+    if (!(error instanceof SandboxConfigError)) throw error;
+    sandbox = { state: 'refused', notice: error.message };
+  }
   return { shellBin, shellArgs, sandbox }
 }

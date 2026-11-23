@@ -15,6 +15,17 @@ import { serializeConfigDocument } from '../../document.js';
 import { importCatalog } from './catalog.js';
 import { validateSessionId } from '../../../session/store/sessionFileLayout.js';
 
+function firstDocument(capture: SourceCapture, stem: string): { readonly path: string; readonly content: string } | undefined {
+  for (const root of capture.roots) {
+    for (const extension of ['.yaml', '.yml', '.json']) {
+      const file = path.join(root.path, `${stem}${extension}`);
+      const content = capture.read(file);
+      if (content !== undefined) return { path: file, content };
+    }
+  }
+  return undefined;
+}
+
 export function importRequest(input: { readonly source: string; readonly target: string; readonly homeDir: string; readonly workspace: string; readonly categories?: readonly ImportCategory[]; readonly excludedSessionId?: string }): ImportRequest {
   assertUnlinkedPath(input.workspace);
   const workspace = directoryIdentity(fs.realpathSync(input.workspace));
@@ -31,7 +42,7 @@ export function planImport(request: ImportRequest): ImportPlan {
   const capture = captureSources(request);
   const files: ImportFile[] = [];
   if (request.categories.includes('config')) {
-    const file = capture.first('config.json');
+    const file = firstDocument(capture, 'config');
     const auth = capture.first('auth.json');
     if (file || auth) {
       const sanitized = parseConfigText(importConfig(file?.content ?? '{}', file?.path ?? auth!.path, auth));
@@ -42,13 +53,13 @@ export function planImport(request: ImportRequest): ImportPlan {
       const preferences = extractPreferences(sanitized);
       if (Object.keys(preferences).length) settings.modelPreferences = preferences;
       const authValues = stripPreferences(credentials);
-      if (file || Object.keys(settings).length) files.push({ relative: 'config.json', content: serializeConfigDocument(settings) + '\n', metadata: false });
+      if (file || Object.keys(settings).length) files.push({ relative: 'config.yaml', content: serializeConfigDocument(settings, 'yaml'), metadata: false });
       if (Object.keys(authValues).length) files.push({ relative: 'auth.json', content: serializeConfigDocument(authValues) + '\n', metadata: false });
     }
   }
   if (request.categories.includes('catalog')) {
-    const file = capture.first('models.json');
-    if (file !== undefined) files.push({ relative: 'models.json', content: importCatalog(file.content), metadata: false });
+    const file = firstDocument(capture, 'models');
+    if (file !== undefined) files.push({ relative: 'models.yaml', content: importCatalog(file.content, file.path), metadata: false });
   }
   if (request.categories.includes('definitions')) files.push(...definitionFiles(capture));
   if (request.categories.includes('history')) files.push(...collectHistory({ source: request.source, target: request.target, workspace: request.workspace.path,

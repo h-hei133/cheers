@@ -13,7 +13,7 @@ describe('configuration source syntax', () => {
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'config-syntax-'));
     vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root);
-    file = getUserRuntimeConfigPath(); fs.mkdirSync(path.dirname(file), { recursive: true });
+    file = path.join(root, '.cheers', 'config.json'); fs.mkdirSync(path.dirname(file), { recursive: true });
   });
   afterEach(() => { vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 

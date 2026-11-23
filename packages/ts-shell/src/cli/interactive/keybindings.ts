@@ -1,9 +1,10 @@
-import fs from "node:fs";
-import path from "node:path";
 import { KEY_BINDINGS, PASTE_GESTURE, type KeyBinding } from "../../presentation/tui/chrome/keys.js";
-import { resolveUserDataFile, userDataDirFor } from "../../core/paths/userHome.js";
+import { resolveConfigFile } from '../../core/paths/config.js';
+import { userDataDirFor, userDataSearchDirs } from "../../core/paths/userHome.js";
 import { assertProfileStorage } from '../../core/paths/profile/context.js';
 import { normalizeKey } from '../../presentation/tui/input/keyId.js';
+import { ConfigDocumentError } from '../../config/syntax.js';
+import { readConfigSnapshot } from '../../config/document.js';
 
 /**
  * Which key does what, and how a user changes it.
@@ -116,7 +117,7 @@ export type KeybindingEntry = string | readonly string[];
 export type KeybindingsConfig = Record<string, KeybindingEntry>;
 
 /** Where the user's bindings live. */
-export const KEYBINDINGS_FILE = "keybindings.json";
+export const KEYBINDINGS_FILE = "keybindings.yaml";
 
 /** What was wrong with the file, in the terms the user needs to fix it. */
 export interface KeybindingsProblem {
@@ -137,33 +138,24 @@ export interface LoadedKeybindings {
  * decide where the user sees them.
  */
 export function loadUserKeybindings(root?: string): LoadedKeybindings {
-  const filePath = root === undefined
-    ? resolveUserDataFile(KEYBINDINGS_FILE)
-    : path.join(userDataDirFor(root), KEYBINDINGS_FILE);
+  const directories = root === undefined ? userDataSearchDirs() : [userDataDirFor(root)];
+  const filePath = resolveConfigFile(directories, 'keybindings');
   const problems: KeybindingsProblem[] = [];
   assertProfileStorage(filePath);
-  let raw: string;
+  let parsed: Record<string, unknown> | undefined;
   try {
-    raw = fs.readFileSync(filePath, "utf8");
-  } catch {
-    // No file is the ordinary case, not a problem.
-    return { config: {}, problems };
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
+    parsed = readConfigSnapshot(filePath)?.values;
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    return { config: {}, problems: [{ message: `${filePath} is not valid JSON: ${detail}` }] };
-  }
-
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { config: {}, problems: [{ message: `${filePath} must contain a JSON object of action ids to keys.` }] };
+    const detail = error instanceof ConfigDocumentError && error.code === 'invalid-document'
+      ? `${filePath} must contain an object mapping action ids to keys.`
+      : error instanceof ConfigDocumentError
+      ? error.message
+      : `${filePath} could not be parsed.`;
+    return { config: {}, problems: [{ message: detail }] };
   }
 
   const config: KeybindingsConfig = {};
-  for (const [actionId, value] of Object.entries(parsed as Record<string, unknown>)) {
+  for (const [actionId, value] of Object.entries(parsed ?? {})) {
     // An id nothing answers to is reported instead of ignored: a binding that
     // silently never fires is the hardest kind of mistake to find. `Object.hasOwn`
     // rather than `in`: every object inherits `toString` and `constructor`, so a

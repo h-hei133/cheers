@@ -5,6 +5,8 @@ import http from 'node:http';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createAdvisorHarness, cleanupAdvisorHarnesses, advisorResult } from '../../test-utils/advisor.js';
 import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
+import { readConfigSnapshot } from '../../config/document.js';
+import type { ModelPreferences } from '../../config/preferences/contract.js';
 import { configurationAdmission, initialConfiguration, refreshConfiguration } from '../../core/shell/configuration.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import { loadCatalog, writeCatalogCache } from '../../core/models/catalogStore.js';
@@ -249,10 +251,10 @@ it.each(['main', 'main-environment', 'main-scope'] as const)('keeps the current 
 
 it('keeps a renewed auth-only profile checkpoint eligible without creating a settings source', async () => {
   const setup = await fixture('main');
-  const settings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
+  const preferences = readConfigSnapshot(getUserRuntimeConfigPath())!.values.modelPreferences as ModelPreferences;
   const auth = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
   auth.providerConnections = auth.providerConnections.map((record: { id: string; provider: string }) => {
-    const owned = settings.modelPreferences.connections.find((item: { id: string; provider: string }) => item.id === record.id && item.provider === record.provider);
+    const owned = preferences.connections!.find(item => item.id === record.id && item.provider === record.provider)!;
     const { id: _id, provider: _provider, ...defaults } = owned;
     return { ...record, ...defaults };
   });

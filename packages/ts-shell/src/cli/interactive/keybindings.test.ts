@@ -59,6 +59,15 @@ describe("keybindings", () => {
     expect(direct.getUserConfig()).toEqual({ "app.agentMode.cycle": "f6", "app.thinkingBlocks.toggle": [] });
   });
 
+  it('loads YAML bindings with the same action validation as JSON', () => {
+    fs.mkdirSync(path.join(home, '.cheers'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.cheers', 'keybindings.yaml'),
+      'tui.editor.undo: ctrl+-\napp.retry: [f5, alt+r]\n');
+    const loaded = loadUserKeybindings();
+    expect(loaded.config).toEqual({ 'tui.editor.undo': ['ctrl+-'], 'app.retry': ['f5', 'alt+r'] });
+    expect(loaded.problems).toEqual([]);
+  });
+
   it('keeps grouped-picker bindings separate from editor bindings and resolves their own conflicts', () => {
     const bindings = new Keybindings();
     expect(bindings.actionFor('tab')).toBe('tui.input.tab');
@@ -246,7 +255,7 @@ describe("keybindings", () => {
     const loaded = loadUserKeybindings();
 
     expect(loaded.config).toEqual({});
-    expect(loaded.problems[0]?.message).toContain("not valid JSON");
+    expect(loaded.problems[0]?.message).toContain("invalid-json");
     // The defaults are still in force, so the session works.
     expect(new Keybindings(loaded.config).actionFor("ctrl+z")).toBe("tui.editor.undo");
   });
@@ -254,7 +263,7 @@ describe("keybindings", () => {
   it("reports a file that is not an object of action ids", () => {
     writeConfig("[1, 2, 3]");
     const loaded = loadUserKeybindings();
-    expect(loaded.problems[0]?.message).toContain("JSON object");
+    expect(loaded.problems[0]?.message).toContain("object mapping action ids to keys");
   });
 
   it("treats a missing file as the ordinary case, not a problem", () => {

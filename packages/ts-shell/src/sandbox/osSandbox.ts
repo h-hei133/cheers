@@ -2,7 +2,11 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
-import { resolveUserDataFile } from "../core/paths/userHome.js";
+import { resolveConfigFile } from "../core/paths/config.js";
+import { assertProfileStorage } from "../core/paths/profile/context.js";
+import { userDataSearchDirsFor } from "../core/paths/userHome.js";
+import { readConfigSnapshot } from '../config/document.js';
+import { ConfigDocumentError } from '../config/syntax.js';
 
 /**
  * OS-level isolation for shell commands.
@@ -60,7 +64,7 @@ export interface SandboxPlan {
   readonly notice?: string;
 }
 
-const CONFIG_NAME = "sandbox.json";
+const CONFIG_NAME = "sandbox";
 /** Paths never exposed, regardless of configuration. */
 const ALWAYS_HIDDEN = [".ssh", ".aws", ".gnupg", ".private-agents-real"];
 /** System paths exposed to isolated commands for interpreters and their libraries. */
@@ -93,19 +97,47 @@ export const sandboxSystemReadRoots = ["/usr", "/bin", "/lib", "/lib64", "/etc",
  */
 export function readSandboxRules(workspaceRoot: string): SandboxRules {
   const home = process.env.USERPROFILE || process.env.HOME || os.homedir();
-  const userRules = readRulesFile(resolveUserDataFile(CONFIG_NAME, home));
-  const projectRules = readRulesFile(path.join(workspaceRoot, ".agents", CONFIG_NAME));
-  return tighten(userRules, projectRules);
+  const userPath = resolveConfigFile(userDataSearchDirsFor(home), CONFIG_NAME);
+  const projectPath = resolveConfigFile([path.join(workspaceRoot, '.agents')], CONFIG_NAME);
+  try { assertProfileStorage(userPath); }
+  catch (error) { throw new SandboxConfigError(userPath, error); }
+  const userRules = readRulesFile(userPath);
+  const projectRules = readRulesFile(projectPath);
+  if (userRules.error) throw userRules.error;
+  if (projectRules.error) throw projectRules.error;
+  return tighten(userRules.rules, projectRules.rules);
 }
 
-/** The rules in one file, or none when it is absent or unreadable. */
-function readRulesFile(configPath: string): SandboxRules | undefined {
+/** A selected but unreadable sandbox file cannot be treated as absent. */
+export class SandboxConfigError extends Error {
+  constructor(readonly filePath: string, cause?: unknown) {
+    const detail = cause instanceof ConfigDocumentError ? cause.message : 'The file could not be read.';
+    super(`Sandbox configuration ${filePath} is invalid: ${detail}`);
+    this.name = 'SandboxConfigError';
+  }
+}
+
+function readRulesFile(configPath: string): { readonly rules?: SandboxRules; readonly error?: SandboxConfigError } {
   try {
-    return JSON.parse(fs.readFileSync(configPath, "utf8")) as SandboxRules;
-  } catch {
-    // Absent, unreadable and malformed all mean the same thing here: this file
-    // contributes no rules. A malformed file must not cost the other one.
-    return undefined;
+    const snapshot = readConfigSnapshot(configPath);
+    if (!snapshot) return {};
+    const value = snapshot.values;
+    if (value.enabled !== undefined && typeof value.enabled !== 'boolean'
+      || value.failClosed !== undefined && typeof value.failClosed !== 'boolean') throw new ConfigDocumentError('invalid-document');
+    for (const [owner, key] of [['network', 'allowedDomains'], ['filesystem', 'allowRead'],
+      ['filesystem', 'allowWrite'], ['filesystem', 'denyRead']] as const) {
+      const section = value[owner];
+      if (section === undefined) continue;
+      if (!section || typeof section !== 'object' || Array.isArray(section)) throw new ConfigDocumentError('invalid-document');
+      const paths = (section as Record<string, unknown>)[key];
+      if (paths !== undefined && (!Array.isArray(paths) || paths.length > 128
+        || paths.some(entry => typeof entry !== 'string' || entry.length === 0 || entry.length > 4096 || entry.includes('\0')))) {
+        throw new ConfigDocumentError('invalid-document');
+      }
+    }
+    return { rules: value as SandboxRules };
+  } catch (error) {
+    return { error: new SandboxConfigError(configPath, error) };
   }
 }
 
@@ -263,7 +295,12 @@ export function planSandboxedCommand(input: {
   /** The execution owner launches this plan in an already detached session. */
   readonly sessionCreated?: boolean;
 }): SandboxPlan {
-  const rules = input.rules ?? readSandboxRules(input.workspaceRoot);
+  let rules: SandboxRules;
+  try { rules = input.rules ?? readSandboxRules(input.workspaceRoot); }
+  catch (error) {
+    if (error instanceof SandboxConfigError) return { state: 'refused', notice: error.message };
+    throw error;
+  }
   if (rules.enabled !== true) return { state: "off" };
   const launcher = sandboxLauncher();
   if (!launcher) return planWithoutLauncher(rules);

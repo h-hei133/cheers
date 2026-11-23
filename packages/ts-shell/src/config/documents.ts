@@ -1,13 +1,16 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { resolveUserDataFile } from '../core/paths/userHome.js';
+import { resolveConfigFile } from '../core/paths/config.js';
+import { assertProfileStorage } from '../core/paths/profile/context.js';
+import { resolveUserDataFile, userDataSearchDirs } from '../core/paths/userHome.js';
 import { readConfigSnapshot, type CapturedConfigSnapshot } from './document.js';
+import { configFormatForPath } from './syntax.js';
 import { extractPreferences, joinPreferences, stripPreferences } from './preferences/documents.js';
 import { PREFERENCE_FIELD } from './preferences/contract.js';
 /**
  * The user's configuration, as two documents rather than one.
  *
- * `config.json` holds what the product does: theme, retry policy, tool
+ * The selected settings file holds what the product does: theme, retry policy, tool
  * allowlists and request policies. `auth.json` holds who is being talked to and
  * as whom: the provider, its connections, their keys and account tokens. Model
  * defaults are kept in the settings document and joined at this boundary.
@@ -25,7 +28,7 @@ import { PREFERENCE_FIELD } from './preferences/contract.js';
  */
 
 /** The settings document, relative to the profile's data directory. */
-export const SETTINGS_FILE = 'config.json';
+export const SETTINGS_FILE = 'config.yaml';
 /** The credential document, beside it. */
 export const AUTH_FILE = 'auth.json';
 
@@ -50,7 +53,9 @@ function isAuthField(key: string): boolean {
 }
 
 export function userSettingsPath(): string {
-  return resolveUserDataFile(SETTINGS_FILE);
+  const selected = resolveConfigFile(userDataSearchDirs(), 'config');
+  assertProfileStorage(selected);
+  return selected;
 }
 
 export function userAuthPath(): string {
@@ -75,13 +80,13 @@ export function mergeConfigDocuments(settings: Record<string, unknown>, auth: Re
  * Read both documents and merge them into the logical one.
  *
  * `auth.json` is read second, so a field it holds wins over the same field in
- * `config.json`. That order matters during the migration window: a file written
- * before the split still carries its credentials in `config.json`, and a
+ * The settings file. That order matters during the compatibility window: a file written
+ * before the split still carries its credentials in the settings file, and a
  * credential the user has since re-entered in `auth.json` must not be shadowed
  * by the older copy.
  */
-export function readConfigDocuments(settingsPath: string, authPath: string): ConfigDocuments {
-  const settings = readConfigSnapshot(settingsPath);
+export function readConfigDocuments(settingsPath: string, authPath: string, settingsFormat: ReturnType<typeof configFormatForPath>): ConfigDocuments {
+  const settings = readConfigSnapshot(settingsPath, { format: settingsFormat });
   const auth = readConfigSnapshot(authPath);
   const values = mergeConfigDocuments(settings?.values ?? {}, auth?.values ?? {});
   return { settings, auth, values };
@@ -102,15 +107,20 @@ export function documentFor(key: string, auth: CapturedConfigSnapshot | undefine
 }
 
 /** Only the primary user settings path denotes the logical document pair. */
-export function configDocumentPaths(filePath: string): { settingsPath: string; authPath?: string } {
+export function configDocumentPaths(filePath: string): {
+  settingsPath: string; settingsFormat: ReturnType<typeof configFormatForPath>; authPath?: string;
+} {
   const settingsPath = path.resolve(filePath);
   const primary = path.resolve(userSettingsPath());
   let matches = settingsPath === primary;
   if (!matches) {
     try { matches = fs.realpathSync(settingsPath) === fs.realpathSync(primary); } catch { /* Missing paths match only by name. */ }
   }
-  return matches
-    ? { settingsPath, authPath: path.resolve(userAuthPath()) } : { settingsPath };
+  return {
+    settingsPath,
+    settingsFormat: configFormatForPath(matches ? primary : settingsPath),
+    ...(matches ? { authPath: path.resolve(userAuthPath()) } : {}),
+  };
 }
 
 /** Preserve existing auth-owned unknown fields and shadowed settings trivia. */

@@ -68,7 +68,7 @@ export async function runModelCommand(
         `Your model catalogue is \`${path}\` (user profile only).`,
         "",
         "An entry with a known provider id patches it — a different base URL, extra models, a different key variable. An unknown id adds a provider outright.",
-        "Add entries inside the existing providers object. Settings and global model defaults are stored in config.json; connections and credentials in auth.json.",
+        "Add entries inside the existing providers object. Settings use config.yaml, config.yml or config.json; connections and credentials stay in auth.json.",
       ].join("\n"),
     };
   }
@@ -116,9 +116,11 @@ function renderCatalogView(context: CommandContext): string {
   const { config, catalog, active, catalogDiagnostics } = modelConfiguration(context);
   const availability = modelCatalogAvailability(context, { config, catalog, active });
   const visible = catalog.flatMap(provider => {
-    const ready = availability.some(entry => entry.id === provider.id && entry.state === 'ready');
-    const models = provider.models.filter(model => ready || isUserConfiguredModel(provider, model.id));
-    return models.length || ready || provider.custom && provider.models.length === 0 ? [{ ...provider, models }] : [];
+    const state = availability.find(entry => entry.id === provider.id);
+    const ready = state?.state === 'ready';
+    const configured = provider.custom || state?.active === true;
+    const models = provider.models.filter(model => ready || configured || isUserConfiguredModel(provider, model.id));
+    return models.length || ready || configured && provider.models.length === 0 ? [{ ...provider, models }] : [];
   });
   const physical = renderCatalog({ providers: visible, configPath: userCatalogPath(), diagnostics: catalogDiagnostics,
     availability: availability.filter(entry => visible.some(provider => provider.id === entry.id)) });
@@ -471,7 +473,7 @@ async function listModels(args: string[], refresh: boolean, context: CommandCont
     notice,
     ...catalogDiagnostics,
     `Models for provider=${provider}`,
-    'Catalogue: models.json (user profile only); settings: config.json; connections: auth.json.',
+    'Catalogue: models.yaml, models.yml or models.json (user profile only); settings: config.yaml, config.yml or config.json; connections: auth.json.',
     context.readConfiguration ? 'Source: accepted session catalogue' : 'Source: local catalogue (shipped, refreshed, then user entries)',
     ...(entry?.models ?? []).map(model => model.id === activeModel ? `* ${model.id} (active)` : `- ${model.id}`),
     entry?.models.length ? undefined : 'No models listed for this provider.',

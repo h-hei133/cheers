@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { catalogCachePath, loadCatalog, loadCatalogSnapshot, userCatalogPath, writeCatalogCache } from './catalogStore.js';
+import { catalogCachePath, ensureUserCatalog, loadCatalog, loadCatalogSnapshot, userCatalogPath, writeCatalogCache } from './catalogStore.js';
 import { isUserConfiguredModel } from './catalog.js';
 
 let root: string;
@@ -21,6 +21,19 @@ it('keeps optional absent catalogue layers silent', () => {
   expect(fs.existsSync(userCatalogPath())).toBe(false);
 });
 
+it('reads the YAML catalogue and creates an owner-only commented example atomically', () => {
+  fs.writeFileSync(userCatalogPath(), '# custom providers\nproviders:\n  local:\n    runtime: openai-compatible\n    auth: api-key\n    baseUrl: https://gateway.example.invalid/v1\n    models:\n      - id: model-one\n');
+  expect(loadCatalogSnapshot().providers.find(provider => provider.id === 'local')?.models[0]?.id).toBe('model-one');
+  fs.unlinkSync(userCatalogPath());
+  const created = ensureUserCatalog();
+  expect(created.endsWith('models.yaml')).toBe(true);
+  expect(fs.readFileSync(created, 'utf8')).toContain('# Add custom providers and models below.');
+  if (process.platform !== 'win32') expect(fs.statSync(created).mode & 0o777).toBe(0o600);
+  const before = fs.readFileSync(created);
+  expect(ensureUserCatalog()).toBe(created);
+  expect(fs.readFileSync(created)).toEqual(before);
+});
+
 it.each(['{ "providers": PRIVATE_CATALOG_VALUE', 'null', '[]', '{"providers":[]}', '{"providers":null}'])(
   'degrades malformed catalogue input with a safe notice: %s', text => {
     fs.writeFileSync(userCatalogPath(), text);
@@ -28,7 +41,7 @@ it.each(['{ "providers": PRIVATE_CATALOG_VALUE', 'null', '[]', '{"providers":[]}
     const snapshot = loadCatalogSnapshot();
     expect(snapshot.providers.some(provider => provider.id === 'openai')).toBe(true);
     expect(snapshot.diagnostics).toHaveLength(1);
-    expect(snapshot.diagnostics[0]).toContain('models.json');
+    expect(snapshot.diagnostics[0]).toContain(path.basename(userCatalogPath()));
     expect(snapshot.diagnostics[0]).toContain('entries were ignored');
     expect(snapshot.diagnostics.join(' ')).not.toContain('PRIVATE_CATALOG_VALUE');
     expect(fs.readFileSync(userCatalogPath())).toEqual(before);
@@ -37,20 +50,21 @@ it.each(['{ "providers": PRIVATE_CATALOG_VALUE', 'null', '[]', '{"providers":[]}
 
 it('distinguishes unreadable optional storage from absent storage', () => {
   fs.mkdirSync(userCatalogPath());
-  expect(loadCatalogSnapshot().diagnostics).toEqual(['models.json could not be read; its catalogue entries were ignored.']);
+    expect(loadCatalogSnapshot().diagnostics).toEqual([`${path.basename(userCatalogPath())} could not be read; its catalogue entries were ignored.`]);
 });
 
 it.each(['providers', 'provi\\u0064ers'])(
   'warns about repeated top-level %s without changing JSON last-object precedence', key => {
     const text = '{"providers":{"openai":{"models":[{"id":"first-only"}]}},"' + key
       + '":{"openai":{"models":[{"id":"last-only"}]}}}';
-    fs.writeFileSync(userCatalogPath(), text);
+    const legacyJson = path.join(path.dirname(userCatalogPath()), 'models.json');
+    fs.writeFileSync(legacyJson, text);
     const snapshot = loadCatalogSnapshot();
     expect(snapshot.diagnostics.join(' ')).toContain('repeats the top-level providers key');
     const models = snapshot.providers.find(provider => provider.id === 'openai')!.models;
     expect(models.some(model => model.id === 'last-only')).toBe(true);
     expect(models.some(model => model.id === 'first-only')).toBe(false);
-    expect(fs.readFileSync(userCatalogPath(), 'utf8')).toBe(text);
+    expect(fs.readFileSync(legacyJson, 'utf8')).toBe(text);
   },
 );
 
@@ -63,7 +77,7 @@ it('ignores nested owner keys and key-like text while keeping refreshed entries 
   fs.writeFileSync(userCatalogPath(), '{bad');
   const snapshot = loadCatalogSnapshot();
   expect(snapshot.providers.find(provider => provider.id === 'openai')!.models.some(model => model.id === 'refreshed-only')).toBe(true);
-  expect(snapshot.diagnostics).toEqual(['models.json could not be parsed; its catalogue entries were ignored.']);
+  expect(snapshot.diagnostics).toEqual(['models.yaml could not be parsed; its catalogue entries were ignored.']);
   fs.writeFileSync(catalogCachePath(), '{bad');
   fs.writeFileSync(userCatalogPath(), '{"providers":{"openai":{"models":[{"id":"user-only"}]}}}');
   const recovered = loadCatalogSnapshot();

@@ -157,7 +157,7 @@ export function writeOpenAiMockConfig(input: {
   const configPath = path.join(
     input.fakeHome,
     ".cheers",
-    "config.json",
+    "config.yaml",
   );
   fs.mkdirSync(path.dirname(configPath), { recursive: true });
   fs.writeFileSync(

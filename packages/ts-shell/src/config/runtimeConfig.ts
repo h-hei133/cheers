@@ -665,8 +665,8 @@ export function readRuntimeConfigFileAt(configPath: string): RuntimeConfigFile {
   try {
     // The user's configuration is two documents; a caller naming that path
     // wants the whole of it, not only the half that holds preferences.
-    const { settingsPath, authPath } = configDocumentPaths(configPath);
-    const documents = authPath ? readConfigDocuments(settingsPath, authPath) : undefined;
+    const { settingsPath, settingsFormat, authPath } = configDocumentPaths(configPath);
+    const documents = authPath ? readConfigDocuments(settingsPath, authPath, settingsFormat) : undefined;
     if (documents) {
       validateRawConfig(documents.settings?.values ?? {}, CONFIG_FIELDS);
       validateRawConfig(documents.auth?.values ?? {}, CONFIG_FIELDS);

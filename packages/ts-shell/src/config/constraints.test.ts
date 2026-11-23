@@ -18,6 +18,7 @@ it('defers dormant model limits while retaining configuration invariants before 
 });
 import { resolveProviderCredential } from '../core/shell/providerCredentials.js';
 import { loadCatalog, userCatalogPath } from '../core/models/catalogStore.js';
+import { readConfigSnapshot } from './document.js';
 import { createShellRuntimeContext, refreshShellRuntimeConfig } from '../core/shell/runtimeContext.js';
 import { configurationAdmission } from '../core/shell/configuration.js';
 import { SessionManager } from '../session/SessionManager.js';
@@ -70,7 +71,7 @@ it.each((['legacy', 'split'] as const).flatMap(storage =>
   save();
   if (storage === 'split') {
     writeUserRuntimeConfigFile(settings, readRuntimeConfigEditAt(file));
-    const preferences = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const preferences = readConfigSnapshot(file)!.values;
     const auth = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
     expect(preferences.providerCredentials).toBeUndefined();
     expect(preferences.providerConnections).toBeUndefined();

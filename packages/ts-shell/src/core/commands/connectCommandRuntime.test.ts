@@ -1,5 +1,7 @@
 import { accountToken } from '../../test-utils/oauth.js';
 import { readRuntimeConfigEditAt, getUserAuthPath } from '../../config/runtimeConfig.js';
+import { readConfigSnapshot } from '../../config/document.js';
+import type { ModelPreferences } from '../../config/preferences/contract.js';
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -290,7 +292,7 @@ describe("connect command runtime", () => {
         createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }] },
     readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     const before = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
-    const settings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
+    const settings = readConfigSnapshot(getUserRuntimeConfigPath())!.values;
     __setConnectBrowserFlowRunnerForTest(async () => ({ apiKey: 'SYNTHETIC_NEW_CONNECTION',
       baseUrl: 'https://new.invalid/v1', model: 'new-model' }));
     __setOpenAIAccountAuthRunnerForTest(() => nativeLogin());
@@ -302,11 +304,13 @@ describe("connect command runtime", () => {
     expect(stored.providerCredentials).toEqual(before.providerCredentials);
     expect(stored.providerConnections?.find(connection => connection.id === 'retained-sibling'))
       .toEqual(before.providerConnections?.[0]);
-    const savedSettings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
+    const savedSettings = readConfigSnapshot(getUserRuntimeConfigPath())!.values;
+    const originalPreferences = settings.modelPreferences as ModelPreferences;
+    const savedPreferences = savedSettings.modelPreferences as ModelPreferences;
     expect(savedSettings.theme).toBe(settings.theme);
-    expect(savedSettings.modelPreferences.providers).toEqual(settings.modelPreferences.providers);
-    expect(savedSettings.modelPreferences.connections.find((item: { id: string }) => item.id === 'retained-sibling'))
-      .toEqual(settings.modelPreferences.connections.find((item: { id: string }) => item.id === 'retained-sibling'));
+    expect(savedPreferences.providers).toEqual(originalPreferences.providers);
+    expect(savedPreferences.connections!.find(item => item.id === 'retained-sibling'))
+      .toEqual(originalPreferences.connections!.find(item => item.id === 'retained-sibling'));
     const active = stored.providerConnections?.find(connection => connection.id === stored.activeProviderConnectionId);
     expect(active?.id).not.toBe('retained-sibling');
     const resolution = resolveProviderCredential({ runtimeConfig: configStore.getRuntimeConfig(workspaceRoot), env: {} });
@@ -742,10 +746,11 @@ describe("connect command runtime", () => {
     expect(stored.theme).toBe('dark');
     expect(stored.activeProviderConnectionId).toBe(activate ? connection!.id : before.activeProviderConnectionId);
     expect(fs.statSync(getUserAuthPath()).mode & 0o777).toBe(0o600);
-    const settings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
+    const settings = readConfigSnapshot(getUserRuntimeConfigPath())!.values;
+    const preferences = settings.modelPreferences as ModelPreferences;
     const auth = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
     expect(settings.providerConnections).toBeUndefined();
-    expect(settings.modelPreferences.connections.find((item: { id: string }) => item.id === connection!.id)?.model).toBe('chosen');
+    expect(preferences.connections!.find(item => item.id === connection!.id)?.model).toBe('chosen');
     expect(auth.providerConnections[0].model).toBeUndefined();
     expect(auth.providerConnections[0].baseUrl).toBe(baseUrl);
   });

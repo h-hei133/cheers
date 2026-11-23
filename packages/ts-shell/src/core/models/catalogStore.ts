@@ -1,7 +1,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { visit } from 'jsonc-parser';
-import { resolveUserDataFile } from "../paths/userHome.js";
+import { resolveConfigFile } from '../paths/config.js';
+import { assertProfileStorage } from '../paths/profile/context.js';
+import { userDataSearchDirs } from '../paths/userHome.js';
+import { writeTextFileAtomic } from '../../session/store/sessionFileStore.js';
+import { ConfigDocumentError, configFormatForPath } from '../../config/syntax.js';
+import { readConfigSnapshot, serializeConfigDocument } from '../../config/document.js';
 import {
   BUILTIN_PROVIDERS,
   mergeProviders,
@@ -23,7 +28,6 @@ export { catalogCachePath, writeCatalogCache } from './cache/store.js';
  * never refreshed, still has a full catalogue.
  */
 
-const USER_FILE = "models.json";
 const CACHE_FILE = "models-cache.json";
 
 interface StoredCatalog {
@@ -46,7 +50,9 @@ export interface CatalogSnapshot {
  * current name alone would show the user a file that is not the one being read.
  */
 export function userCatalogPath(): string {
-  return resolveUserDataFile(USER_FILE);
+  const target = resolveConfigFile(userDataSearchDirs(), 'models');
+  assertProfileStorage(target);
+  return target;
 }
 
 /** The full catalogue: snapshot, then any refreshed copy, then the user's file. */
@@ -64,7 +70,8 @@ export function loadCatalogSnapshot(): CatalogSnapshot {
       origin: "refresh",
     });
   }
-  const user = readOverlay(userCatalogPath(), USER_FILE);
+  const userPath = userCatalogPath();
+  const user = readOverlay(userPath, path.basename(userPath));
   if (user.providers.length > 0) providers = mergeProviders(providers, user.providers, { origin: "user" });
   return { providers, diagnostics: [...cached.diagnostics, ...user.diagnostics] };
 }
@@ -77,7 +84,8 @@ export function loadCatalogSnapshot(): CatalogSnapshot {
  */
 export function ensureUserCatalog(): string {
   const target = userCatalogPath();
-  if (fs.existsSync(target)) return target;
+  try { fs.lstatSync(target); return target; }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return target; }
   const example = {
     providers: {
       "my-proxy": {
@@ -91,48 +99,63 @@ export function ensureUserCatalog(): string {
     },
   };
   fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, `${JSON.stringify(example, null, 2)}\n`, "utf8");
+  writeTextFileAtomic(target, `# Add custom providers and models below.\n${serializeConfigDocument(example, 'yaml')}`, 0o600, {
+    beforeRename: () => {
+      assertProfileStorage(target);
+      if (userCatalogPath() !== target || fs.existsSync(target)) throw new Error('The model catalogue changed before creation.');
+    },
+  });
   return target;
 }
 
 /** Provider patches and safe notices; a bad optional layer never prevents startup. */
-function readOverlay(file: string, label: typeof USER_FILE | typeof CACHE_FILE): {
+function readOverlay(file: string, label: string): {
   readonly providers: Partial<CatalogProvider>[]; readonly diagnostics: readonly string[];
 } {
+  const isCache = label === CACHE_FILE;
   let raw: string;
-  try {
-    raw = fs.readFileSync(file, "utf8");
-  } catch (error) {
-    return { providers: [], diagnostics: (error as NodeJS.ErrnoException).code === 'ENOENT' ? []
-      : [`${label} could not be read; its catalogue entries were ignored.`] };
-  }
-  try {
-    const parsed = JSON.parse(raw) as StoredCatalog;
-    const providers = parsed?.providers;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
-      || providers !== undefined && (!providers || typeof providers !== 'object' || Array.isArray(providers))) {
-      return { providers: [], diagnostics: [`${label} must contain a providers object; its catalogue entries were ignored.`] };
+  let parsed: StoredCatalog;
+  if (isCache) {
+    try { raw = fs.readFileSync(file, "utf8"); }
+    catch (error) {
+      return { providers: [], diagnostics: (error as NodeJS.ErrnoException).code === 'ENOENT' ? []
+        : [`${label} could not be read; its catalogue entries were ignored.`] };
     }
-    const diagnostics = duplicateProviders(raw) ? [`${label} repeats the top-level providers key; only the last object is used. Merge the provider entries into one providers object.`] : [];
-    let invalidPrices = false;
-    const patches = Object.entries(providers ?? {}).map(([id, patch]) => {
-      const models = Array.isArray(patch?.models) ? patch.models.map(model => {
-        if (model?.cost === undefined) return model;
-        try { return { ...model, cost: captureCostSchedule(model.cost) ?? {} }; }
-        catch {
-          invalidPrices = true;
-          return { ...model, cost: {} };
-        }
-      }) : patch?.models;
-      return { ...patch, id, ...(models !== undefined ? { models } : {}) };
-    });
-    if (invalidPrices) diagnostics.push(`${label} contains invalid prices; affected model prices are unavailable.`);
-    return { providers: patches, diagnostics };
-  } catch {
-    // A hand-edited file with a stray comma should degrade to "no overlay", not
-    // to a session that cannot start.
-    return { providers: [], diagnostics: [`${label} could not be parsed; its catalogue entries were ignored.`] };
+    try { parsed = JSON.parse(raw) as StoredCatalog; }
+    catch { return { providers: [], diagnostics: [`${label} could not be parsed; its catalogue entries were ignored.`] }; }
+  } else {
+    let snapshot;
+    try { snapshot = readConfigSnapshot(file, { allowDuplicateTopLevel: ['providers'] }); }
+    catch (error) {
+      const action = error instanceof ConfigDocumentError && error.code === 'unreadable' ? 'read' : 'parsed';
+      return { providers: [], diagnostics: [`${label} could not be ${action}; its catalogue entries were ignored.`] };
+    }
+    if (!snapshot) return { providers: [], diagnostics: [] };
+    raw = snapshot.text;
+    parsed = snapshot.values as StoredCatalog;
   }
+
+  const providers = parsed?.providers;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
+    || providers !== undefined && (!providers || typeof providers !== 'object' || Array.isArray(providers))) {
+    return { providers: [], diagnostics: [`${label} must contain a providers object; its catalogue entries were ignored.`] };
+  }
+  const diagnostics = !isCache && configFormatForPath(file) === 'jsonc' && duplicateProviders(raw)
+    ? [`${label} repeats the top-level providers key; only the last object is used. Merge the provider entries into one providers object.`] : [];
+  let invalidPrices = false;
+  const patches = Object.entries(providers ?? {}).map(([id, patch]) => {
+    const models = Array.isArray(patch?.models) ? patch.models.map(model => {
+      if (model?.cost === undefined) return model;
+      try { return { ...model, cost: captureCostSchedule(model.cost) ?? {} }; }
+      catch {
+        invalidPrices = true;
+        return { ...model, cost: {} };
+      }
+    }) : patch?.models;
+    return { ...patch, id, ...(models !== undefined ? { models } : {}) };
+  });
+  if (invalidPrices) diagnostics.push(`${label} contains invalid prices; affected model prices are unavailable.`);
+  return { providers: patches, diagnostics };
 }
 
 /** Inspect only the top-level owner key, including JSON-escaped spellings. */

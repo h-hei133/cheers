@@ -37,6 +37,13 @@ describe("hook configuration loading", () => {
     expect(loaded.hooks[0]?.matcher).toBe("bash");
   });
 
+  it('keeps the JSON filename and accepts comments and trailing commas', () => {
+    writeConfig(tempDir, '{\n  // reviewed command declaration\n  "hooks": {\n    "SessionStart": [{\n      "hooks": [{"type": "command", "command": "audit.sh",}],\n    }],\n  },\n}');
+    expect(loadHookDeclarations(tempDir)).toMatchObject({
+      hooks: [{ event: 'SessionStart', command: 'audit.sh' }], problems: [],
+    });
+  });
+
   it("returns nothing when there is no configuration", () => {
     expect(loadHookDeclarations(tempDir).hooks).toEqual([]);
   });

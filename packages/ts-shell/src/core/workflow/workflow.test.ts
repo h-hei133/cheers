@@ -5,7 +5,7 @@ import nodePath from "node:path";
 import { DAGResolver, ParallelDispatcher } from '@cheers/workflow';
 import { runWorkflowCommand } from "../commands/workflowCommandRuntime.js";
 import { routeSlashCommand } from "../commands/slashRouter.js";
-import { readWorkflow } from './definition.js';
+import { readWorkflow, workflowNameForPath } from './definition.js';
 import { runRecordPath } from './runStore.js';
 import type { WorkflowTask, WorkflowStage } from '@cheers/workflow';
 
@@ -135,6 +135,23 @@ describe("Workflow & Agentic SDLC Subsystem Test Suite", () => {
       expect(list.output).toContain("`verify` (1 steps) — a real one");
     });
 
+    it('loads YAML workflow definitions before legacy JSON files', () => {
+      const directory = nodePath.join(project, '.agents', 'workflows');
+      nodeFs.mkdirSync(directory, { recursive: true });
+      nodeFs.writeFileSync(nodePath.join(directory, 'verify.yaml'),
+        '# reviewed workflow\nname: verify\ndescription: yaml definition\nsteps:\n  - id: yaml-step\n    run: exit 0\n');
+      nodeFs.writeFileSync(nodePath.join(directory, 'verify.json'), JSON.stringify({ steps: [{ id: 'json-step', run: 'exit 0' }] }));
+      const loaded = readWorkflow(project, 'verify');
+      expect(loaded).toMatchObject({ workflow: { description: 'yaml definition', steps: [{ id: 'yaml-step' }] } });
+      if ('workflow' in loaded) expect(loaded.workflow.source).toBe(nodePath.join(directory, 'verify.yaml'));
+    });
+
+    it('continues resolving valid workflow names containing dots', () => {
+      define('verify.types', [{ id: 'check', run: 'exit 0' }]);
+      expect(readWorkflow(project, 'verify.types')).toMatchObject({ workflow: { name: 'verify.types' } });
+      expect(workflowNameForPath(nodePath.join(project, '.agents/workflows/verify.types.yaml'))).toBe('verify.types');
+    });
+
     it('hashes exact UTF-8 source and refuses invalid byte encodings and oversized definitions', () => {
       define('bytes', [{ id: 'one', run: 'exit 0' }]); const source = nodePath.join(project, '.agents/workflows/bytes.json');
       const before = readWorkflow(project, 'bytes'); nodeFs.appendFileSync(source, '\n'); const after = readWorkflow(project, 'bytes');
@@ -190,7 +207,7 @@ describe("Workflow & Agentic SDLC Subsystem Test Suite", () => {
       nodeFs.writeFileSync(nodePath.join(dir, "bad.json"), "{ not json", "utf8");
       const result = await runWorkflowCommand(["run", "bad"], { cwd: project });
 
-      expect(result.output).toContain("not valid JSON");
+      expect(result.output).toContain("invalid-json");
     });
 
     it("requires each step to carry a command", async () => {

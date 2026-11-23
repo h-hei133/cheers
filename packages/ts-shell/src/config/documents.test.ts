@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt,
-  readUserRuntimeConfigFile, writeUserRuntimeConfigFile } from './runtimeConfig.js';
+  readUserRuntimeConfigFile, writeRuntimeConfigFileAt, writeUserRuntimeConfigFile } from './runtimeConfig.js';
 import { readConfigSnapshot } from './document.js';
 import { documentFor } from './documents.js';
 import { configEditStorage } from './persistence.js';
@@ -27,7 +27,7 @@ describe('user configuration documents', () => {
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 
   it('migrates credentials before stripping their legacy copy, preserving settings trivia', () => {
-    const text = '\uFEFF{\r\n// preferences\r\n"theme":"dark", "provider":"openai", "providerCredentials":{"openai":{"apiKey":"synthetic-document-key"}}\r\n}\r\n';
+    const text = '\uFEFF# preferences\r\ntheme: dark\r\nprovider: openai\r\nproviderCredentials:\r\n  openai:\r\n    apiKey: synthetic-document-key\r\n';
     put(settings, text);
     const base = readRuntimeConfigEditAt(settings);
     const write = store.writeTextFileAtomic;
@@ -41,7 +41,7 @@ describe('user configuration documents', () => {
     writeUserRuntimeConfigFile({ theme: 'light' }, base);
     expect(published).toEqual([auth, settings]);
     expect(read(settings)).toEqual({ theme: 'light' });
-    expect(fs.readFileSync(settings, 'utf8')).toContain('// preferences\r\n');
+    expect(fs.readFileSync(settings, 'utf8')).toMatch(/# preferences\r?\n/);
     expect(fs.readFileSync(settings, 'utf8').startsWith('\uFEFF')).toBe(true);
     expect(readUserRuntimeConfigFile()).toEqual({ ...credentials, theme: 'light' });
     if (process.platform !== 'win32') expect(fs.statSync(auth).mode & 0o777).toBe(0o600);
@@ -127,12 +127,16 @@ describe('user configuration documents', () => {
     expect(read(settings)).toEqual({ theme: 'new-owner' });
   });
 
-  it('keeps auth source ownership across a settings symlink alias', () => {
+  it('keeps the selected settings format and auth ownership across a symlink with a different suffix', () => {
     const target = path.join(root, 'settings-target.json');
-    put(target, '{"theme":"dark"}'); put(auth, JSON.stringify(credentials));
+    put(target, '# preferences\ntheme: "dark"\n'); put(auth, JSON.stringify(credentials));
     fs.symlinkSync(target, settings);
     const base = readRuntimeConfigEditAt(fs.realpathSync(settings));
     expect(base.values.providerCredentials).toEqual(credentials.providerCredentials);
+    writeRuntimeConfigFileAt(target, { theme: 'light' }, base);
+    expect(fs.readFileSync(target, 'utf8')).toBe('# preferences\ntheme: "light"\n');
+    expect(fs.lstatSync(settings).isSymbolicLink()).toBe(true);
+    expect(readUserRuntimeConfigFile()).toEqual({ ...credentials, theme: 'light' });
   });
 
   it('writes a stable auth symlink through its captured canonical target', () => {

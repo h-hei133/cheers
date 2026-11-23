@@ -36,7 +36,7 @@ export function renderCatalog(view: CatalogView): string {
     "- `/model use <provider>/<model>` picks one; `/model use <model>` keeps the current provider.",
     "- `/connect` sets a provider up.",
     `- \`/model config\` opens \`${view.configPath}\`, where your own providers go.`,
-    '- models.json is a user-profile catalogue; config.json stores settings and global model defaults; auth.json stores connections and credentials.',
+    '- models.yaml, models.yml or models.json is the user catalogue; config.yaml, config.yml or config.json stores settings; auth.json stores connections and credentials.',
     "- `/model refresh` replaces the shipped catalogue with a current one.",
   );
   return lines.join("\n");

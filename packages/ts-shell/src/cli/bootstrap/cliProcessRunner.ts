@@ -106,6 +106,22 @@ export async function runCliProcess(
   }
   const handoff = input.process.env?.CHEERS_PROFILE_HANDOFF;
   const profile = createProfileContext({ name: parsed.args.options.profile, ...(handoff !== undefined ? { mode: 'existing' } : {}) });
+  if (invocation.positionals[0] === 'config' && invocation.positionals[1] === 'migrate') {
+    input.profileSelected?.(profile);
+    if (invocation.positionals.length !== 2 || invocation.tail.length || invocation.options.some(option => option.name !== '--profile')) {
+      input.writeError('Usage: cheers [--profile <name>] config migrate');
+      input.exit(1);
+      return;
+    }
+    await withProfile(profile, async () => {
+      const { migrateConfiguration } = await import('../../config/migration.js');
+      const items = migrateConfiguration(input.launchCwd);
+      input.writeOutput(['Configuration migration:', ...items.map(item =>
+        `- ${item.file.replace(/[\x00-\x1f\x7f-\x9f]/g, '?')}: ${item.status}${item.reason ? ` (${item.reason})` : ''}`)].join('\n'));
+      if (items.some(item => item.status === 'partial' || item.status === 'rejected')) input.exit(1);
+    });
+    return;
+  }
   const child = claimSwitchChild(profile, input.args, handoff);
   if (child) delete input.process.env.CHEERS_PROFILE_HANDOFF;
   const switchDepth = child?.plan.depth ?? 0;
