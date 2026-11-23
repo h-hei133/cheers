@@ -39,7 +39,7 @@ const sha256 = /^[a-f0-9]{64}$/;
 const isPackageMember = value => /^package(?:\/[a-zA-Z0-9@._-]+)+\/?$/.test(value)
   && !value.split('/').some(segment => segment === '.' || segment === '..');
 
-function validateUpstreamMetadata(metadata) {
+function validateUpstreamMetadata(metadata, expectedArchiveSha256 = contract.archiveSha256) {
   const keys = ['version', 'package', 'packageVersion', 'baseCommit', 'sourceArchive', 'archiveSha256', 'members'];
   if (!metadata || typeof metadata !== 'object' || metadata.version !== 2 || Object.keys(metadata).length !== keys.length
     || contract.version !== '2.0.0' || contract.mode !== 'shadow'
@@ -47,7 +47,7 @@ function validateUpstreamMetadata(metadata) {
     || typeof metadata.packageVersion !== 'string' || !/^\d+\.\d+\.\d+$/.test(metadata.packageVersion)
     || metadata.sourceArchive !== `.normproof/normproof-${metadata.packageVersion}.tgz`
     || typeof metadata.baseCommit !== 'string' || !/^[a-f0-9]{40}$/.test(metadata.baseCommit)
-    || !sha256.test(metadata.archiveSha256) || metadata.archiveSha256 !== contract.archiveSha256
+    || !sha256.test(metadata.archiveSha256) || metadata.archiveSha256 !== expectedArchiveSha256
     || !metadata.members || Array.isArray(metadata.members) || typeof metadata.members !== 'object'
     || requiredMembers.some(member => !Object.hasOwn(metadata.members, member))
     || Object.entries(metadata.members).some(([member, hash]) => !isPackageMember(member) || typeof hash !== 'string' || !sha256.test(hash))) {
@@ -55,8 +55,8 @@ function validateUpstreamMetadata(metadata) {
   }
 }
 
-export function extractUpstream(bytes, metadata, destination) {
-  validateUpstreamMetadata(metadata);
+export function extractUpstream(bytes, metadata, destination, expectedArchiveSha256) {
+  validateUpstreamMetadata(metadata, expectedArchiveSha256);
   requireDigest(bytes, metadata.archiveSha256, 'archive');
   const options = { input: bytes, encoding: 'utf8', maxBuffer: contract.limits.processOutputBytes };
   const entries = execFileSync('tar', ['-tzf', '-'], options).trimEnd().split('\n');

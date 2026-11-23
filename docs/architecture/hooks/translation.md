@@ -42,16 +42,7 @@ hook 执行仍需原有项目信任、声明批准、workspace identity 与撤�
 
 独立发行物为 [.normproof/write-gate/cli.mjs](../../../.normproof/write-gate/cli.mjs)，
 来源提交与逐输入哈希在 [artifact.json](../../../.normproof/write-gate/artifact.json)。
-它是未经语义修改的 upstream write-gate 依赖闭包，经 esbuild 固定目标 `node20.3` 打包。
-旧的 `.normproof/normproof-0.1.0.tgz` 和 CI judge 不变。重建只读固定源码仓库：
-
-```bash
-rtk proxy node .normproof/write-gate/package.mjs <clean-pinned-source-checkout>
-```
-
-构建器不写源码仓库，不把 Cheers 映射加入 upstream。运行时检查只选择或拒绝 artifact；
-不能用 upstream 完整 package 的 Node ≥24 声明把 Cheers 的写操作统称 unsupported。
-已实测 Linux x64 / Node 20.3.0；其他平台未验证。
+独立产物以 `node20.3` 为目标。归档、Write 和 Stop 产物按同一源码提交刷新。 [刷新程序](../../validation/pinned-adapter.md#刷新程序)
 
 ## 输入
 

@@ -95,8 +95,9 @@ jobs:
       - name: Check pinned package conformance
         run: node --test --test-concurrency=1 scripts/normproof.test.mjs scripts/normproof-conformance.test.mjs
 
-      - name: Install and run the pinned archive
+      - name: Install the pinned archive and check workspace norms
         run: |
           npm install --prefix "$RUNNER_TEMP/normproof" --no-audit --no-fund .normproof/normproof-0.1.0.tgz
           npm ls --prefix "$RUNNER_TEMP/normproof" --depth=1 typescript
+          "$RUNNER_TEMP/normproof/node_modules/.bin/normproof" prose --check
           "$RUNNER_TEMP/normproof/node_modules/.bin/normproof" judge

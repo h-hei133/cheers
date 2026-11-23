@@ -41,6 +41,13 @@
       }
     },
     {
+      "id": "source_filenames",
+      "source": {
+        "kind": "file-set",
+        "pattern": "packages/**/*.ts*"
+      }
+    },
+    {
       "id": "structure_baseline",
       "source": {
         "kind": "baseline",

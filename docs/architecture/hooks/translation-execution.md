@@ -41,6 +41,8 @@ Stop、旧 judge bundle、依赖、package scripts 或 CI。实现契约见 [tra
 
 ## 已执行命令与输出
 
+本节记录当时的打包器和运行结果。当前入口见 [刷新程序](../../validation/pinned-adapter.md#刷新程序)。
+
 命令从 Cheers 根目录执行，重型验证串行。VITEST_MAX_THREADS/VITEST_MIN_THREADS 均为 2。
 
 ```bash

@@ -37,7 +37,7 @@
         "evidenceId": "source_module_graph",
         "matches": "unresolved: */**"
       },
-      "repair": "Fix or remove imports that do not resolve to a collected file — path aliases, bare package specifiers written as relative paths, and escapes from the detected root all leave a hole in the graph every other rule reads."
+      "repair": "Use a declared package entry or an import that resolves to captured source."
     },
     {
       "id": "execution_does_not_reach_cli",
@@ -81,6 +81,30 @@
         "reachable": true
       },
       "repair": "Accept the required behavior through the domain interface and supply it from the shell."
+    },
+    {
+      "id": "filenames_carry_no_phase_labels",
+      "title": "Source filenames describe their responsibility",
+      "severity": "blocking",
+      "requiredWhen": { "kind": "always" },
+      "requiredEvidence": ["source_filenames"],
+      "requiredAuthority": "A0",
+      "expression": {
+        "kind": "all",
+        "operands": [
+          { "kind": "none", "evidenceId": "source_filenames", "matches": "**/*-v2*", "caseInsensitive": true },
+          { "kind": "none", "evidenceId": "source_filenames", "matches": "**/*-v3*", "caseInsensitive": true },
+          { "kind": "none", "evidenceId": "source_filenames", "matches": "**/*-new*", "caseInsensitive": true },
+          { "kind": "none", "evidenceId": "source_filenames", "matches": "**/*-old*", "caseInsensitive": true },
+          { "kind": "none", "evidenceId": "source_filenames", "matches": "**/*-temp*", "caseInsensitive": true },
+          { "kind": "none", "evidenceId": "source_filenames", "matches": "**/*-tmp*", "caseInsensitive": true },
+          { "kind": "none", "evidenceId": "source_filenames", "matches": "**/*-copy*", "caseInsensitive": true },
+          { "kind": "none", "evidenceId": "source_filenames", "matches": "**/*-final*", "caseInsensitive": true },
+          { "kind": "none", "evidenceId": "source_filenames", "matches": "**/*-mvp*", "caseInsensitive": true },
+          { "kind": "none", "evidenceId": "source_filenames", "matches": "**/*-phase*", "caseInsensitive": true }
+        ]
+      },
+      "repair": "Choose a responsibility-based filename and update its imports."
     },
     {
       "id": "declared_functions_within_module_ceiling",

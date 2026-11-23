@@ -1,4 +1,18 @@
-# Pinned NormProof adapter 1.0.0
+# Pinned NormProof adapter
+
+## 刷新程序
+
+在干净的 NormProof checkout 中选定完整提交 SHA 并执行 `npm ci`。从 Cheers 根目录执行：
+
+```bash
+rtk proxy node .normproof/package.mjs <clean-source-checkout> <full-commit-sha>
+```
+
+刷新入口调用该提交自带的打包脚本，校验 npm 归档、Write 和 Stop 产物的 SHA-256 以及现有 hook 描述符，再更新固定文件。来源提交、归档身份和 gate 输入摘要分别记录在 [bundle.json](../../.normproof/bundle.json)、[Write artifact.json](../../.normproof/write-gate/artifact.json) 和 [Stop artifact.json](../../.normproof/completion-gate/artifact.json)。
+
+用新归档中的 `normproof prose --sync` 更新 `AGENTS.md`，再核对 `normproof prose --check`、`normproof judge` 和 [归档与 hook 验收](../../scripts/normproof-conformance.test.mjs)。CI 使用同一份固定归档执行漂移检查和判定。
+
+## 1.0.0 历史记录
 
 Cheers 自有部署适配器，机器契约为
 [contract.json](../../.normproof/adapter/contract.json)。blocking 提升与 fork 保留
@@ -111,7 +125,9 @@ conformance 验证，可退役 G5 相关部分。**当前停止点：G5 上游�
 不能无替代删除 fork。
 blocking 的复审触发条件与两个 open 项见 [发布表及决定清单](adapter-release.md)。
 
-## 刷新程序
+## 1.0.0 刷新计划
+
+以下保留当时的源归档和打补丁计划。当前刷新使用本文开头的命令。
 
 1. 操作者先选择候选 release/clean commit；确认所有 hunks、归口 owner、到期处理。
 2. 取得 metadata 声明的 original archive（SHA `d79b5d94d4e80cb1df99315920494a440859f9cad1a638c9b27f3e6a05a5923e`），

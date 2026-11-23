@@ -169,10 +169,49 @@ test('policy: workspace direction and module function scope agree at write and c
   const baselineRule = rules.rules.find(item => item.kind === 'moduleFunctionBaseline');
   assert.equal(baselineRule.pattern, functionSource.pattern);
   assert.deepEqual(baselineRule.exclude, functionSource.exclude);
+  const filename = rules.rules.find(item => item.kind === 'filenameTokens');
+  const names = profile.obligationTemplates.find(item => item.id === filename.id);
+  assert.equal(names.severity, 'blocking');
+  assert.deepEqual(names.expression.operands.map(term => term.matches).sort(), filename.tokens.map(token => `**/*${token}*`).sort());
+  for (const term of names.expression.operands) {
+    assert.equal(term.kind, 'none');
+    assert.equal(term.caseInsensitive, true);
+    assert.deepEqual(manifest.entries.find(item => item.id === term.evidenceId).source, { kind: 'file-set', pattern: filename.pattern });
+  }
+  assert.deepEqual(filename.exclude ?? [], []);
   fs.writeFileSync(path.join(root, 'packages/browser/api.d.ts'), Array.from({ length: 21 }, (_, i) => `export declare function f${i}(): void;`).join('\n'));
   fs.writeFileSync(path.join(root, 'packages/browser/src/entry.test.ts'), Array.from({ length: 25 }, (_, i) => `function t${i}() {}`).join('\n'));
   const captured = await collector.collectEvidence(manifest, path.join(root, '.normproof'));
   assert.deepEqual({ ...captured.moduleFunctionCounts.source_module_functions }, { 'packages/browser/src/entry.ts': 1 });
+});
+
+test('policy: a file landed outside the edit tools is blocked by Stop and the cold judge', () => {
+  const root = workspace('filename', 'export function value() { return 1; }', 'packages/example/src/entry.ts');
+  const invalid = 'packages/example/src/entry-V2.ts';
+  const source = 'export const other = 2;';
+  fs.copyFileSync(path.join(repository, '.normproof/write-rules.json'), path.join(root, '.normproof/write-rules.json'));
+  const pre = command([path.join(repository, '.normproof/write-gate/cli.mjs'), '--emit-result'], {
+    cwd: root, input: JSON.stringify({ cwd: root, tool_name: 'Write', tool_input: { file_path: invalid, content: source } }),
+  });
+  assert.equal(pre.status, 0, pre.stderr);
+  assert.equal(JSON.parse(pre.stdout).decision, 'block');
+
+  fs.writeFileSync(path.join(root, invalid), source);
+  const stop = command([path.join(repository, '.normproof/completion-gate/cli.mjs'), '--emit-result'], {
+    cwd: root, input: JSON.stringify({ cwd: root, hook_event_name: 'Stop', stop_hook_active: false }),
+  });
+  assert.equal(stop.status, 0, stop.stderr);
+  assert.equal(JSON.parse(stop.stdout).decision, 'block');
+  assert.match(JSON.parse(stop.stdout).reason, /filenames_carry_no_phase_labels/);
+  const cli = path.join(scratch, 'package/dist/adapters/cli/normproof.js');
+  const judge = command([cli, 'judge', '--format', 'text'], { cwd: root });
+  assert.equal(judge.status, 2, judge.stderr);
+  assert.match(judge.stdout, /filenames_carry_no_phase_labels.*entry-V2\.ts/);
+
+  fs.renameSync(path.join(root, invalid), path.join(root, 'packages/example/src/helper.ts'));
+  const lawful = command([cli, 'judge'], { cwd: root });
+  assert.equal(lawful.status, 0, lawful.stderr);
+  assert.equal(JSON.parse(lawful.stdout).verdictStatus, 'proven');
 });
 
 test('hooks: pinned write CLI emits allow and block JSON with process exit 0', () => {

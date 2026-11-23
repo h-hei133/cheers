@@ -107,16 +107,30 @@ Detailed rules: [reference repositories](agent-rules/reference-repositories.md).
 
 ## Architectural Norms (NormProof)
 
-NormProof governs structural invariants across all 9 workspace packages through both active hooks (`.agents/hooks.json`: PreToolUse `write-gate` and Stop `completion-gate`) and terminal judgement (`normproof judge`, pack `.normproof/norm-packs/software-structure-v0/profile.json`):
+NormProof evaluates the workspace through the PreToolUse and Stop hooks in `.agents/hooks.json` and the terminal `normproof judge` command. Regenerate the instructions below with the pinned `normproof prose --sync` after changing the governing configuration. Check module facades with `npm run analyze:module-facades`.
 
-| Obligation / Rule | Enforcement | Scope & Policy |
-|---|---|---|
-| `source_graph_has_no_unresolved_specifiers` | **Blocking** (`judge`, Stop, `write-gate` export advisory) | Every relative and workspace package import resolves within the declared source graph with valid exports. |
-| `source_graph_is_acyclic` | **Blocking** (`judge`, Stop, `write-gate` `noNewCycle`, `verify:import-cycles`) | Zero runtime value dependency cycles (`type-only` edges are excluded from cycle checks). |
-| `domains_do_not_reach_shell` | **Blocking** (`judge`, Stop, `write-gate` `noReachableDependency`) | No package under `packages/**` (excluding `packages/ts-shell/**`) may directly or transitively reach `packages/ts-shell/**`. |
-| `execution_does_not_reach_cli` | Advisory (`judge`), **Blocking** on new paths (`write-gate`) | `packages/ts-shell/src/runtime/execution/**` must not reach `packages/ts-shell/src/cli/**`. |
-| `declared_functions_within_module_ceiling` | Advisory (`judge`), **Blocking** above ceiling (`write-gate` `moduleFunctionBaseline`) | Production modules (`packages/*/src/**/*.ts*`, excluding `**/*.test.ts*` and `**/*.spec.ts*`) stay within the v2 baseline seed floor (`20` functions, or legacy accepted ceiling in `.normproof/baseline.json`). Check facades via `npm run analyze:module-facades`. |
-| `filenames_carry_no_phase_labels` | **Blocking** (`write-gate`) | New files under `packages/**/*.ts*` must not carry temporary phase/version tokens (`-v2`, `-new`, `-old`, `-temp`, `-mvp`, `-phase`, etc.). |
+<!-- normproof:begin -->
+Follow these workspace rules:
+Completion
+- Graph source_module_graph: packages/**/*.ts* using workspace source condition cheers-source. Check value and type imports and re-exports.
+- Count distinct named functions, methods, accessors and function-valued variables in packages/*/src/**/*.ts* excluding **/*.test.ts*, **/*.spec.ts*.
+- [blocking] No dependency cycles in the runtime value graph. Type-only edges are excluded from cycle checks. Remove a value dependency along the reported cycle. Use a type-only import where only types are needed.
+- [blocking] Every module import resolves within the declared source graph. Use a declared package entry or an import that resolves to captured source.
+- [advisory] Forbid direct and transitive value and type-only dependencies from packages/ts-shell/src/runtime/execution/** to packages/ts-shell/src/cli/**. Inject the runtime implementation from the composition entry.
+- [blocking] Forbid direct and transitive value and type-only dependencies from packages/** (excluding packages/ts-shell/**) to packages/ts-shell/**. Accept the required behavior through the domain interface and supply it from the shell.
+- [blocking] Filenames in packages/**/*.ts* must omit -v2, -v3, -new, -old, -temp, -tmp, -copy, -final, -mvp, -phase (case-insensitive). Choose a responsibility-based filename and update its imports.
+- [advisory] Module limit: max(seed 20, per-path count in .normproof/baseline.json); seed when unlisted. The set must be non-empty. Extract one responsibility from the module to satisfy its accepted ceiling.
+Proposed writes
+- Resolve dependencies in graph source_module_graph.
+- New filenames in packages/**/*.ts* must omit case-insensitive substrings: -v2, -v3, -new, -old, -temp, -tmp, -copy, -final, -mvp, -phase.
+- JS/TS function-name limits in packages/*/src/**/*.ts* excluding **/*.test.ts*, **/*.spec.ts*. Use seed 20 for new files. Edits: max(seed 20, per-path count in .normproof/baseline.json); seed when unlisted.
+- Do not add cycle-forming value edges. Only all-value paths count.
+- Forbid new direct or transitive dependencies from packages/ts-shell/src/runtime/execution/** to packages/ts-shell/src/cli/**, including type-only. Suggested layers: packages/ts-shell/src/runtime/execution/**, packages/ts-shell/src/tools/types.ts.
+- Forbid new direct or transitive dependencies from packages/** except packages/ts-shell/** to packages/ts-shell/**, including type-only.
+- Advisory for public export changes: preserve names and value/type compatibility for affected consumers.
+Accepted module counts
+- .normproof/baseline.json counts above seed 20: packages/ts-shell/src/cli/interactive/interactiveMode.ts=22, packages/ts-shell/src/cli/interactive/overlay.ts=22, packages/ts-shell/src/cli/runtime/extensions.ts=21, packages/ts-shell/src/core/agent/agent.ts=21, packages/ts-shell/src/presentation/tui/render/engine.ts=21, packages/ts-shell/src/session/compaction.ts=22, packages/ts-shell/src/session/sessionReadSurface.ts=21.
+<!-- normproof:end -->
 
 ### Architecture Watch Disposition Protocol
 
