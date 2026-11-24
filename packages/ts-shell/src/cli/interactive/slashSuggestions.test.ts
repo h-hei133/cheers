@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { slashArgumentHint, slashSuggestions } from "./slashSuggestions.js";
 import { listSlashInvocations, getSlashCommand, registerSlashCommand } from "../../entrypoints/slashCommandRegistry.js";
+import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 
 describe("command completions", () => {
   it.each([
@@ -42,9 +43,13 @@ describe("command completions", () => {
     } finally { remove(); }
   });
 
-  it("offers each distinct invocation without synonymous aliases for a bare slash", () => {
-    const names = new Set(listSlashInvocations().filter(invocation => invocation.kind !== "alias").map(invocation => invocation.name));
-    expect(slashSuggestions("/")).toHaveLength(names.size);
+  it("prioritizes daily commands for a bare slash and finds other commands by name", () => {
+    const daily = slashSuggestions('/')?.map(item => item.value) ?? [];
+    expect(daily.slice(0, 5)).toEqual(['/model', '/clear', '/resume', '/settings', '/help']);
+    expect(daily.length).toBeGreaterThanOrEqual(15);
+    expect(daily.length).toBeLessThanOrEqual(20);
+    expect(daily).not.toContain('/diagnose');
+    expect(slashSuggestions('/diagnose')?.[0]?.value).toBe('/diagnose');
   });
 
   it("only offers known command invocations", () => {
@@ -52,6 +57,15 @@ describe("command completions", () => {
     for (const suggestion of slashSuggestions("/") ?? []) {
       expect(getSlashCommand(suggestion.value)).toBeDefined();
     }
+  });
+
+  it('keeps unavailable capabilities out of typed matches', () => {
+    const root = '/workspace';
+    const runtimeConfig = getRuntimeConfig(root);
+    expect(slashSuggestions('/mcp', undefined, { root, runtimeConfig: { ...runtimeConfig, enableMcpTools: false } })
+      ?.some(item => item.value === '/mcp') ?? false).toBe(false);
+    expect(slashSuggestions('/mcp', undefined, { root, runtimeConfig: { ...runtimeConfig, enableMcpTools: true } })
+      ?.[0]?.value).toBe('/mcp');
   });
 
   it("ranks the typed prefix first", () => {
@@ -165,7 +179,7 @@ describe("command completions", () => {
     expect(slashSuggestions("/diagnose")?.[0]?.detail).not.toContain("<");
   });
 
-  it("advertises every dispatchable command, including commit/tools/thinking", () => {
+  it("offers commit, tools and thinking among the daily commands", () => {
     const values = new Set(
       (slashSuggestions("/") ?? []).map((match) => match.value),
     );
@@ -225,7 +239,7 @@ it("refreshes default and filtered candidates for named extension invocations", 
   slashSuggestions("/");
   const remove = registerSlashCommand({ name: "fixture", aliases: ["fixture-alias"], invocations: [{ name: "fixture-special", summary: "separate action" }], group: "workflow", summary: "fixture" });
   try {
-    expect(slashSuggestions("/")?.some(item => item.value === "/fixture-special")).toBe(true);
+    expect(slashSuggestions("/")?.some(item => item.value === "/fixture-special")).toBe(false);
     expect(slashSuggestions("/fixture-alias")?.some(item => item.value === "/fixture-alias") ?? false).toBe(false);
     expect(slashSuggestions("/fixture-special")?.[0]?.value).toBe("/fixture-special");
   } finally { remove(); }

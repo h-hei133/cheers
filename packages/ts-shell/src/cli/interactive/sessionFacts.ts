@@ -3,6 +3,7 @@ import { resolveProviderCredential } from "../../core/shell/providerCredentials.
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from "../../core/auth/account/target.js";
 import { DEFAULT_ENDPOINT_KIND } from "../../provider/endpoints/index.js";
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
+import { summarizeCacheUsage } from '../../observability/cacheWaste.js';
 import path from "node:path";
 import os from "node:os";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
@@ -60,6 +61,7 @@ export interface LiveStatusFacts {
   /** Other live sessions reachable for cross-session messaging. */
   readonly peers?: number;
   readonly promptContext?: import('./context/controller.js').ContextReading;
+  readonly architecture?: StatusFacts['architecture'];
 }
 
 export function readStatusFacts(
@@ -81,6 +83,7 @@ export function readStatusFacts(
     activeEndpoint = undefined;
   }
   const usage = getSessionUsage(context.session.id);
+  const { hitRate: cacheHitRate } = summarizeCacheUsage(usage.recentRequests);
   const measured = active?.model && activeEndpoint ? measuredPromptContext(context.session.id, {
     ...(context.promptIdentity ?? {}), provider: active.provider, model: active.model, endpoint: activeEndpoint,
     ...(activeBaseUrl ? { endpointId: captureUsageAttribution({ provider: active.provider,
@@ -115,11 +118,13 @@ export function readStatusFacts(
     worktreeDirty: context.gitContext.isClean === null ? undefined : !context.gitContext.isClean,
     queued: live.queued,
     peers: live.peers,
+    architecture: live.architecture,
     openTodos: getSessionTodos(context.session.id).filter((todo) => todo.status !== "done" && todo.status !== "dropped").length,
     // The denominator is the same resolution compaction uses, even when its
     // numerator is unknown after startup, restoration, or context replacement.
     ...(!logical && window ? { contextWindow: window.window, contextWindowSource: window.source, contextWarning: window.warning } : {}),
     ...(logical && !preview ? {} : contextFact),
+    ...(cacheHitRate === undefined ? {} : { cacheHitRate }),
     ...(totalTokens(usage) > 0 ? { sessionTokens: totalTokens(usage) } : {}),
     ...(usage.turnsCount > 0 ? { turns: usage.turnsCount } : {}),
     ...(usage.usageHealth ? { usageIncomplete: true } : {}),

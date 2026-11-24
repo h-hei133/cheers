@@ -19,10 +19,10 @@ function paintedRows(output, normalize) {
   return rows;
 }
 
-function diffRow(output, normalize, oldSource, newSource) {
+function diffPosition(output, normalize, oldSource, newSource) {
   const matches = [...paintedRows(output, normalize)]
     .filter(([, text]) => text.includes(oldSource) && text.includes(newSource));
-  return matches.length === 1 ? matches[0][0] : undefined;
+  return matches.length === 1 ? { row: matches[0][0], text: matches[0][1] } : undefined;
 }
 
 function clipboardTexts(output) {
@@ -32,22 +32,25 @@ function clipboardTexts(output) {
 
 /** A copy result adds chrome; acquire the next hit from its completed paint. */
 export async function copyDiffSources({ read, write, waitForOutput, normalize, oldSource, newSource }) {
-  await waitForOutput(read, value => diffRow(value, normalize, oldSource, newSource) !== undefined,
+  await waitForOutput(read, value => diffPosition(value, normalize, oldSource, newSource) !== undefined,
     'currently painted source diff row');
   const start = read().length;
-  const click = column => {
-    const row = diffRow(read(), normalize, oldSource, newSource);
-    if (row === undefined) throw new Error('Expected one currently painted source diff row');
-    write(`\x1b[<0;${column};${row}M\x1b[<0;${column};${row}m`);
+  const dragCopy = source => {
+    const position = diffPosition(read(), normalize, oldSource, newSource);
+    const column = position?.text.indexOf(source);
+    if (!position || column === undefined || column < 0) throw new Error('Expected one currently painted source diff row');
+    const first = column + 1;
+    const last = first + source.length - 1;
+    write(`\x1b[<0;${first};${position.row}M\x1b[<32;${last};${position.row}M\x1b[<0;${last};${position.row}m`);
   };
-  click(15);
+  dragCopy(oldSource);
   await waitForOutput(() => read().slice(start), value => {
     const resultPainted = [...paintedRows(value, normalize).values()]
       .some(text => /^(?:Copied|Sent) \d+ characters.*clipboard\./.test(text));
     return clipboardTexts(value).length >= 1 && resultPainted
-      && diffRow(read(), normalize, oldSource, newSource) !== undefined;
+      && diffPosition(read(), normalize, oldSource, newSource) !== undefined;
   }, 'old-side diff source copy and result frame');
-  click(70);
+  dragCopy(newSource);
   await waitForOutput(() => read().slice(start), value => clipboardTexts(value).length >= 2,
     'new-side diff source copy');
   const copiedSides = clipboardTexts(read().slice(start));

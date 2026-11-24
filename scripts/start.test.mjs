@@ -33,8 +33,8 @@ function writeStaging(staging, entry = "// built\n") {
   write(path.join(staging, "public.json"), JSON.stringify({ schemaVersion: 1,
     entries: [{ specifier: ".", path: "index.js", types: "types/index.d.ts", names: ["value"] }] }));
   write(path.join(staging, "entrypoints/cli.js"), entry);
-  for (const asset of ["dark", "dark-contrast", "light", "light-contrast", "schema"]) {
-    write(path.join(staging, `presentation/themes/${asset}.json`), "{}\n");
+  for (const asset of REQUIRED_BUILD_ASSETS) {
+    write(path.join(staging, asset), "{}\n");
   }
 }
 

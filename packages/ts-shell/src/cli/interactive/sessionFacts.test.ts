@@ -51,6 +51,27 @@ beforeEach(() => {
   testHome = fs.mkdtempSync('/tmp/cheers-test/status-facts-');
   for (const name of ['HOME', 'USERPROFILE', 'CHEERS_TEST_ROOT']) vi.stubEnv(name, testHome);
 });
+
+it('shows only the prompt cache ratio backed by reported foreground usage', () => {
+  const id = 'cache-status';
+  const runtime = context(id);
+  const promptIdentity = measurementIdentity(runtime);
+  const cacheText = () => {
+    const text = renderStatusItem('cache', readStatusFacts(runtime));
+    return text === undefined ? undefined : stripAnsi(text);
+  };
+  try {
+    recordSessionUsage(id, { promptIdentity, promptTokens: 100, cacheReadTokens: 0, cacheReadReported: false });
+    expect(cacheText()).toBeUndefined();
+    recordSessionUsage(id, { promptIdentity, promptTokens: 100, cacheReadTokens: 0 });
+    expect(cacheText()).toBe('cache 0.0%');
+    recordSessionUsage(id, { promptIdentity, promptTokens: 20, cacheReadTokens: 80 });
+    recordSessionUsage(id, { promptIdentity, promptTokens: 0, cacheReadTokens: 1_000 }, { affectsContext: false });
+    expect(cacheText()).toBe('cache 40.0%');
+  } finally {
+    resetSessionUsage(id);
+  }
+});
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();

@@ -2,6 +2,8 @@ import { inputQueueControl, PendingQueue, type InputQueueControl } from '../../c
 import type { Session } from '../../session/schema/sessionRecord.js';
 import type { ImageContent } from '../../model-adapters/multimodal.js';
 import type { TurnInput } from '../../turn/session.js';
+import type { RecallInput } from '../../turn/input.js';
+import type { PasteStore } from '../../presentation/tui/pastes.js';
 
 export interface PendingSubmission { readonly text: string; readonly sessionId: string; readonly createdAt: string; readonly projectRoot: string;
   readonly source?: import('../../core/shell/input/contract.js').PromptInputRequest['source'];
@@ -10,6 +12,14 @@ export interface PendingSubmission { readonly text: string; readonly sessionId: 
 export function recoverQueuedDrafts(input: TurnInput | undefined, queue: SubmissionQueue, hold: (image: ImageContent) => string): string[] {
   const restore = (text: string, images: readonly ImageContent[] = []) => [text, images.map(hold).join(' ')].filter(Boolean).join('\n\n');
   return [...(input?.clearQueue(restore) ?? []), ...queue.release().map(submission => restore(submission.text, submission.attachments?.images))];
+}
+
+export function recallQueuedDraft(input: TurnInput | undefined, queue: SubmissionQueue, pastes: PasteStore, current: string): string | undefined {
+  const format: RecallInput = (text, images) => {
+    const tokens = pastes.restoreImages(images, current);
+    return tokens === undefined ? undefined : text + tokens;
+  };
+  return queue.length ? queue.recallTail(format) : input?.recallFollowUp?.(format);
 }
 
 /** The host's actual pending submissions, bound when the person queued them. */
@@ -63,6 +73,17 @@ export class SubmissionQueue {
 
   release(): PendingSubmission[] {
     const values = this.pending.entries().map(entry => entry.value); this.pending.clear(); return values;
+  }
+
+  recallTail(format: RecallInput): string | undefined {
+    const entry = this.pending.entries().at(-1);
+    if (!entry) return undefined;
+    const { value } = entry;
+    const session = this.current();
+    if (session.id !== value.sessionId || session.createdAt !== value.createdAt || session.projectRoot !== value.projectRoot
+      || value.source !== undefined && value.source !== 'interactive') return undefined;
+    const draft = format(value.text, value.attachments?.images ?? []);
+    return draft !== undefined && this.pending.contains(entry) && this.pending.cancel(entry.id) ? draft : undefined;
   }
 
   cancelWhere(matches: (text: string) => boolean): void {

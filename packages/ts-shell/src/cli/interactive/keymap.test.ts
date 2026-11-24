@@ -44,6 +44,7 @@ function build(busy = false, interruptible = false, vimMode = false,
     openRewind: vi.fn(),
     retry: vi.fn(),
     syncSuggestions: vi.fn(),
+    recallQueuedDraft: vi.fn(),
     scroll: vi.fn(),
     scrollPrompt: vi.fn(),
     scrollPage: vi.fn(),
@@ -274,6 +275,30 @@ describe("input while a turn runs", () => {
     press("\x11");
     expect(actions.submit).toHaveBeenCalledWith("h", "followUp");
     expect(surface.editor.getText()).toBe("");
+  });
+
+  it("queues a draft on Tab when a busy editor has no completion to handle it", () => {
+    const { press, actions, surface } = build(true);
+    press("h");
+    press("\t");
+    expect(actions.submit).toHaveBeenCalledWith("h", "followUp");
+    expect(surface.editor.getText()).toBe("");
+  });
+
+  it("lets Tab start a completion lookup during a turn", () => {
+    const { press, actions, surface } = build(true);
+    actions.syncSuggestions.mockReturnValue(true);
+    press("h");
+    press("\t");
+    expect(actions.submit).not.toHaveBeenCalled();
+    expect(surface.editor.getText()).toBe("h");
+  });
+
+  it("dispatches Alt+Up to pending input recall", () => {
+    const { press, actions } = build(true);
+    press("\x1b[1;3A");
+    expect(actions.recallQueuedDraft).toHaveBeenCalledOnce();
+    expect(actions.submit).not.toHaveBeenCalled();
   });
 
   it("sends without a disposition when idle", () => {

@@ -34,6 +34,7 @@ import { btwPicker } from "./btw.js";
 import { planPicker } from "./plan.js";
 import { statusItemPicker } from "./statusItems.js";
 import { settingsPicker, type SettingsHost } from "./settings.js";
+import { themePicker } from './theme.js';
 import { undoPicker } from './undo.js';
 import type { UndoHost } from '../../../edit/recovery/undo/service.js';
 import type { GitWorkbench } from '../../../workflow/git/service.js';
@@ -153,6 +154,8 @@ const PICKERS: Record<string, PickerFactory> = {
     modelSettings: back => modelPicker(host.commandContext, undefined, undefined, undefined, undefined, host.modelSignIn, back),
     thinkingSettings: back => thinkingPicker(host.commandContext, back),
   }),
+  theme: (host, argument) => !argument && host.themes
+    ? themePicker(host.themes, host.commandContext?.admission) : undefined,
   thinking: host => thinkingPicker(host.commandContext),
   hub: host => host.jobs ? hubPicker(host.jobs) : undefined,
   jobs: host => jobsPicker(host.jobs),

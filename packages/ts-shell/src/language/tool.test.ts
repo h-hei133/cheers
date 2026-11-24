@@ -15,6 +15,7 @@ import { snapshot } from './documents.js';
 import { createCoreToolRegistry } from '../core/tools/registry.js';
 import { approvalPicker, approvalPreview } from '../cli/interactive/picker/approval.js';
 import { languageLimits } from './contract.js';
+import { discoverLanguageCandidates } from './discovery.js';
 import { captureWorkspaceRoot } from '../core/workspace/roots.js';
 import { approveAllGroups } from '../test-utils/approval.js';
 
@@ -62,6 +63,41 @@ it('requires execute approval including executable, arguments and canonical cwd,
   const picker = approvalPicker(prompt, () => {});
   expect(picker.initialSelection).toBe('deny'); expect(picker.footer).toContain('execute this request');
   expect(fs.existsSync(path.join(test.root, 'frames.jsonl'))).toBe(false);
+});
+
+it('lists only installed fixed candidates and does not execute or approve them during discovery', async () => {
+  const test = setup();
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'language-candidates-')); roots.push(bin);
+  const marker = path.join(bin, 'started');
+  const executable = path.join(bin, 'typescript-language-server');
+  fs.writeFileSync(executable, `#!/bin/sh\ntouch ${JSON.stringify(marker)}\n`, { mode: 0o755 });
+  fs.chmodSync(executable, 0o755);
+  expect(discoverLanguageCandidates(`relative:${bin}`).map(item => item.id)).toEqual(['typescript']);
+  expect(discoverLanguageCandidates(bin, 'win32')).toEqual([]);
+
+  const args = { operation: 'discover' };
+  const options = gate(test, { commandEnv: { PATH: bin }, escalationPromptHandler: vi.fn() });
+  expect(evaluateToolPermissionScope('lsp', args, 'ask', test.root)).toMatchObject({ operation: 'read', requiresEscalation: false });
+  expect(planModeBlock('plan', 'lsp', args)).toBeUndefined();
+  const definitions = new Map([['lsp', test.tool]]);
+  const hooks = createToolHooks(options, definitions);
+  const tool = adaptTools(definitions, options)[0]!;
+  const refusal = await hooks.beforeToolCall!({
+    assistantMessage: { role: 'assistant', content: '' }, call: { name: 'lsp', id: 'discover', args }, args,
+  });
+  expect(refusal).toBeUndefined();
+  const result = await tool.execute('discover', args);
+  expect(result.isError).toBe(false);
+  expect(result.metadata).toMatchObject({ operation: 'discover', candidates: [{ id: 'typescript',
+    command: fs.realpathSync(executable), args: ['--stdio'] }] });
+  expect(options.escalationPromptHandler).not.toHaveBeenCalled();
+  expect(fs.existsSync(marker)).toBe(false);
+});
+
+it('does not traverse relative or excessive captured executable search paths', () => {
+  const test = setup();
+  expect(discoverLanguageCandidates(test.root)).toEqual([]);
+  expect(discoverLanguageCandidates('a'.repeat(16 * 1024 + 1))).toEqual([]);
 });
 
 it('reuses one bounded session/project server across independently recreated tool catalogs', async () => {

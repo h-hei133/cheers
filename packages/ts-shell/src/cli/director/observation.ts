@@ -22,13 +22,13 @@ export function workerObservations(owner: DirectorOwner): ToolDefinition[] {
 export async function waitWorker(owner: DirectorOwner, id: string, seconds: number, signal?: AbortSignal): Promise<string> {
   if (!Number.isSafeInteger(seconds) || seconds < 1 || seconds > 30) throw new Error('Worker wait must be 1–30 seconds.');
   const job = selectedWorker(owner, id); const runId = job.runs.at(-1)?.id;
+  if (!runId) return report({ ...agentProjection(owner.host, job), waiting: false });
+  const refused = owner.admission(); if (refused) throw new Error(refused);
   const deadline = Date.now() + seconds * 1000;
-  while (owner.host.agents.hasLive(id) && Date.now() < deadline) {
-    signal?.throwIfAborted(); const refused = owner.admission(); if (refused) throw new Error(refused);
-    if (selectedWorker(owner, id).runs.at(-1)?.id !== runId) throw new Error('The selected worker run changed while waiting.');
-    await new Promise<void>(resolve => setTimeout(resolve, 25));
-  }
+  const settled = await owner.host.agents.waitForRun(id, runId, Math.max(1, deadline - Date.now()), signal);
+  signal?.throwIfAborted();
+  const changed = owner.admission(); if (changed) throw new Error(changed);
   const current = selectedWorker(owner, id);
   if (current.runs.at(-1)?.id !== runId) throw new Error('The selected worker run changed while waiting.');
-  return report({ ...agentProjection(owner.host, current), waiting: owner.host.agents.hasLive(id) });
+  return report({ ...agentProjection(owner.host, current), waiting: !settled && owner.host.agents.hasLive(id) });
 }

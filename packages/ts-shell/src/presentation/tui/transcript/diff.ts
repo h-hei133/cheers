@@ -1,6 +1,6 @@
 import { defaultTheme } from "../../theme/theme.js";
-import { truncateToWidth } from "../text/layout.js";
-import { graphemeBoundaries, visibleWidth } from "../text/measure.js";
+import { truncateToWidth, wrapSegments } from "../text/layout.js";
+import { graphemeBoundaries, lineCells, visibleWidth } from "../text/measure.js";
 import { boundDiffLines, DIFF_PREVIEW_BYTES, DIFF_PREVIEW_ROWS } from "./diffPage.js";
 import {
   displayLine,
@@ -55,6 +55,8 @@ export interface DiffLayoutSource {
   readonly left?: string;
   readonly right?: string;
   readonly split?: number;
+  readonly leftContinues?: boolean;
+  readonly rightContinues?: boolean;
 }
 
 /** Rows for a diff, each fitted to `width`; unified when two columns do not fit. */
@@ -276,6 +278,37 @@ export interface DiffRowSource {
   readonly right?: string;
   /** Column of the divider; selections left of it are old text, right are new. */
   readonly split: number;
+  readonly leftContinues?: boolean;
+  readonly rightContinues?: boolean;
+}
+
+/** Pair display fragments with their source without rescanning preceding columns. */
+function wrapDiffCell(text: string | undefined, width: number): { readonly display: string; readonly source: string }[] {
+  if (text === undefined) return [];
+  if (visibleWidth(text) <= width) return [{ display: text, source: text }];
+  const cells = [...lineCells(text)].map(cell => {
+    const widerThanCell = cell.width > width;
+    return {
+      cluster: cell.cluster,
+      display: widerThanCell ? '�' : cell.cluster,
+      width: widerThanCell ? 1 : cell.width,
+    };
+  });
+  let cellIndex = 0;
+  let column = 0;
+  return wrapSegments(cells, width).map(segment => {
+    let display = '';
+    let source = '';
+    while (cellIndex < cells.length) {
+      const cell = cells[cellIndex]!;
+      if (cell.width > 0 && column >= segment.start + segment.width) break;
+      cellIndex += 1;
+      column += cell.width;
+      display += cell.display;
+      source += cell.cluster;
+    }
+    return { display, source };
+  });
 }
 
 export function renderSideBySide(diff: string, width: number, options: DiffRenderOptions = {}): string[] {
@@ -305,10 +338,10 @@ export function layoutSideBySide(diff: string, width: number, options: DiffRende
       sources.push(undefined);
     }
   };
-  const numberWidth = 5;
-  const cell = Math.max(8, Math.floor((width - numberWidth * 2 - 5) / 2));
+  const numberWidth = Math.min(5, Math.max(1, Math.floor((width - 9) / 4)));
+  const cell = Math.max(1, Math.floor((width - numberWidth * 2 - 7) / 2));
   const gutter = (left: string, right: string): string =>
-    defaultTheme.dim(`${left.padStart(numberWidth)} ${right.padStart(numberWidth)} │ `);
+    defaultTheme.dim(`${truncateToWidth(left, numberWidth).padStart(numberWidth)} ${truncateToWidth(right, numberWidth).padStart(numberWidth)} │ `);
   let oldLine = options.initialLineNumbers?.oldLine ?? 0;
   let newLine = options.initialLineNumbers?.newLine ?? 0;
   let index = 0;
@@ -323,6 +356,26 @@ export function layoutSideBySide(diff: string, width: number, options: DiffRende
   // The first divider separates the paired line numbers from the left cell;
   // source selection must split at the divider between the two content cells.
   const split = numberWidth * 2 + 5 + cell;
+  const pushPair = (left: string | undefined, right: string | undefined, context: boolean): boolean => {
+    const leftRows = wrapDiffCell(left, cell);
+    const rightRows = context ? leftRows : wrapDiffCell(right, cell);
+    const count = Math.max(leftRows.length, rightRows.length);
+    for (let row = 0; row < count; row += 1) {
+      const old = leftRows[row];
+      const next = rightRows[row];
+      const leftText = old ? defaultTheme.fg(context ? 'diffContext' : 'diffRemoved', old.display) : '';
+      const rightText = next ? defaultTheme.fg(context ? 'diffContext' : 'diffAdded', next.display) : '';
+      const numbers = gutter(row === 0 && old ? String(oldLine) : '', row === 0 && next ? String(newLine) : '');
+      if (!push(numbers + pad(leftText, cell) + ' │ ' + rightText, {
+        split,
+        ...(old ? { left: old.source, leftContinues: row < leftRows.length - 1 } : {}),
+        ...(next ? { right: next.source, rightContinues: row < rightRows.length - 1 } : {}),
+      })) return false;
+    }
+    if (left !== undefined) oldLine += 1;
+    if (right !== undefined) newLine += 1;
+    return true;
+  };
   while (index < lineCount) {
     const line = displayLine(lines, index);
     const hunk = HUNK_PREFIXES.some(prefix => line.startsWith(prefix)) || isFileHeaderLine(lines, index, inHunk);
@@ -340,14 +393,7 @@ export function layoutSideBySide(diff: string, width: number, options: DiffRende
       if (consumed > maxBytes) { truncated(); return { rows, sources }; }
       const count = Math.max(removed.length, added.length);
       for (let pair = 0; pair < count; pair++) {
-        const left = removed[pair];
-        const right = added[pair];
-        const leftText = left === undefined ? '' : defaultTheme.fg('diffRemoved', truncateToWidth(left, cell));
-        const rightText = right === undefined ? '' : defaultTheme.fg('diffAdded', truncateToWidth(right, cell));
-        if (!push(gutter(left === undefined ? '' : String(oldLine), right === undefined ? '' : String(newLine))
-          + pad(leftText, cell) + ' │ ' + rightText, { ...(left !== undefined ? { left } : {}), ...(right !== undefined ? { right } : {}), split })) { truncated(); return { rows, sources }; }
-        if (left !== undefined) oldLine += 1;
-        if (right !== undefined) newLine += 1;
+        if (!pushPair(removed[pair], added[pair], false)) { truncated(); return { rows, sources }; }
       }
       continue;
     }
@@ -367,9 +413,9 @@ export function layoutSideBySide(diff: string, width: number, options: DiffRende
     }
     if (line.startsWith(' ')) {
       const text = line.slice(1);
-      if (!push(gutter(String(oldLine), String(newLine)) + defaultTheme.fg('diffContext', truncateToWidth(text, cell))
-        + ' │ ' + defaultTheme.fg('diffContext', truncateToWidth(text, cell)), { left: text, right: text, split })) { truncated(); break; }
-      oldLine += 1; newLine += 1; index += 1; continue;
+      if (!pushPair(text, text, true)) { truncated(); break; }
+      index += 1;
+      continue;
     }
     if (!push(defaultTheme.dim(truncateToWidth(line, width)))) { truncated(); break; }
     index += 1;

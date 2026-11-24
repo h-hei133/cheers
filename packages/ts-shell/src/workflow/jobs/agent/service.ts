@@ -9,6 +9,7 @@ interface Operation {
   readonly runId: string;
   settlement: Promise<void>;
   requested?: 'paused' | 'cancelled';
+  readonly waitsForPerson: Set<string>;
 }
 export class AgentService {
   private readonly operations = new Map<string, Operation>();
@@ -16,6 +17,37 @@ export class AgentService {
   private closing = false;
   constructor(readonly journal: AgentJournal) {}
   hasLive(id: string): boolean { return this.operations.has(id); }
+  waitsForPerson(id: string): boolean { return (this.operations.get(id)?.waitsForPerson.size ?? 0) > 0; }
+  setWaitingForPerson(id: string, runId: string, promptId: string, waiting: boolean): void {
+    const operation = this.operations.get(id);
+    if (operation?.runId !== runId) return;
+    if (waiting) operation.waitsForPerson.add(promptId);
+    else operation.waitsForPerson.delete(promptId);
+  }
+  waitForRun(id: string, runId: string, timeoutMs: number, signal?: AbortSignal): Promise<boolean> {
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) throw new JobStateError('invalid');
+    if (this.journal.get(id).runs.at(-1)?.id !== runId) throw new JobStateError('conflict');
+    const operation = this.operations.get(id);
+    if (!operation || operation.runId !== runId) return Promise.resolve(true);
+    if (signal?.aborted) return Promise.reject(signal.reason);
+    return new Promise<boolean>((resolve, reject) => {
+      let settled = false;
+      const finish = (result?: boolean, error?: unknown): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', abort);
+        if (error !== undefined) reject(error);
+        else resolve(result === true);
+      };
+      const abort = (): void => finish(undefined, signal?.reason ?? new Error('Worker wait was cancelled.'));
+      const timer = setTimeout(() => finish(false), timeoutMs);
+      timer.unref?.();
+      signal?.addEventListener('abort', abort, { once: true });
+      operation.settlement.then(() => finish(true), error => finish(undefined, error));
+      if (signal?.aborted) abort();
+    });
+  }
   onEnded(listener: (job: AgentJob) => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   create(instruction: string, origin: JobOrigin, runtime: AgentRuntime, queue = false): AgentJob {
     if (this.closing || runtime.admission()) throw new JobStateError('unavailable');
@@ -46,7 +78,8 @@ export class AgentService {
     if (admission()) throw new JobStateError('unavailable');
     job = this.journal.arm(job, checkpoint, instruction ?? job.prompt);
     const run = job.runs.at(-1)!;
-    const operation: Operation = { controller: new AbortController(), runId: run.id, settlement: Promise.resolve() };
+    const operation: Operation = { controller: new AbortController(), runId: run.id, settlement: Promise.resolve(),
+      waitsForPerson: new Set() };
     this.operations.set(job.id, operation);
     const watch = setInterval(() => { if (admission()) operation.controller.abort(); }, 100); watch.unref();
     const output = (text: string) => {

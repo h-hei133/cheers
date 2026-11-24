@@ -14,6 +14,11 @@ let cached: readonly Suggestion[] | undefined;
 let unsubscribe: (() => void) | undefined;
 let cachedScope: string | undefined;
 
+const DAILY_COMMANDS = [
+  '/model', '/clear', '/resume', '/settings', '/help', '/connect', '/thinking', '/compact', '/context', '/usage',
+  '/git', '/review', '/commit', '/undo', '/tools', '/queue', '/jobs', '/copy', '/theme', '/statusline',
+];
+
 function candidates(scope?: SlashCatalogScope): readonly Suggestion[] {
   unsubscribe ??= subscribeSlashCommands(() => {
     cached = undefined;
@@ -40,7 +45,11 @@ function candidates(scope?: SlashCatalogScope): readonly Suggestion[] {
 export function slashSuggestions(draft: string, snapshot: DraftSnapshot = { text: draft, cursor: draft.length, revision: 0 }, scope?: SlashCatalogScope): Suggestion[] | null {
   const token = completionToken(draft, snapshot.cursor);
   if (token.from === 0 && token.before.length === 0 && COMMAND_DRAFT.test(token.prefix)) {
-    const matches = matchSuggestions(token.prefix, candidates(scope));
+    const available = candidates(scope);
+    const matches = token.prefix === '/' ? DAILY_COMMANDS.flatMap(name => {
+      const candidate = available.find(item => item.value === name);
+      return candidate ? [candidate] : [];
+    }) : matchSuggestions(token.prefix, available);
     return matches.length ? matches.map(candidate => completionEdit(candidate, snapshot, token.from, token.to)) : null;
   }
   const command = token.before[0];

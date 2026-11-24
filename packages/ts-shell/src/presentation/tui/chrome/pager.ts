@@ -9,6 +9,7 @@ import { renderMarkdown, type MarkdownRenderOptions } from "../transcript/markdo
 import { layoutDiff } from "../transcript/diff.js";
 import {
   countDiffLines,
+  DIFF_PREVIEW_ROWS,
   diffNeedsFullView,
   nextDiffPage,
   type DiffPage,
@@ -327,10 +328,12 @@ export class Pager {
     if (!page) return [];
     const previous = this.diffPages[this.diffPageIndex - 1];
     const safeWidth = Math.max(1, width);
+    const maxBytes = Math.max(1, Buffer.byteLength(page.text, "utf8"));
     const layout = layoutDiff(page.text, safeWidth, {
       sideBySide: safeWidth >= 100,
-      maxRows: 400,
-      maxBytes: Math.max(1, Buffer.byteLength(page.text, "utf8")),
+      // Source pages already bound bytes and logical lines. Allow their wrapped rows to scroll in full.
+      maxRows: safeWidth >= 100 ? Math.max(DIFF_PREVIEW_ROWS, maxBytes) : DIFF_PREVIEW_ROWS,
+      maxBytes,
       initialLineNumbers: {
         oldLine: previous?.oldLine ?? 0,
         newLine: previous?.newLine ?? 0,

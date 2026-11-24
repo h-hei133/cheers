@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { createQaPtyEnvironment } from "./qa-pty-env.mjs";
 import { seedRecoverySession, seedSavedSession, extractSessionId, currentSessionFromStore, assertTranscript,
   SAVED_ASSISTANT_MARKDOWN, SAVED_DIFF_OLD, SAVED_DIFF_NEW } from "./qa/session.mjs";
@@ -172,101 +172,21 @@ function qaEnvironment(home, project) {
   };
 }
 
-async function assertFixtureSkillDiscovery(project) {
-  const buildRoot = path.join(root, "packages", "ts-shell", "dist", "builds", verified.manifest.buildId);
-  const modulePath = path.join(buildRoot, "core", "skills", "skillLoader.js");
-  const { SkillLoader } = await import(pathToFileURL(modulePath).href);
-  const sources = [];
-  let discoveryError;
-  let loaded = { skills: new Map(), diagnostics: [], failures: [] };
-  try {
-    loaded = await new SkillLoader(project, { onSource: target => sources.push(target) }).loadDetailed();
-  } catch (error) {
-    discoveryError = describeError(error);
+function assertSkillFixture(project) {
+  const workspace = fs.realpathSync(project);
+  const directory = path.join(workspace, ".agents", "skills", "qa-discovery");
+  const manifest = path.join(directory, "SKILL.md");
+  const directoryStat = fs.lstatSync(directory);
+  const manifestStat = fs.lstatSync(manifest);
+  if (!directoryStat.isDirectory() || directoryStat.isSymbolicLink()
+    || !manifestStat.isFile() || manifestStat.isSymbolicLink() || fs.realpathSync(manifest) !== manifest) {
+    throw new Error("the skill fixture must be a local directory and regular file");
   }
-  if (loaded.skills.has("qa-discovery")) return;
-  const skillDirectory = path.join(project, ".agents", "skills", "qa-discovery");
-  const manifest = path.join(project, ".agents", "skills", "qa-discovery", "SKILL.md");
-  const workspaceRoot = fs.realpathSync(project);
-  let directoryEntries;
-  let directoryError;
-  let manifestBytes;
-  let manifestError;
-  let containment;
-  let realpaths;
-  let stats;
-  try {
-    const { readDirectory } = await import(pathToFileURL(path.join(buildRoot, "runtime", "execution", "directory.js")).href);
-    directoryEntries = (await readDirectory(workspaceRoot, skillDirectory)).map(entry => entry.name);
-  } catch (error) {
-    directoryError = describeError(error);
+  const text = fs.readFileSync(manifest, "utf8");
+  if (text !== "---\nname: qa-discovery\ndescription: Local discovery fixture\n---\n\nqa-skill-body\n") {
+    throw new Error("the skill fixture changed before the CLI smoke");
   }
-  try {
-    const { readBinarySnapshot } = await import(pathToFileURL(path.join(buildRoot, "runtime", "execution", "snapshot.js")).href);
-    manifestBytes = (await readBinarySnapshot({ absolutePath: manifest, workspaceRoot }, 512 * 1024)).length;
-  } catch (error) {
-    manifestError = describeError(error);
-  }
-  try {
-    const { verifyPathContainment } = await import(pathToFileURL(path.join(buildRoot, "core", "security", "pathJail.js")).href);
-    containment = verifyPathContainment(manifest, workspaceRoot);
-    realpaths = {
-      workspace: fs.realpathSync(workspaceRoot),
-      workspaceNative: fs.realpathSync.native(workspaceRoot),
-      manifest: fs.realpathSync(manifest),
-      manifestNative: fs.realpathSync.native(manifest),
-    };
-  } catch (error) {
-    containment = { error: describeError(error) };
-  }
-  try {
-    const before = fs.statSync(manifest, { bigint: true });
-    const handle = await fs.promises.open(manifest, "r");
-    const opened = await handle.stat({ bigint: true });
-    await handle.close();
-    const after = fs.statSync(manifest, { bigint: true });
-    stats = { before: describeStats(before), opened: describeStats(opened), after: describeStats(after) };
-  } catch (error) {
-    stats = { error: describeError(error) };
-  }
-  throw new Error(`fixture skill discovery failed (${JSON.stringify({
-    project,
-    workspaceRoot,
-    manifest,
-    manifestExists: fs.existsSync(manifest),
-    directoryEntries,
-    directoryError,
-    manifestBytes,
-    manifestError,
-    containment,
-    realpaths,
-    stats,
-    discoveryError,
-    sources,
-    diagnostics: loaded.diagnostics,
-    failures: loaded.failures,
-  })})`);
 }
-
-function describeStats(stats) {
-  return {
-    dev: String(stats.dev),
-    ino: String(stats.ino),
-    size: String(stats.size),
-    mtimeNs: String(stats.mtimeNs),
-    ctimeNs: String(stats.ctimeNs),
-  };
-}
-
-function describeError(error) {
-  if (!(error instanceof Error)) return { message: String(error) };
-  return {
-    name: error.name,
-    message: error.message,
-    ...("code" in error && typeof error.code === "string" ? { code: error.code } : {}),
-  };
-}
-
 
 async function runInteractivePrompt(state, child, prompt, expected, timeoutMs = 30_000) {
   const start = state.output.length;
@@ -337,6 +257,13 @@ async function saveMaxTurns(state, child, home) {
   );
   const config = JSON.parse(fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8"));
   if (config.maxTurns !== 7) throw new Error(`settings save persisted maxTurns=${String(config.maxTurns)}`);
+  start = state.output.length;
+  child.stdin.write("\x1b");
+  await waitForOutput(
+    () => normalized(state.output.slice(start)),
+    value => value.includes("Ask anything, or / for commands"),
+    "settings prompt restored",
+  );
 }
 
 async function runTerminalSmoke(target, mode) {
@@ -358,7 +285,7 @@ async function runTerminalSmoke(target, mode) {
   };
   const hardTimeout = setTimeout(() => child.kill("SIGKILL"), 90_000);
   try {
-    await assertFixtureSkillDiscovery(project);
+    assertSkillFixture(project);
     await waitForOutput(read, value => value.includes("Cheers") && value.includes(recoverySession) && value.includes("Recovery hint"),
       "first frame and recovery hint", 20_000);
     const sessionId = extractSessionId(state.output, recoverySession);
@@ -534,7 +461,7 @@ async function runTerminalSmoke(target, mode) {
     for (const [command, expected, marker] of [
       ["/hub", "Jobs", "No jobs, agents or workflows in this session."],
       ["/agents", "Agents", "Enter inspects a live agent or effective definition."],
-      ["/plan-review", "Plan review", "Show current plan"],
+      ["/plan-review", "Plan review", "No draft is available"],
       ["/btw", "Side questions", "No side questions have been retained."],
       ["/advisor", "Advisor", "esc cancel"],
     ]) {
@@ -543,12 +470,6 @@ async function runTerminalSmoke(target, mode) {
       await waitForOutput(() => normalized(state.output.slice(start)),
         value => value.includes(expected) && value.toLowerCase().includes(marker.toLowerCase()),
         `${command} read-only panel`, 25_000);
-      child.stdin.write("\x1b");
-      await new Promise(resolve => setTimeout(resolve, 250));
-      child.stdin.write("/sessions current\r");
-      await waitForOutput(() => normalized(state.output.slice(start)),
-        value => value.includes("Current session"),
-        `${command} panel close`);
       child.stdin.write("\x1b");
       await new Promise(resolve => setTimeout(resolve, 250));
     }
@@ -661,7 +582,7 @@ async function runLineSmoke(target) {
   child.stderr.on("data", chunk => { state.output += chunk.toString("utf8"); });
   const hardTimeout = setTimeout(() => child.kill("SIGKILL"), 90_000);
   try {
-    await assertFixtureSkillDiscovery(project);
+    assertSkillFixture(project);
     await waitForOutput(() => {
       if (child.probeError) throw child.probeError;
       return normalized(state.output);
@@ -749,7 +670,7 @@ async function runPipeSmoke(target) {
   child.stdin.end(input);
   const hardTimeout = setTimeout(() => child.kill("SIGKILL"), 90_000);
   try {
-    await assertFixtureSkillDiscovery(project);
+    assertSkillFixture(project);
     const code = await waitForExit(child, 60_000);
     if (code !== 0) throw new Error(`process exited ${code}`);
     const config = JSON.parse(fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8"));

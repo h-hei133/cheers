@@ -236,6 +236,33 @@ it('requires a live selection after restart and refuses adopting the retained wo
   expect(new DirectorStore(manager, context.session).read().cycles[0]).toMatchObject({ phase: 'unknown', retired: true, endedAt: previous.createdAt });
   expect(requests).toHaveLength(1); expect(await command('on')).toContain('Director on');
 });
+it('marks only the live approval wait in worker observations and clears it after settlement', async () => {
+  let mainTurn = 0; let workerTurn = 0;
+  reply = (body, response) => {
+    if (body.model === 'planner' && mainTurn++ === 0) {
+      respond(response, [{ id: 'delegate', name: 'worker_start', args: { prompt: 'Approval wait' } }]);
+      return;
+    }
+    if (body.model === 'vendor/executor' && workerTurn++ === 0) {
+      respond(response, [{ id: 'write-call', name: 'write', args: { path: 'approval.txt', content: 'approved' } }]);
+      return;
+    }
+    respond(response);
+  };
+  let answer!: (decision: 'allow-once' | 'deny') => void;
+  approval = async name => name === 'write' ? new Promise(resolve => { answer = resolve; }) : 'allow-once';
+  await command('on --model openai-compatible/vendor/executor'); await drive();
+  const job = jobsFor(context)!.agents.journal.list()[0]!;
+  await vi.waitFor(() => expect(jobsFor(context)!.agents.waitsForPerson(job.id)).toBe(true));
+  const host = jobsFor(context)!;
+  const { agentProjection } = await import('../jobs/agent/projection.js');
+  const pending = command('status');
+  expect(agentProjection(host, job)).toMatchObject({ status: 'running', waitsForPerson: true });
+  expect(await pending).toContain('"waitsForPerson": true');
+  answer('allow-once'); await pending;
+  await settled(job.id);
+  expect(agentProjection(jobsFor(context)!, jobsFor(context)!.agents.journal.get(job.id))).not.toHaveProperty('waitsForPerson');
+});
 it('confirms exact cancellation only after native cleanup settles', async () => {
   let began!: () => void; const ready = new Promise<void>(resolve => { began = resolve; });
   reply = (_body, response) => respond(response, [{ id: 'held-command', name: 'bash', args: { command: 'node -e "setTimeout(() => {}, 10000)"' } }]);

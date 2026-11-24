@@ -62,6 +62,56 @@ it('waits for actual cleanup before claiming pause and permits only a fresh cont
   service.start(paused, runtime(async input => ({ status: 'completed', checkpoint: input.run.checkpoint })), 'A new explicit instruction');
   await service.drain(); expect(journal.get(job.id).runs).toHaveLength(2); expect(journal.get(job.id).runs[0]!.status).toBe('paused');
 });
+
+it('fences event-backed waits to the current run and never cancels the worker on observer abort', async () => {
+  vi.useFakeTimers();
+  try {
+    let release!: () => void; const hold = new Promise<void>(resolve => { release = resolve; });
+    let began!: () => void; const ready = new Promise<void>(resolve => { began = resolve; });
+    const job = service.create('Held run', { kind: 'local' }, runtime(async input => {
+      began(); await hold; return { status: 'completed', checkpoint: input.run.checkpoint };
+    }));
+    await ready;
+    const runId = job.runs.at(-1)!.id;
+    const read = vi.spyOn(journal, 'get');
+    const waiting = service.waitForRun(job.id, runId, 1_000);
+    expect(read).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(await waiting).toBe(false);
+    expect(service.hasLive(job.id)).toBe(true);
+    expect(() => service.waitForRun(job.id, 'replaced-run', 1_000)).toThrow();
+
+    const controller = new AbortController();
+    const aborted = service.waitForRun(job.id, runId, 5_000, controller.signal);
+    controller.abort();
+    await expect(aborted).rejects.toBeDefined();
+    expect(service.hasLive(job.id)).toBe(true);
+    release();
+    await service.drain();
+  } finally { vi.useRealTimers(); }
+});
+
+it('tracks overlapping wait-for-person prompts by exact id and live run', async () => {
+  let release!: () => void; const hold = new Promise<void>(resolve => { release = resolve; });
+  let began!: () => void; const ready = new Promise<void>(resolve => { began = resolve; });
+  const job = service.create('Held run', { kind: 'local' }, runtime(async input => {
+    began(); await hold; return { status: 'completed', checkpoint: input.run.checkpoint };
+  }));
+  await ready;
+  const runId = job.runs.at(-1)!.id;
+  service.setWaitingForPerson(job.id, runId, 'approval-a', true);
+  service.setWaitingForPerson(job.id, runId, 'approval-a', true);
+  service.setWaitingForPerson(job.id, runId, 'approval-b', true);
+  expect(service.waitsForPerson(job.id)).toBe(true);
+  service.setWaitingForPerson(job.id, runId, 'approval-a', false);
+  expect(service.waitsForPerson(job.id)).toBe(true);
+  service.setWaitingForPerson(job.id, 'older-run', 'approval-b', false);
+  expect(service.waitsForPerson(job.id)).toBe(true);
+  service.setWaitingForPerson(job.id, runId, 'approval-b', false);
+  expect(service.waitsForPerson(job.id)).toBe(false);
+  release(); await service.drain();
+  expect(service.waitsForPerson(job.id)).toBe(false);
+});
 it('retains unknown cleanup, refuses replay and preserves the shared admission reservation', async () => {
   const host = runtime(async () => ({ status: 'unknown' })); const job = service.create('Uncertain task', { kind: 'local' }, host);
   await service.drain(); const unknown = journal.get(job.id); expect(unknown).toMatchObject({ status: 'unknown', output: 'unknown' });

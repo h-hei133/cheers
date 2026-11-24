@@ -55,6 +55,8 @@ export interface KeymapContext {
   readonly actions: KeymapActions;
   /** True while a turn is running. */
   readonly busy: boolean;
+  /** A question owns the draft while it is waiting for an answer. */
+  readonly awaitingAnswer?: boolean;
   /** True while background scheduling can be stopped between turns. */
   readonly interruptible?: boolean;
   /** Monotonic clock, used for the double-press exit gesture. */
@@ -221,8 +223,11 @@ function runAction(action: string, event: ParsedKeyEvent, context: KeymapContext
       submitDraft(context, context.busy ? "steer" : undefined);
       return "redrawn";
     case "tui.input.tab":
-      actions.syncSuggestions(true);
+      if (!actions.syncSuggestions(true) && context.busy && !context.awaitingAnswer) submitDraft(context, "followUp", true);
       actions.redraw();
+      return "redrawn";
+    case "app.message.recall":
+      if (!context.awaitingAnswer && !isKeyRelease(event.raw)) actions.recallQueuedDraft?.();
       return "redrawn";
     case "tui.input.stash":
       // The host owns the slot, so the keymap only says the gesture happened;
@@ -522,7 +527,7 @@ function consumeSuggestionKey(event: ParsedKeyEvent, context: KeymapContext): bo
   return false;
 }
 
-function submitDraft(context: KeymapContext, disposition?: "steer" | "followUp"): void {
+function submitDraft(context: KeymapContext, disposition?: "steer" | "followUp", deferCommands?: true): void {
   const { view, actions } = context;
   const source = view.editor.getText();
   if (!source.trim()) {
@@ -548,7 +553,9 @@ function submitDraft(context: KeymapContext, disposition?: "steer" | "followUp")
   // Omitted rather than passed as undefined when there is nothing attached, so a
   // caller reading the arguments sees only what was actually said.
   const attachments = images.length > 0 ? { images } : undefined;
-  if (attachments) {
+  if (deferCommands && submission.startsWith("/")) {
+    actions.submit(submission, disposition, attachments, deferCommands);
+  } else if (attachments) {
     if (disposition) actions.submit(submission, disposition, attachments);
     else actions.submit(submission, undefined, attachments);
   } else if (disposition) {

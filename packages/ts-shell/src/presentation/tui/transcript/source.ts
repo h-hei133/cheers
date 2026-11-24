@@ -28,6 +28,10 @@ export interface SourceLine {
   readonly right?: string;
   /** Divider column; a selection left of it copies old, right copies new. */
   readonly split?: number;
+  readonly leftContinues?: boolean;
+  readonly rightContinues?: boolean;
+  readonly leftTerminalNewline?: boolean;
+  readonly rightTerminalNewline?: boolean;
   /** Stable source node for structured rows that share one source line. */
   readonly node?: number;
   /** Visual row within that source node. */
@@ -128,7 +132,7 @@ export function sourceLinesFor(
     const layout = layoutDiff(diff, diffWidth, { sideBySide: diffWidth >= 100 });
     const visible = (row: string): string => {
       const text = stripAnsi(row);
-      return (framed ? text.slice(2, 2 + diffWidth) : text).trimEnd();
+      return (framed ? text.slice(2, -2) : text).trimEnd();
     };
     // A tool card has its own header rows before the diff; find the block of
     // rows that matches the layout instead of assuming it starts at a fixed offset.
@@ -137,11 +141,17 @@ export function sourceLinesFor(
       if (layout.rows.every((row, index) => visible(rows[candidate + index] ?? "") === stripAnsi(row).trimEnd())) { offset = candidate; break; }
     }
     if (offset < 0) return rows.map(() => undefined);
+    const finalNewline = diff.endsWith("\n");
+    const last = finalNewline ? layout.sources.findLastIndex(item => item !== undefined) : -1;
+    const lastLeft = finalNewline ? layout.sources.findLastIndex(item => item?.left !== undefined) : -1;
+    const lastRight = finalNewline ? layout.sources.findLastIndex(item => item?.right !== undefined) : -1;
     return rows.map((_, index) => {
-      const source = layout.sources[index - offset];
+      const row = index - offset;
+      const source = layout.sources[row];
       return source ? { block: blockIndex, ...source,
-        ...(diff.endsWith("\n") && index - offset === layout.sources.findLastIndex(item => item !== undefined)
-          ? { terminalNewline: true } : {}),
+        ...(row === last ? { terminalNewline: true } : {}),
+        ...(row === lastLeft && !source.leftContinues ? { leftTerminalNewline: true } : {}),
+        ...(row === lastRight && !source.rightContinues ? { rightTerminalNewline: true } : {}),
         ...(source.split !== undefined && framed ? { split: source.split + 2 } : {}) } : undefined;
     });
   }

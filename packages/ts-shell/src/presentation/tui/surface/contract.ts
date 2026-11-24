@@ -124,6 +124,7 @@ export interface ViewActions {
     text: string,
     disposition?: "steer" | "followUp",
     attachments?: { readonly images: readonly ImageContent[] },
+    deferCommands?: true,
   ): void;
   /** Escape while a turn is running. */
   interrupt(): void;
@@ -168,7 +169,9 @@ export interface ViewActions {
    * draft change may refine an open list but must never pop one up, or the list
    * steals the arrow keys from prompt-history recall.
    */
-  syncSuggestions(mayOpen: boolean): void;
+  syncSuggestions(mayOpen: boolean): boolean | void;
+  /** Return an undelivered message to the composer. */
+  recallQueuedDraft?(): void;
   /** Copy an active source or mouse selection and clear its highlight. */
   copySelection?(selection?: SourceSelection): boolean;
   /** Report a non-fatal input refusal without changing the draft. */

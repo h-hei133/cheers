@@ -79,7 +79,7 @@ In Settings, Left/Right changes the top category; Tab or Shift+Tab toggles rows 
 | `tui.editor.redo` | `ctrl+shift+z` | Take back the last undo |
 | `tui.input.newLine` | `shift+enter` / `alt+enter` / `ctrl+j` | Insert a new line instead of sending |
 | `tui.input.submit` | `enter` | Send the prompt |
-| `tui.input.tab` | `tab` | Complete the highlighted candidate |
+| `tui.input.tab` | `tab` | Complete the highlighted candidate or queue the draft during a turn |
 | `tui.input.stash` | `ctrl+s` / `alt+s` | Set the draft aside, or take it back |
 | `tui.overlay.nextGroup` | `tab` | Next picker group |
 | `tui.overlay.previousGroup` | `shift+tab` | Previous picker group |
@@ -93,6 +93,7 @@ In Settings, Left/Right changes the top category; Tab or Shift+Tab toggles rows 
 | `app.exit` | `ctrl+d` | Exit when the draft is empty |
 | `app.clearScreen` | `ctrl+l` | Clear the screen |
 | `app.message.followUp` | `ctrl+q` | Queue the draft to run after the turn; sends it now when idle |
+| `app.message.recall` | `alt+up` | Bring the last pending message back to the draft |
 | `app.agentMode.cycle` | `shift+tab` | Switch between planning and building |
 | `app.thinkingBlocks.toggle` | `ctrl+t` | Collapse or expand thinking blocks |
 | `app.tools.expand` | `ctrl+o` | Collapse or expand tool output |
@@ -107,7 +108,9 @@ In Settings, Left/Right changes the top category; Tab or Shift+Tab toggles rows 
 Arrow keys move within the draft before recalling history; a new draft is not replaced by an older prompt.
 An open completion list consumes its navigation keys first. Enter accepts an actively selected completion;
 otherwise it submits. While a turn runs, Enter steers the draft into it and `ctrl+q` queues it to run after the
-turn. A command, a composed prompt, or one carrying images cannot be steered and waits for the next turn; the rows
+turn. Tab also queues a draft when completion has no candidate or lookup. Alt+Up brings the latest pending
+submission back ahead of the current draft, including its attachments. A command, a composed prompt, or one
+carrying images can wait for the next turn. The rows
 above the prompt name each waiting entry and say which delivery it is, and `/queue list` prints the same entries
 with the IDs `/queue edit`, `/queue move` and `/queue cancel` take. With no turn running, `ctrl+q` sends the
 draft immediately and says so.

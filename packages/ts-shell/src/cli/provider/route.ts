@@ -83,6 +83,8 @@ export function providerRouteResolver(host: RouteHost, assemble: (resolution: Pr
     const captured = snapshotData(fresh, { bytes: 256 * 1024, nodes: 4_096, depth: 12 }) as unknown as ProviderCredentialResolution;
     const target = assemble(captured, admit);
     return { provider: target.provider, fetchImpl: target.fetchImpl, modelTransport: target.modelTransport,
+      ...(target.transportOwnsBodyDeadline ? { transportOwnsBodyDeadline: true as const } : {}),
+      ...(target.bodyIdleTimeoutMs !== undefined ? { bodyIdleTimeoutMs: target.bodyIdleTimeoutMs } : {}),
       contextWindow: target.contextWindow, maxOutputTokens: target.maxOutputTokens, reserveTokens: target.reserveTokens,
       isCurrent: () => {
         try { assertAdmission(admit); assertScopedModel(host.runtimeConfig, captured); return true; }

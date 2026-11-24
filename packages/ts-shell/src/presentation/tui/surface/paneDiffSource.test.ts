@@ -44,3 +44,20 @@ it('copies a side from a framed tool-card diff', () => {
     pane.screenToContent(row, divider + 8),
   )).toBe('new line');
 });
+
+it.each(['command', 'tool'] as const)('copies wrapped %s diff fragments across padding without copying display breaks', kind => {
+  const previous = 'é🙂'.repeat(42) + ' old tail';
+  const next = 'short replacement';
+  const transcript = new Transcript();
+  transcript.append({ kind, title: 'edit', text: '', diff: `@@ -1,2 +1,2 @@\n-${previous}\n+${next}\n context`, finalized: true });
+  const pane = new TranscriptPane(transcript);
+  const rows = pane.render(120, 30, undefined).map(stripAnsi);
+  const first = rows.findIndex(line => line.includes(next));
+  const last = rows.findIndex(line => line.includes('old tail'));
+  const context = rows.findIndex(line => line.includes('context'));
+  const oldColumn = rows[first]!.indexOf('é');
+  const rightColumn = rows[first]!.indexOf('│', oldColumn) + 2;
+  expect(last).toBeGreaterThan(first);
+  expect(pane.extractSource(pane.screenToContent(first, oldColumn), pane.screenToContent(last, oldColumn))).toBe(previous);
+  expect(pane.extractSource(pane.screenToContent(first, rightColumn), pane.screenToContent(context, rightColumn))).toBe(`${next}\ncontext`);
+});

@@ -76,6 +76,15 @@ it('polls the read-only projection and keeps unknown distinct from stored status
     expect((await picker.load())[0]).toMatchObject({ id: 'job-live', note: 'unknown' });
     expect(picker.detail?.('job-live')?.join('\n')).toContain('Status: unknown (stored running)');
 
+    projection.value = { jobs: [{ ...projection.value.jobs[0], unusedInternalField: 1 }] };
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(publish).not.toHaveBeenCalled();
+
+    projection.value = { jobs: [{ ...projection.value.jobs[0], directory: '/public-job-location' }] };
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(publish).toHaveBeenCalledOnce();
+    expect(picker.detail?.('job-live')).toContain('Directory: /public-job-location');
+
     projection.value = {
       jobs: [{ id: 'job-live', backend: 'agent', status: 'completed', storedStatus: 'completed', output: 'done' }],
     };
@@ -84,11 +93,35 @@ it('polls the read-only projection and keeps unknown distinct from stored status
     stop();
     projection.value = { jobs: [] };
     await vi.advanceTimersByTimeAsync(1_000);
-    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledTimes(2);
   } finally {
     projection.value = { jobs: [] };
     vi.useRealTimers();
   }
+});
+
+it('highlights only an active user-wait and publishes its transition as a snapshot change', async () => {
+  vi.useFakeTimers();
+  try {
+    const session = { id: 'hub-session', createdAt: 'created', projectRoot: process.cwd() };
+    const jobs = { session, context: { session }, local: { get: () => undefined } } as unknown as JobsComposition;
+    projection.value = { jobs: [{ id: 'worker-1', backend: 'agent', status: 'running', output: 'pending', waitsForPerson: true }] };
+    const picker = hubPicker(jobs);
+    const publish = vi.fn();
+    const stop = picker.subscribe!(publish);
+    expect((await picker.load())[0]).toMatchObject({ id: 'worker-1', note: 'approval required' });
+    expect(picker.detail?.('worker-1')).toContain('Waiting for your approval');
+
+    projection.value = { jobs: [{ id: 'worker-1', backend: 'agent', status: 'running', output: 'pending' }] };
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(publish).toHaveBeenCalledOnce();
+    expect(publish).toHaveBeenCalledWith([expect.objectContaining({ id: 'worker-1', note: 'running' })]);
+
+    projection.value = { jobs: [{ id: 'worker-1', backend: 'agent', status: 'running', output: 'pending', internalReadCount: 2 }] };
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(publish).toHaveBeenCalledOnce();
+    stop();
+  } finally { vi.useRealTimers(); }
 });
 
 it('becomes stale after a same-id session or workspace rebind', async () => {

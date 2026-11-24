@@ -1,7 +1,8 @@
 import type { ToolDefinition } from '../tools/types.js';
 import type { ExecutionService } from '../runtime/execution/service.js';
-import { LanguageError } from './contract.js';
+import { LanguageError, languageLimits } from './contract.js';
 import { LanguageService } from './service.js';
+import { discoverLanguageCandidates } from './discovery.js';
 import { resultText } from './projection.js';
 import { createScannerToolDefinition } from './scanner.js';
 import { TOOL_OUTPUT_LIMIT } from '../core/agent/tools.js';
@@ -12,10 +13,10 @@ export function createLspToolDefinition(executionService: ExecutionService): Too
   const scanner = createScannerToolDefinition(executionService);
   return {
     name: 'lsp',
-    description: 'Language server intelligence with explicit executable approval: definition, references, hover, symbols, diagnostics and proposed rename. Choose server.command as an absolute installed executable and server.args explicitly; no auto-install or project configuration discovery. Server code runs with OS process permissions. Positions are zero-based UTF-16. Rename returns apply_patch arguments for a separate complete plan approval; it never writes files. backend: scanner explicitly selects the legacy read-only symbol scanner, queried by symbol name.',
+    description: 'Language server intelligence with explicit executable approval: definition, references, hover, symbols, diagnostics and proposed rename. operation: discover lists fixed installed server candidates from the captured executable search path and never starts them. Select a returned absolute executable and its exact arguments explicitly. No project configuration discovery or installation. Server code runs with OS process permissions. Positions are zero-based UTF-16. Rename returns apply_patch arguments for separate approval; it never writes files. backend: scanner selects the read-only symbol scanner.',
     argsSchema: { type: 'object', properties: {
       backend: { type: 'string', enum: ['server', 'scanner'] },
-      operation: { type: 'string', enum: ['definition', 'references', 'hover', 'documentSymbol', 'workspaceSymbol', 'diagnostics', 'rename', 'status', 'restart', 'shutdown'] },
+      operation: { type: 'string', enum: ['discover', 'definition', 'references', 'hover', 'documentSymbol', 'workspaceSymbol', 'diagnostics', 'rename', 'status', 'restart', 'shutdown'] },
       server: { type: 'object', properties: { command: { type: 'string', maxLength: 4096 }, args: { type: 'array', items: { type: 'string', maxLength: 8192 }, maxItems: 32 } }, required: ['command', 'args'], additionalProperties: false },
       filePath: { type: 'string', maxLength: 4096 }, symbol: { type: 'string', maxLength: 4096 },
       line: { type: 'integer', minimum: 0 }, character: { type: 'integer', minimum: 0 },
@@ -24,6 +25,12 @@ export function createLspToolDefinition(executionService: ExecutionService): Too
     async execute(args, context) {
       if (args.backend === 'scanner') return scanner.execute(args, context);
       try {
+        if (args.operation === 'discover') {
+          const candidates = discoverLanguageCandidates(context.commandEnv?.PATH);
+          const output = candidates.length ? JSON.stringify(candidates, null, 2) : 'No supported language-server candidates were found on the captured executable search path.';
+          if (Buffer.byteLength(output) > languageLimits.resultBytes) throw new LanguageError('unsupported', 'Language candidate list exceeds the result limit.');
+          return { success: true, output, metadata: { backend: 'server', operation: 'discover', candidates } };
+        }
         const result = await service.execute(args, context);
         const output = resultText(result);
         if (args.operation === 'rename' && output.length > TOOL_OUTPUT_LIMIT) throw new LanguageError('unsupported', 'Language rename proposal exceeds the complete tool-message limit. Narrow the rename scope or use a local rename workflow; no partial patch proposal was returned.');

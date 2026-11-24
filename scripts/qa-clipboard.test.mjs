@@ -9,7 +9,7 @@ const row = (number, text) => `\x1b[${number};1H${text}\x1b[K`;
 const offer = text => `\x1b]52;c;${Buffer.from(text).toString('base64')}\x07`;
 const normalize = text => text.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '');
 
-test('waits for the complete copy result and targets the relocated painted diff', async () => {
+test('waits for the complete copy result and drags across the relocated painted diff', async () => {
   let output = row(55, diff);
   const clicks = [];
   await copyDiffSources({ read: () => output, normalize, oldSource, newSource,
@@ -27,7 +27,10 @@ test('waits for the complete copy result and targets the relocated painted diff'
       }
       assert.equal(predicate(read()), true);
     } });
-  assert.deepEqual(clicks, ['\x1b[<0;15;55M\x1b[<0;15;55m', '\x1b[<0;70;54M\x1b[<0;70;54m']);
+  assert.deepEqual(clicks, [
+    '\x1b[<0;1;55M\x1b[<32;18;55M\x1b[<0;18;55m',
+    '\x1b[<0;22;54M\x1b[<32;39;54M\x1b[<0;39;54m',
+  ]);
 });
 
 test('handles native success without changing source geometry', async () => {
@@ -40,7 +43,7 @@ test('handles native success without changing source geometry', async () => {
         + row(60, 'Copied 18 characters to the clipboard.');
     },
     waitForOutput: async (read, predicate) => assert.equal(predicate(read()), true) });
-  assert.equal(clicks[1], '\x1b[<0;70;55M\x1b[<0;70;55m');
+  assert.equal(clicks[1], '\x1b[<0;22;55M\x1b[<32;39;55M\x1b[<0;39;55m');
 });
 
 test('refuses a source row that was erased or only partially painted', async () => {

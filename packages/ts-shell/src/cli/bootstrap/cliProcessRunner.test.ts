@@ -392,6 +392,7 @@ type OutputFixtureOptions = {
   stdoutTty?: boolean;
   stderrTty?: boolean;
   plan?: 'interactive' | 'stdin-batch' | 'stdin-stream';
+  fullScreenHost?: boolean;
   rootFailure?: Error;
   bootstrapFailure?: Error;
   writeFailure?: Error;
@@ -474,7 +475,7 @@ function outputFixture(settings: OutputFixtureOptions = {}) {
     return boot as never;
   });
   vi.mocked(projectAndRenderCliStartupSurface).mockResolvedValue({
-    fullScreenHost: false, showStartupSurface: false, startupPlan: {},
+    fullScreenHost: settings.fullScreenHost ?? false, showStartupSurface: false, startupPlan: {},
   } as never);
   vi.mocked(createCliProviderRuntimeBridge).mockReturnValue({
     resolveCredentialSnapshot: () => ({}), providerModeEnv: () => undefined,
@@ -513,6 +514,30 @@ function outputFixture(settings: OutputFixtureOptions = {}) {
     dispose: () => stdin.destroy(),
   };
 }
+
+it.each([
+  { options: {}, plan: 'interactive' as const, expected: 'connection' },
+  { options: { resumeSession: true }, plan: 'interactive' as const, expected: 'resume' },
+  { options: { printMode: true }, plan: 'stdin-batch' as const, expected: 'print' },
+  { options: { rpcMode: true }, plan: 'stdin-stream' as const, expected: 'rpc' },
+])('passes only eligible startup guidance to the interactive host ($expected)', async ({ options, plan, expected }) => {
+  const fixture = outputFixture({ options, plan, fullScreenHost: true });
+  try {
+    await fixture.run();
+    if (plan !== 'interactive') {
+      expect(runInteractiveLoop).not.toHaveBeenCalled();
+      return;
+    }
+    const launch = vi.mocked(runInteractiveLoop).mock.calls[0]?.[0];
+    expect(launch).toBeDefined();
+    if (expected === 'resume') {
+      expect(launch?.resumeOnStart).toBe(true);
+      expect(launch?.connectOnStart).toBeUndefined();
+    } else {
+      expect(launch?.connectOnStart).toEqual(expect.any(Function));
+    }
+  } finally { fixture.dispose(); }
+});
 
 it.each([true, false])('runs the standalone plugin installer with an exact terminal decision (%s)', async installConfirmed => {
   const source = './package with spaces';

@@ -54,6 +54,7 @@ import { createCliStartupNotices } from './notices.js';
 import {
   runInteractiveLoop,
 } from "../interactive/interactiveLoop.js";
+import { startupConnection } from '../interactive/startup/connection.js';
 import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 import {
   runCliPrintModeRouter,
@@ -318,7 +319,7 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
     });
 
     let readline: ReadlineInterface | null = null;
-    let interactiveApprovalPrompt: ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined;
+    let interactiveApprovalPrompt: ((prompt: EscalationPrompt, signal?: AbortSignal) => Promise<InteractiveApprovalResult>) | undefined;
     const createRuntime = () => createCliSessionRuntime({
       mcpGateway,
       sessionManager,
@@ -453,6 +454,10 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
         },
         ...(options.themePaths ? { themePaths: options.themePaths } : {}),
         ...(options.resumeSession ? { resumeOnStart: true } : {}),
+        connectOnStart: startupConnection({
+          options, mode: stdinPromptCapture.cliModePlan.kind, terminal: startupSurface.fullScreenHost,
+          context: runtimeContext, provider: providerRuntimeBridge,
+        }),
         exit: shutdown.exit,
         stopSignal: stopSurface.signal,
       });

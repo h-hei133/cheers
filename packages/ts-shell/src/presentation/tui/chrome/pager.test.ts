@@ -163,6 +163,17 @@ describe("reading in the pager", () => {
     pager.handleKey("home", undefined, HEIGHT);
     expect(plain(pager.render(WIDTH, HEIGHT)).join("\n")).toContain("line 0");
   });
+
+  it('preserves wrapped rows before advancing the source page', () => {
+    const pager = new Pager();
+    const diff = Array.from({ length: 401 }, (_, index) => `+${'a'.repeat(75)} tail-${index}\n`).join('');
+    pager.openDiff('/diff', diff);
+    pager.render(120, HEIGHT);
+    pager.handlePaste('tail-399');
+    expect(plain(pager.render(120, HEIGHT)).join('\n')).toContain('tail-399');
+    pager.handleKey('pagedown', undefined, HEIGHT);
+    expect(plain(pager.render(120, HEIGHT)).join('\n')).toContain('diff part 2');
+  });
 });
 
 

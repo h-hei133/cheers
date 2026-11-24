@@ -77,7 +77,7 @@ export class PasteStore {
   /** Hold `text` and return the placeholder that stands for it. */
   hold(text: string): string {
     this.fresh = undefined;
-    const clean = normalizePaste(text);
+    const clean = text.replace(/\r\n?/g, "\n");
     const bytes = Buffer.byteLength(clean, "utf8");
     if (bytes > MAX_HELD_ENTRY_BYTES) throw new RangeError("Pasted text exceeds the input limit.");
     const id = this.nextId++;
@@ -166,7 +166,7 @@ export class PasteStore {
   /** Replace what a placeholder stands for, keeping its identity. */
   update(id: number, text: string): string {
     this.fresh = undefined;
-    const clean = normalizePaste(text);
+    const clean = text.replace(/\r\n?/g, "\n");
     const bytes = Buffer.byteLength(clean, "utf8");
     if (bytes > MAX_HELD_ENTRY_BYTES) throw new RangeError("Pasted text exceeds the input limit.");
     this.heldBytes -= this.heldSizes.get(id) ?? 0;
@@ -272,6 +272,31 @@ export class PasteStore {
     return placeholder;
   }
 
+  /** Stage every recalled image together while protecting the current and stashed drafts. */
+  restoreImages(images: readonly ImageContent[], draft: string): string | undefined {
+    if (!images.length) return '';
+    const protectedIds = new Set(this.idsIn(draft, true));
+    for (const id of this.order.keys()) {
+      if (this.protector?.(id)) protectedIds.add(id);
+    }
+    const protectedBytes = [...protectedIds].reduce((total, id) => total + (this.heldSizes.get(id) ?? this.heldImageSizes.get(id) ?? 0), 0);
+    const sizes = images.map(image => Buffer.byteLength(image.data, "utf8"));
+    if (protectedIds.size + images.length > Math.min(this.maxHeld, MAX_ISSUED) || sizes.some(bytes => bytes > MAX_HELD_ENTRY_BYTES)
+      || sizes.reduce((total, bytes) => total + bytes, protectedBytes) > this.maxHeldBytes) return undefined;
+    const previous = this.protector;
+    this.protector = id => protectedIds.has(id);
+    try {
+      return images.map(image => {
+        const id = this.nextId;
+        const placeholder = this.holdImage(image);
+        protectedIds.add(id);
+        return placeholder;
+      }).join('');
+    } finally {
+      this.protector = previous;
+    }
+  }
+
   /** The images a draft refers to, in the order their placeholders appear. */
   imagesIn(draft: string): readonly ImageContent[] {
     const images: ImageContent[] = [];
@@ -328,16 +353,6 @@ export class PasteStore {
  */
 export function replaceLiteral(subject: string, find: string, text: string): string {
   return subject.replace(find, () => text);
-}
-
-/**
- * Logical line endings, normalized the same way the editor's insert does.
- *
- * Tabs remain source characters. Their display width belongs to the editor
- * layout, including when a held paste is expanded back into the draft.
- */
-function normalizePaste(text: string): string {
-  return text.replace(/\r\n?/g, "\n");
 }
 
 /** What the draft shows in place of a held paste. */

@@ -1,11 +1,12 @@
-import type { RuntimeConfig } from '../../config/runtimeConfig.js';
+import type { RuntimeConfig, RuntimeProvider } from '../../config/runtimeConfig.js';
 import { assertScopedModel } from '../../config/scope/projection.js';
 import type { RequestPolicy } from '../../core/agent/request/model.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
+import { availablePoolConnections } from '../../core/auth/account/pool.js';
 import { catalogProvider, type CatalogModel, type CatalogProvider } from '../../core/models/catalog.js';
 import { captureInputLimits, modelSupportsVision, withDefaultImageLimits } from '../../core/models/modalities.js';
 import type { Admission } from '../../core/network/admission.js';
-import type { ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
+import { resolveProviderCredential, type ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
 import { MODEL_DISPATCH_TOOL, type ModelDispatchTool } from '../../core/tools/codemode/models.js';
 import { approvedResult, deniedResult } from '../../core/tools/toolResultLifecycle.js';
 import { DECISIONS_ENDPOINT } from '../../provider/endpoints/decisions.js';
@@ -32,26 +33,72 @@ interface MediaHost {
   readonly admission?: Admission;
 }
 
-function activeModels(host: MediaHost, ownerId: string, baseUrl: string): Map<string, CatalogModel> {
-  const { providerCredentialResolution: resolution, providerCatalog: catalog = [] } = host;
-  if (host.providerMode !== 'real' || host.runtimeConfig?.offline || resolution.blocked
-    || resolution.credential?.authMode !== 'api-key' || !resolution.credential.apiKey?.trim()
-    || resolution.credential.accountAuth) return new Map();
+type MediaRoute = { readonly provider: RuntimeProvider; readonly ownerId: string; readonly baseUrl: string };
+const IMAGE_ROUTE: MediaRoute = { provider: IMAGE_ENDPOINT, ownerId: 'openrouter', baseUrl: IMAGE_BASE };
+const DECISIONS_ROUTE: MediaRoute = { provider: 'openai', ownerId: 'openai', baseUrl: DECISIONS_BASE };
+
+function matchesMediaRoute(resolution: ProviderCredentialResolution, catalog: readonly CatalogProvider[], route: MediaRoute): boolean {
+  if (resolution.provider !== route.provider || resolution.blocked || resolution.credential?.authMode !== 'api-key'
+    || !resolution.credential.apiKey?.trim() || resolution.credential.accountAuth) return false;
   const address = providerCredentialBaseUrl(catalog, resolution)?.replace(/\/+$/, '');
-  if (address !== baseUrl) return new Map();
-  const { ambiguous, entry } = catalogProvider(catalog, resolution.provider, address);
-  if (ambiguous || entry?.id !== ownerId || entry.runtime !== resolution.provider
-    || entry.baseUrl?.replace(/\/+$/, '') !== baseUrl) return new Map();
-  const counts = new Map<string, number>();
-  for (const model of entry.models) counts.set(model.id, (counts.get(model.id) ?? 0) + 1);
-  return new Map(entry.models.filter(model => counts.get(model.id) === 1 && model.input?.includes('text')
-    && (host.runtimeConfig?.allowedModels === undefined || host.runtimeConfig.allowedModels.includes(`${resolution.provider}/${model.id}`)))
-    .map(model => [model.id, model]));
+  return address === route.baseUrl;
 }
 
-function boundModel(host: MediaHost, model: CatalogModel, baseUrl: string, endpoint: string) {
+function mediaResolution(host: MediaHost, route: MediaRoute): ProviderCredentialResolution | undefined {
+  const { runtimeConfig: config, providerCredentialResolution: main, providerCatalog: catalog = [] } = host;
+  if (host.providerMode !== 'real' || config?.offline || config?.configValidation.valid === false) return undefined;
+  // The session's closed pool also bounds auxiliary provider calls.
+  if (config?.accountPool?.[main.provider] && main.provider !== route.provider) return undefined;
+  const pool = config?.accountPool?.[route.provider];
+  const eligible = (resolution: ProviderCredentialResolution) => matchesMediaRoute(resolution, catalog, route);
+  const poolMembers = pool && config ? availablePoolConnections({ config, provider: route.provider }) : undefined;
+  if (eligible(main) && (!pool || poolMembers?.some(member => member.id === main.credential?.connectionId))) return main;
+  if (!config) return undefined;
+
+  const candidates = poolMembers ?? config.providerConnections.filter(connection => connection.autoSelect !== false);
+  const bindings = candidates.flatMap(connection => {
+    if (connection.provider !== route.provider || config.providerConnections.filter(item => item.id === connection.id).length !== 1) return [];
+    // A generic API-key connection must name its endpoint itself. A bare native
+    // connection uses its built-in endpoint, never a different profile's relay.
+    const ownerAddress = connection.baseUrl?.replace(/\/+$/, '') ?? (route.provider === 'openai' ? DECISIONS_BASE : undefined);
+    if (ownerAddress !== route.baseUrl) return [];
+    const resolution = resolveProviderCredential({ runtimeConfig: { ...config,
+      provider: route.provider, activeProviderConnectionId: connection.id,
+      sessionConnection: { id: connection.id, provider: route.provider } }, env: {} });
+    return resolution.credential?.connectionId === connection.id && eligible(resolution) ? [resolution] : [];
+  });
+  if (bindings.length === 1) return bindings[0];
+  if (pool) {
+    // Preserve the normal session affinity when the pool chooses this endpoint.
+    const selected = resolveProviderCredential({ runtimeConfig: { ...config, provider: route.provider,
+      activeProviderConnectionId: undefined, sessionConnection: undefined }, env: {}, pool: { sessionId: host.sessionId } });
+    return bindings.find(binding => binding.credential?.connectionId === selected.credential?.connectionId);
+  }
+  if (bindings.length > 1) return undefined;
+
+  const profile = resolveProviderCredential({ runtimeConfig: { ...config, provider: route.provider,
+    activeProviderConnectionId: undefined, sessionConnection: { scope: 'provider', provider: route.provider } }, env: {} });
+  return eligible(profile) ? profile : undefined;
+}
+
+function mediaModels(host: MediaHost, route: MediaRoute) {
+  const catalog = host.providerCatalog ?? [];
+  const { ambiguous, entry } = catalogProvider(catalog, route.provider, route.baseUrl);
+  if (ambiguous || entry?.id !== route.ownerId || entry.runtime !== route.provider
+    || entry.baseUrl?.replace(/\/+$/, '') !== route.baseUrl) return undefined;
+  const resolution = mediaResolution(host, route);
+  if (!resolution) return undefined;
+  const counts = new Map<string, number>();
+  for (const model of entry.models) counts.set(model.id, (counts.get(model.id) ?? 0) + 1);
+  const models = new Map(entry.models.filter(model => counts.get(model.id) === 1 && model.input?.includes('text')
+    && (host.runtimeConfig?.allowedModels === undefined || host.runtimeConfig.allowedModels.includes(`${resolution.provider}/${model.id}`)))
+    .map(model => [model.id, model]));
+  return { resolution, models };
+}
+
+function boundModel(host: MediaHost, credential: ProviderCredentialResolution, model: CatalogModel, baseUrl: string, endpoint: string) {
   const modelId = model.id;
-  const resolution = { ...host.providerCredentialResolution, model: modelId };
+  const resolution = { ...credential, model: modelId };
   assertScopedModel(host.runtimeConfig, resolution);
   const target = providerRequestTarget({ resolution, baseUrl, endpoint,
     workspaceRoot: host.workspaceRoot, sessionId: host.sessionId });
@@ -76,10 +123,11 @@ function refused(error: unknown, fallback: string) {
 }
 
 export function imageGenerationTool(host: MediaHost): ModelDispatchTool | undefined {
-  if (host.providerCredentialResolution.provider !== IMAGE_ENDPOINT) return undefined;
-  const models = activeModels(host, 'openrouter', IMAGE_BASE);
+  const target = mediaModels(host, IMAGE_ROUTE);
+  if (!target) return undefined;
+  const { resolution, models } = target;
   for (const [id, model] of models) {
-    const endpoint = providerCredentialEndpoint(host.providerCatalog ?? [], { ...host.providerCredentialResolution, model: id }, IMAGE_BASE);
+    const endpoint = providerCredentialEndpoint(host.providerCatalog ?? [], { ...resolution, model: id }, IMAGE_BASE);
     if (model.modelType !== 'image' || !model.output?.includes('image')
       || endpoint !== undefined && endpoint !== IMAGE_ENDPOINT
       || model.compat?.endpoint !== undefined && model.compat.endpoint !== IMAGE_ENDPOINT) models.delete(id);
@@ -92,7 +140,7 @@ export function imageGenerationTool(host: MediaHost): ModelDispatchTool | undefi
       throw new Error('Choose an available image model and provide a text prompt within 8 KiB.');
     }
     const references = captureMediaImages(args.references, modelSupportsVision(model));
-    const request = boundModel(host, model, IMAGE_BASE, IMAGE_ENDPOINT);
+    const request = boundModel(host, resolution, model, IMAGE_BASE, IMAGE_ENDPOINT);
     const outputText = model.output?.includes('text') === true;
     return {
       targets: [], permissionArgs: Object.freeze({ model: model.id, prompt, endpoint: IMAGE_BASE, references: mediaImageProof(references) }),
@@ -110,7 +158,7 @@ export function imageGenerationTool(host: MediaHost): ModelDispatchTool | undefi
     [MODEL_DISPATCH_TOOL]: true,
     name: 'generate_image',
     resultAdmission: host.admission,
-    description: 'Generate an image with an admitted model on the active connection. Include verified inline references for models that accept images.',
+    description: 'Generate an image with a configured image model. Include verified inline references for models that accept images.',
     argsSchema: { type: 'object', additionalProperties: false, required: ['model', 'prompt'],
       properties: { model: { type: 'string', enum: [...models.keys()] }, prompt: { type: 'string' }, references: mediaImagesSchema } },
     prepare, async execute(args, context) { return prepare(args).execute(context); },
@@ -118,8 +166,9 @@ export function imageGenerationTool(host: MediaHost): ModelDispatchTool | undefi
 }
 
 export function classificationTool(host: MediaHost): ModelDispatchTool | undefined {
-  if (host.providerCredentialResolution.provider !== 'openai') return undefined;
-  const models = activeModels(host, 'openai', DECISIONS_BASE);
+  const target = mediaModels(host, DECISIONS_ROUTE);
+  if (!target) return undefined;
+  const { resolution, models } = target;
   for (const [id, model] of models) {
     if (model.modelType !== 'classifier' || model.compat?.endpoint !== DECISIONS_ENDPOINT) models.delete(id);
   }
@@ -129,7 +178,7 @@ export function classificationTool(host: MediaHost): ModelDispatchTool | undefin
     if (!model) throw new Error('Choose an available classification model.');
     const { state, questions } = captureQuestions(args.state, args.questions);
     const images = captureMediaImages(args.images, modelSupportsVision(model));
-    const request = boundModel(host, model, DECISIONS_BASE, DECISIONS_ENDPOINT);
+    const request = boundModel(host, resolution, model, DECISIONS_BASE, DECISIONS_ENDPOINT);
     return {
       targets: [], previewKind: 'execution' as const,
       permissionArgs: Object.freeze({ model: model.id, endpoint: DECISIONS_BASE, state, questions, images: mediaImageProof(images) }),
@@ -146,9 +195,13 @@ export function classificationTool(host: MediaHost): ModelDispatchTool | undefin
     [MODEL_DISPATCH_TOOL]: true,
     name: 'classify',
     resultAdmission: host.admission,
-    description: 'Classify state and optional inline images with an admitted classification model on the active connection.',
+    description: 'Classify state and optional inline images with a configured classification model.',
     argsSchema: { type: 'object', additionalProperties: false, required: ['model', 'state', 'questions'],
       properties: { model: { type: 'string', enum: [...models.keys()] }, state: { type: 'object' }, questions: questionsSchema, images: mediaImagesSchema } },
     prepare, async execute(args, context) { return prepare(args).execute(context); },
   };
+}
+
+export function mediaTools(host: MediaHost): ModelDispatchTool[] {
+  return [imageGenerationTool(host), classificationTool(host)].filter(tool => tool !== undefined);
 }

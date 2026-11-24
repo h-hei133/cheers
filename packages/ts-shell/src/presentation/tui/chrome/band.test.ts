@@ -58,6 +58,12 @@ describe("status band", () => {
     expect(band).not.toContain("main");
   });
 
+  it('shows measured cache hits by default and respects explicit choices', () => {
+    const measured = { ...facts, cacheHitRate: 42.5 };
+    expect(stripAnsi(renderBand(measured, DEFAULT_STATUS_ITEMS, 80))).toContain('cache 42.5%');
+    expect(stripAnsi(renderBand(measured, ['model'], 80))).not.toContain('cache');
+  });
+
   it("never renders as an empty coloured stripe", () => {
     // Every configured item having nothing to say would otherwise read as a bug.
     expect(stripAnsi(renderBand(facts, ["cost"], 40)).trim()).toBe("opus-5");

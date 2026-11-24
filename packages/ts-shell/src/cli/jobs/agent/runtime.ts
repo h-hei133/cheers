@@ -103,7 +103,10 @@ export async function captureAgentRuntime(host: JobsComposition, input: AgentRun
           escalationPromptHandler: async prompt => {
             const denied = { decision: 'deny' as const, promptId: prompt.id, respondedAt: Date.now() };
             if (signal.aborted || admit() || !gate.escalationPromptHandler) return denied;
-            const response = await gate.escalationPromptHandler({ ...prompt, title: `Agent ${job.id}: ${prompt.title}` });
+            host.agents.setWaitingForPerson(job.id, run.id, prompt.id, true);
+            let response;
+            try { response = await gate.escalationPromptHandler({ ...prompt, title: `Agent ${job.id}: ${prompt.title}` }); }
+            finally { host.agents.setWaitingForPerson(job.id, run.id, prompt.id, false); }
             return signal.aborted || admit() ? denied : response;
           },
           onPromptAccepted: () => {

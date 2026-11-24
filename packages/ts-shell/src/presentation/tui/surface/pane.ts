@@ -300,8 +300,14 @@ export class TranscriptPane {
       if (!line) return undefined;
       if (line.split !== undefined) {
         const text = side === "right" ? line.right : line.left;
-        if (text === undefined) return undefined;
-        selected.push({ ...line, text });
+        if (text === undefined) {
+          if (row === from.row) return undefined;
+          continue;
+        }
+        const continues = side === "right" ? line.rightContinues : line.leftContinues;
+        const terminalNewline = side === "right" ? line.rightTerminalNewline : line.leftTerminalNewline;
+        selected.push({ ...line, text, breakAfter: continues ? "soft" : "logical",
+          ...(terminalNewline ? { terminalNewline: true } : {}) });
         continue;
       }
       if (sideSelectable) return undefined;

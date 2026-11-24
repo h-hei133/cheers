@@ -5,6 +5,8 @@ import { selectTheme, selectedTheme } from '../../../presentation/theme/selectio
 import { currentTheme } from '../../../presentation/theme/theme.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 import { settingsPicker } from './settings.js';
+import { opensPicker, pickerFor, type PickerHost } from './registry.js';
+import type { PickerOutcome } from '../overlay.js';
 import { OverlayHost } from '../overlay.js';
 import type { SettingsDraft, SettingsSaveResult } from '../settings.js';
 
@@ -91,4 +93,49 @@ it.each([true, false])('rejects stale preview callbacks after a newer accepted c
   if (started) picker.previewChange!([light]); selectTheme('dark');
   picker.previewChange!([light]); expect(currentTheme()).toBe('dark');
   picker.previewEnd!(); expect(currentTheme()).toBe('dark');
+});
+
+it('opens the bare theme command as a live session picker and leaves named forms to the command', async () => {
+  const h = host();
+  h.themes.names = () => ['auto', 'dark', 'dark-contrast', 'light'];
+  const pickerHost = { ...h, commandContext: { cwd: process.cwd() } } as PickerHost;
+  const picker = pickerFor('/theme', pickerHost)!;
+  expect(opensPicker('/theme')).toBe(true);
+  expect(opensPicker('/theme list')).toBe(false);
+  expect(opensPicker('/theme light')).toBe(false);
+  expect(pickerFor('/theme light', pickerHost)).toBeUndefined();
+  const overlay = new OverlayHost(() => {});
+  overlay.open(picker);
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(picker.initialSelection).toBe('dark');
+  overlay.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+  const previewed = currentTheme();
+  expect(previewed).toBe('dark-contrast');
+  expect(selectedTheme()).toBe('dark');
+  let outcome: Promise<PickerOutcome | undefined> | undefined;
+  overlay.handleKey(parseKeyEvent('\r'), (active, ids) => { outcome = active.apply(ids, overlay.acceptanceFor(active)); });
+  expect((await outcome)?.note).toContain('for this session');
+  expect(selectedTheme()).toBe(previewed);
+  expect(currentTheme()).toBe(previewed);
+  expect(h.save).not.toHaveBeenCalled();
+});
+
+it('restores the accepted theme after dismissing the picker and refuses an outdated choice', async () => {
+  const h = host();
+  const pickerHost = { ...h, commandContext: { cwd: process.cwd() } } as PickerHost;
+  const picker = pickerFor('/theme', pickerHost)!;
+  await picker.load();
+  picker.previewChange!(['light']);
+  expect(currentTheme()).toBe('light');
+  picker.previewEnd!();
+  expect(currentTheme()).toBe('dark');
+  expect(await picker.apply(['light'])).toBeUndefined();
+
+  const stale = pickerFor('/theme', pickerHost)!;
+  await stale.load();
+  selectTheme('dark-contrast');
+  expect((await stale.apply(['light']))?.note).toContain('Reopen /theme');
+  expect(currentTheme()).toBe('dark-contrast');
+  expect(h.save).not.toHaveBeenCalled();
 });

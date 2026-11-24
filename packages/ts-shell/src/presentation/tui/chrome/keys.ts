@@ -79,7 +79,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     negotiated: true,
   },
   { keys: ["ctrl+q"], does: "queue the draft to run after the current turn", group: "sending" },
-  { keys: ["tab"], does: "complete a command name", group: "sending" },
+  { keys: ["tab"], does: "complete a candidate or queue the draft during a turn", group: "sending" },
+  { keys: ["alt+up"], does: "bring the last pending message back to the draft", group: "sending" },
   { keys: ["ctrl+s", "alt+s"], does: "set the draft aside, or take it back", group: "sending" },
   {
     keys: ["escape"],

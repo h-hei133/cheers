@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createUnifiedDiff, renderDiff, renderSideBySide } from "./diff.js";
+import { createUnifiedDiff, layoutSideBySide, renderDiff, renderSideBySide } from "./diff.js";
 import { nextDiffPage } from "./diffPage.js";
 import { stripAnsi } from "../text/ansi.js";
 import { visibleWidth } from "../text/measure.js";
@@ -203,8 +203,39 @@ describe("side-by-side diff", () => {
   });
 
   it("keeps every row inside the width, including wide glyphs", () => {
-    const rows = renderSideBySide("@@ -1 +1 @@\n-中文内容\n+中文更新", 120);
+    const rows = renderSideBySide("@@ -100000 +1 @@\n-" + "中文内容".repeat(16) + "\n+中文更新", 120);
+    expect(rows.length).toBeGreaterThan(2);
     for (const row of rows) expect(visibleWidth(row)).toBeLessThanOrEqual(120);
+  });
+
+  it('wraps old and new lines at grapheme boundaries and aligns the context after the pair', () => {
+    const old = 'a'.repeat(50) + '👩‍💻' + 'é'.repeat(60) + ' old tail';
+    const next = 'new value';
+    const layout = layoutSideBySide(`@@ -8,2 +12,2 @@\n-${old}\n+${next}\n context`, 120);
+    expect(layout.rows).toHaveLength(5);
+    expect(layout.sources.slice(1, 4).map(source => source?.left).join('')).toBe(old);
+    expect(layout.sources[1]).toMatchObject({ left: 'a'.repeat(50), right: next, leftContinues: true, rightContinues: false });
+    expect(layout.sources[2]?.left).toMatch(/^👩‍💻é/);
+    expect(layout.sources[2]?.right).toBeUndefined();
+    expect(stripAnsi(layout.rows[2]!)).toMatch(/^\s+│/);
+    expect(stripAnsi(layout.rows[4]!)).toMatch(/9\s+13\s+│ context/);
+    expect(new Set(layout.sources.slice(1).map(source => source?.split)).size).toBe(1);
+  });
+
+  it('continues the longer right side and wraps the same context on both sides', () => {
+    const context = 'context words '.repeat(8);
+    const layout = layoutSideBySide(`-old\n+${'a'.repeat(65)}\n ${context}`, 100);
+    expect(layout.sources[0]).toMatchObject({ left: 'old', right: 'a'.repeat(41), rightContinues: true });
+    expect(layout.sources[1]).toMatchObject({ right: 'a'.repeat(24), rightContinues: false });
+    expect(layout.sources[1]?.left).toBeUndefined();
+    expect(layout.sources.slice(2).map(source => source?.left).join('')).toBe(context);
+    for (const source of layout.sources.slice(2)) expect(source?.left).toBe(source?.right);
+  });
+
+  it('marks truncation when wrapped rows exhaust the inline row budget', () => {
+    const rows = renderSideBySide(`@@ -1 +1 @@\n-${'a'.repeat(120)}\n+b`, 100, { maxRows: 3 }).map(stripAnsi);
+    expect(rows).toHaveLength(3);
+    expect(rows.at(-1)).toContain('truncated');
   });
 
   it("continues old/new line numbers when a pager renders the next chunk", () => {

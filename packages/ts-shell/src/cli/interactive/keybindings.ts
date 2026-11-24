@@ -75,7 +75,7 @@ export const KEY_ACTIONS: Record<string, KeybindingDefinition> = {
     description: "Insert a new line instead of sending",
   },
   "tui.input.submit": { defaultKeys: ["enter"], description: "Send the prompt" },
-  "tui.input.tab": { defaultKeys: ["tab"], description: "Complete the highlighted candidate" },
+  "tui.input.tab": { defaultKeys: ["tab"], description: "Complete the highlighted candidate or queue the draft during a turn" },
   "tui.input.stash": {
     // `alt+s` as well because `ctrl+s` is XOFF: a terminal that still has flow
     // control enabled, or a multiplexer that forwards it, swallows the key
@@ -98,6 +98,7 @@ export const KEY_ACTIONS: Record<string, KeybindingDefinition> = {
   "app.exit": { defaultKeys: ["ctrl+d"], description: "Exit when the draft is empty" },
   "app.clearScreen": { defaultKeys: ["ctrl+l"], description: "Clear the screen" },
   "app.message.followUp": { defaultKeys: ["ctrl+q"], description: "Queue the draft to run after the turn; sends it now when idle" },
+  "app.message.recall": { defaultKeys: ["alt+up"], description: "Bring the last pending message back to the draft" },
   "app.agentMode.cycle": { defaultKeys: ["shift+tab"], description: "Switch between planning and building" },
   "app.thinkingBlocks.toggle": { defaultKeys: ["ctrl+t"], description: "Collapse or expand thinking blocks" },
   "app.tools.expand": { defaultKeys: ["ctrl+o"], description: "Collapse or expand tool output" },

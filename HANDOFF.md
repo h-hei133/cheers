@@ -59,12 +59,13 @@ Long wrapped Unicode lines can spend over 30 seconds in terminal layout on Node 
 ### Sandboxed Hooks Must Expose Non-System `process.execPath`
 - **Symptom**: `PreToolUse` / `Stop` hooks fail under `bwrap` when Cheers runs via `nvm` Node or a compiled single-file executable outside `/usr`/`/bin`/`/opt`.
 - **Root Cause**: `bwrap` only read-only mounts `sandboxSystemReadRoots` and the workspace; executables under `$HOME` are invisible inside the namespace.
-- **Rule**: Pass `readOnlyRoots: [process.execPath]` when planning sandboxed hook commands (`writeGate` / `completionGate`), and log a warning whenever the persistent write-gate stdio worker falls back to one-shot execution.
+- **Rule**: Bind `process.execPath` read-only when planning sandboxed hooks. A packaged hook also needs an explicit read-only bind for its verified profile artifact file. Report persistent write-gate stdio fallback to one-shot execution.
 
 ### Startup Metrics Must Follow Real Surface Readiness
 - **Symptom**: Benchmarks misreport first-frame latency or PTY probes send input before a view finishes returning.
 - **Root Cause**: Prepaint, runtime adoption, and stream flush are separate lifecycle events.
 - **Rule**: Synchronize terminal assertions on concrete rendered chrome/focus markers and wait for child process exit and stream close before tearing down fixtures.
+- **PTY command handoff**: A save/result notice can render before its picker fully closes. Wait for the ordinary input prompt before sending the next command.
 
 ---
 
@@ -79,6 +80,11 @@ Long wrapped Unicode lines can spend over 30 seconds in terminal layout on Node 
 - **Symptom**: Cost, cache-miss estimation, or tiered pricing drifts when models or catalogs reload mid-session.
 - **Root Cause**: Re-reading mutable catalogs after completion loses the exact rate schedule and cache window that governed the sent request.
 - **Rule**: Capture exact endpoint address, pricing tier, and cache retention window before transport handoff; keep `unknown` / `partial` usage and absent prices visible rather than fabricating zero.
+
+### Stream Idle Time Starts With A Pending Byte Read
+- **Symptom**: An idle deadline kills a slow consumer even though the provider continues to stream, or never-ending custom streams hang without a deadline.
+- **Root Cause**: Timing the whole parse loop charges consumer work, while configured native dispatchers do not cover arbitrary injected streams.
+- **Rule**: Time only each pending upstream byte read, reset when bytes arrive, propagate caller cancellation unchanged, and leave native transport deadline ownership explicit.
 
 ---
 
@@ -96,6 +102,11 @@ Long wrapped Unicode lines can spend over 30 seconds in terminal layout on Node 
 - **Symptom**: A dismissed picker saves stale state, a revoked grant reads attachment content, or a late reload resurrects a closed host/extension.
 - **Root Cause**: Capturing permissions, picker closures, or catalog snapshots before an `await` allows stale generations to commit after dismissal, revocation, or reload.
 - **Rule**: Bind actions to explicit host/extension generations, recheck admission, cancellation, and live grants after every async boundary, and consume one-shot actions once.
+
+### Approval Freshness Must Be Rechecked After Recovery Snapshots
+- **Symptom**: A reviewed patch writes a baseline derived from source files that changed while its recovery records were being prepared.
+- **Root Cause**: Patch approval awaits recovery snapshot persistence before acquiring native target locks and committing files.
+- **Rule**: Bind dependent source and destination freshness checks to the native patch's pre-commit boundary. Ignore only the internal recovery-state subtree when its directory metadata changes because of that same operation.
 
 ### Reopen & Picker Focus Must Preserve Accepted Values Without Silent Normalization
 - **Symptom**: Pressing Enter on an effort/settings/model chooser overwrites a saved preference with the first option when the saved option is unavailable or filtered out.
@@ -137,6 +148,10 @@ Long wrapped Unicode lines can spend over 30 seconds in terminal layout on Node 
 ### Script Model Helpers Require The Host's Media Tool
 - **Symptom**: A script calling a model helper invokes an unrelated tool that has the same name as a media tool.
 - **Rule**: Require the captured host media definition before dispatch. Keep the nested call on the ordinary permission path.
+
+### Script Result Text Has Separate Authority From Effects
+- **Symptom**: A text replacement obscures a stopped script, or an internal change preview comes from an unexecuted patch group.
+- **Rule**: Capture hook text as inert data and recheck the original registration and declaration. Preserve the outer stop status and nested effect receipts. Project internal diffs from the owner's committed change and approved selection.
 
 ### Discovery Shutdown Must Match The Owner's Abort Reason
 - **Symptom**: Closing MCP misreports a cancelled handshake as a cleanup failure.

@@ -10,6 +10,7 @@ export function agentProjection(host: JobsComposition, job: AgentJob) {
   return { id: job.id, backend: job.backend, prompt: job.prompt, childSessionId: job.childSessionId,
     origin: job.origin, status: !bound || job.status === 'running' && !liveOwner ? 'unknown' : job.status,
     storedStatus: job.status, liveOwner, detached: !bound, checkpoint: job.checkpoint, runs: job.runs,
+    ...(host.agents.waitsForPerson(job.id) ? { waitsForPerson: true } : {}),
     output: job.output, truncated: job.truncated, note: job.note, completionProof: false };
 }
 export function agentPage(job: AgentJob, offset: number): string {

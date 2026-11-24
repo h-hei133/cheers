@@ -5,6 +5,7 @@ import type { JobsComposition } from '../../jobs/model.js';
 import type { Option } from '../../../presentation/tui/chrome/options.js';
 import type { Picker } from '../overlay.js';
 import { captureWorkspaceRoot } from '../../../core/workspace/roots.js';
+import { sameValue } from '../../../config/values.js';
 
 /** One job as the chooser shows it, independent of the backend's extra fields. */
 interface JobRow {
@@ -13,6 +14,7 @@ interface JobRow {
   readonly status: string;
   readonly summary: string;
   readonly detail: readonly string[];
+  readonly waitsForPerson?: true;
 }
 
 /**
@@ -24,9 +26,9 @@ interface JobRow {
  * its own; the interval dies with the subscription.
  */
 export function hubPicker(jobs: JobsComposition): Picker {
-  const rows: JobRow[] = [];
   const details = new Map<string, readonly string[]>();
-  let offered = new Set<string>();
+  let rows: readonly JobRow[] = [];
+  let options: readonly Option[] | undefined;
   const initialSession = jobs.session;
   let initialWorkspace: ReturnType<typeof captureWorkspaceRoot> | undefined;
   try {
@@ -47,16 +49,15 @@ export function hubPicker(jobs: JobsComposition): Picker {
     }
   };
   const safe = (value: unknown, max: number): string => safeReport(value, max);
-  const refresh = (): readonly Option[] => {
+  const refresh = (): readonly Option[] | undefined => {
     const hub = hubProjection(jobs);
-    rows.length = 0;
-    details.clear();
-    offered = new Set<string>();
+    const next: JobRow[] = [];
     for (const job of hub.jobs as readonly Record<string, unknown>[]) {
       const id = typeof job.id === 'string' ? job.id : '';
       if (!id) continue;
       const kind = safe(typeof job.backend === 'string' ? job.backend : typeof job.kind === 'string' ? job.kind : 'job', 80);
       const status = safe(typeof job.status === 'string' ? job.status : 'unknown', 80);
+      const waitsForPerson = job.waitsForPerson === true;
       const storedStatus = typeof job.storedStatus === 'string' ? safe(job.storedStatus, 80) : undefined;
       const summary = typeof job.command === 'string' ? safe(job.command, 240)
         : typeof job.note === 'string' ? safe(job.note, 240) : `${kind} ${safe(id, 80).slice(0, 8)}`;
@@ -67,15 +68,20 @@ export function hubPicker(jobs: JobsComposition): Picker {
         ...(typeof job.timeoutMs === 'number' ? [`Deadline: ${job.timeoutMs} ms`] : []),
         ...(typeof job.exitCode === 'number' ? [`Exit: ${job.exitCode}`] : []),
         ...(job.liveOwner === true ? ['Live owner: yes'] : []),
+        ...(waitsForPerson ? ['Waiting for your approval'] : []),
         ...(job.detached === true ? ['Detached from this session'] : []),
         ...(job.dispatchPossible === true ? ['Dispatch possible: yes'] : []),
         `Output: ${safe(typeof job.output === 'string' ? job.output : 'unknown', 80)}`,
       ];
-      rows.push({ id, kind, status, summary, detail });
-      details.set(id, detail);
-      offered.add(id);
+      next.push({ id, kind, status, summary, detail, ...(waitsForPerson ? { waitsForPerson: true } : {}) });
     }
-    return rows.map(row => ({ id: row.id, label: `${row.kind} ${safe(row.id, 80).slice(0, 8)}`, detail: row.summary, note: row.status }));
+    if (options && sameValue(rows, next)) return undefined;
+    rows = next;
+    details.clear();
+    for (const row of rows) details.set(row.id, row.detail);
+    options = rows.map(row => ({ id: row.id, label: `${row.kind} ${safe(row.id, 80).slice(0, 8)}`,
+      detail: row.summary, note: row.waitsForPerson ? 'approval required' : row.status }));
+    return options;
   };
   return {
     title: 'Jobs',
@@ -83,12 +89,15 @@ export function hubPicker(jobs: JobsComposition): Picker {
     empty: 'No jobs, agents or workflows in this session.',
     isCurrent,
     status: () => isCurrent() ? undefined : 'Session or workspace changed. Reopen /hub.',
-    async load() { return isCurrent() ? refresh() : []; },
+    async load() { return isCurrent() ? refresh() ?? options ?? [] : []; },
     subscribe(publish) {
       if (!isCurrent()) return () => {};
       const timer = setInterval(() => {
         if (!isCurrent()) return;
-        try { publish(refresh()); } catch { /* a journal that cannot be read keeps the last rows */ }
+        try {
+          const changed = refresh();
+          if (changed) publish(changed);
+        } catch { /* a journal that cannot be read keeps the last rows */ }
       }, 1000);
       timer.unref?.();
       return () => clearInterval(timer);
@@ -96,7 +105,7 @@ export function hubPicker(jobs: JobsComposition): Picker {
     detail: id => (id ? details.get(id) ?? [] : []),
     async apply(ids) {
       const id = ids[0];
-      if (!id || ids.length !== 1 || !offered.has(id) || !isCurrent()) return undefined;
+      if (!id || ids.length !== 1 || !details.has(id) || !isCurrent()) return undefined;
       let job;
       try { job = jobs.local.get(id); } catch { job = undefined; }
       if (job) {

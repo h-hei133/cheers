@@ -34,6 +34,8 @@ export interface Block {
    * the tool's name says that something happened, not what.
    */
   detail?: string;
+  code?: string;
+  nestedCallCount?: number;
   text: string;
   readonly report?: CommandReport;
   /** Unified diff rendered below the body, for edit-shaped tools. */
@@ -232,6 +234,10 @@ function renderTool(block: Block, width: number, options: BlockRenderOptions = {
   if (block.collapsed === true) {
     const rows = [`${GUTTER}${glyph} ${name}${detail}`];
     for (const note of notes) rows.push(...wrapToWidth(defaultTheme.dim(note), width));
+    if (block.code) {
+      const label = block.nestedCallCount === undefined ? 'Code' : `Code (${block.nestedCallCount} tools)`;
+      rows.push(defaultTheme.dim(`  ↳ ${label} · click to expand`));
+    }
     if (block.diff) {
       rows.push(...renderDiff(block.diff, width - BODY_INDENT.length, { sideBySide: width >= 100 }).map((row) => `${BODY_INDENT}${row}`));
     } else if (body) {
@@ -261,6 +267,15 @@ function renderTool(block: Block, width: number, options: BlockRenderOptions = {
     const formattedCmd = block.title === "bash" ? formatCommandLine(block.detail) : defaultTheme.fg("filename", block.detail);
     for (const wrapped of wrapToWidth(formattedCmd, inner - 2)) {
       rows.push(`${defaultTheme.fg("border", "│")} ${padToWidth(wrapped, inner - 2)} ${defaultTheme.fg("border", "│")}`);
+    }
+  }
+
+  if (block.code) {
+    const codeLabel = block.nestedCallCount === undefined ? ' Code ' : ` Code (${block.nestedCallCount} tools) `;
+    const fill = Math.max(0, inner - visibleWidth(codeLabel));
+    rows.push(defaultTheme.fg("borderAccent", `├${codeLabel}${"─".repeat(fill)}┤`));
+    for (const line of wrapAll(block.code, inner - 2)) {
+      rows.push(`${defaultTheme.fg("border", "│")} ${padToWidth(defaultTheme.fg("toolOutput", line), inner - 2)} ${defaultTheme.fg("border", "│")}`);
     }
   }
 
