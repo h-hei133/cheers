@@ -86,7 +86,7 @@ E.5本批实际L／额外依赖3（blocked publication独立撤权、原共享ho
 
 | Date | Evidence and next action |
 | --- | --- |
-| 2026-11-24 | 后续路线图 Batch 0.5 与 Batch 1–4 本地范围已实现并验收。修复并验证重复 TS/单文件构建产物摘要稳定；用户确认后补齐 MIT LICENSE 与 package metadata。Linux v0.1.0 构建通过，标签发布 workflow 待触发。B0.6 仍部分验证。细节见 [路线图执行记录](roadmap-tasks.md)。 |
+| 2026-11-24 | 后续路线图 Batch 0.5 与 Batch 1–4 本地范围已实现并验收。修复并验证重复 TS/单文件构建产物摘要稳定；补齐 MIT LICENSE 与 metadata；标签 `v0.1.0` 的 GitHub Release run `45310333037` 已发布 Linux/macOS 三个平台资产。B0.6 仍部分验证，B2.7/B3.5 继续按生命周期边界暂缓。细节见 [路线图执行记录](roadmap-tasks.md)。 |
 | 2026-11-22 | `13b40efe` 完成分叉目录发布和转录字节校验。`7cbad149` 修复两处断链，普通创建复用暂存发布，根重绑使用 v5 注册表回执。`374b21a0` 验证安装 worker 准入、实时消息渲染和精确 stdio MCP 撤权，E.7 完成，56/62。 |
 | 2026-11-21 | `e72fad7` 提交受保护恢复的注册表回执与读取快照。`e5f9a28` 提交 SDK 扩展 MCP 隔离、受控重载持久设置及网关快照归位。联合六项静态检查、23 文件 331 项、Linux 构建 `bd359e1bca57`、固定归档结构判定 `proven`。两项继续开放，55/62 已验收。 |
 | 2026-11-21 | Batch 4 完成 E.4 Codemode 确定性重放（环境/源码/输入绑定、固定时钟与种子 PRNG、有序只读目录 RPC 追踪与副作用零重派发），并修复全量同步模型目录元数据上限与 worker `execArgv` 隔离缺陷。六门、7 套件 126 项、build `d853f94c600c`、三进程编译产物重放/漂移测试、配置模型真实 `record`→`replay_id` 逐字节一致实测与 `normproof judge` `proven` 通过；51/62 完成，11 项开放。 |

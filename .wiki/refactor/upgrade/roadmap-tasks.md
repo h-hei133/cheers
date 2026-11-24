@@ -1,6 +1,6 @@
 # 2026-11 路线图执行记录
 
-**状态**：Batch 0–4 的本地实现已通过 Linux 定向验收并分批提交。Batch 0 真实模型路由仍部分未证实；Batch 4 的 MIT LICENSE 已按权利人信息补齐，版本标签的公开 Release workflow 尚未触发。
+**状态**：Batch 0–4 的本地实现已通过定向验收并分批提交，v0.1.0 公开 Release 已发布。Batch 0 真实模型路由仍部分未证实；B2.7 长脚本后台化与 B3.5 自动晋升/前台优先槽按已核实的生命周期边界继续暂缓。
 **任务范围**：核实并执行 `.wiki/wiki/references/codex-and-frontier-gap-audit-2026-11.md` 与 `.wiki/wiki/references/cheers-next-phase-roadmap-2026-11.md` 中的后续批次。
 **基线**：2026-11-23，源码提交 `f65ba979`。
 
@@ -17,7 +17,7 @@
 | Batch 1 | Linux 本地验收通过，已提交 | 请求前缀、工具发现、缓存 usage/状态、Responses 摘要前缀复用、Bedrock cachePoint 和 capability 反转均通过定向测试。提交 `ab7312f3` 与接线补充 `976847c3`。真实 BaiLu cache-read 为 0、384、640 tokens，但无输入 token 分母，未报告命中率百分比。 |
 | Batch 2 | Linux 本地验收通过，已提交 | 嵌套调用 fail-closed、拒绝终止分类、逐调用审批、审批等待暂停、receipt/diff、代码折叠和 PostToolUse 脱敏通过定向测试。字面 shell 模板复用现有 gated bash。提交 `d006c981`。重复调用观察器与共享工具执行 owner 同批集成。长脚本后台晋升按现有生命周期反证暂缓，详见 `script-jobs.md`。 |
 | Batch 3 | 四模式 Linux CLI 验收通过，已提交 | 命令面板、主题预览入口、并排 diff 换行、Tab/Alt+Up、首次连接引导、受控 LSP 候选、重复调用提醒、job 观察及 stream idle watchdog 通过定向测试及四模式 smoke。提交 `b06ec6d0`。五秒后台晋升暂缓。 |
-| Batch 4 | LICENSE 与本地发布资格已验收；公开 Release workflow 待触发 | README、INSTALL、发布 workflow 和审批式外部 workspace 架构初始化已实现。根与 shell 包 SPDX 为 MIT，版权信息为 `Copyright (c) 2026 h-hei133`。固定包为 `ea5054127f4679a8939a747c6495e0df8534b70e`，pinned judge `proven`。原 Batch 4 实现提交 `099b661`；许可证与发布收尾另行提交。 |
+| Batch 4 | v0.1.0 公开 Release 已发布 | README、INSTALL、发布 workflow、审批式外部 workspace 架构初始化及 MIT LICENSE 已实现。根与 shell 包 SPDX 为 MIT，版权信息为 `Copyright (c) 2026 h-hei133`。固定包为 `ea5054127f4679a8939a747c6495e0df8534b70e`，pinned judge `proven`。原 Batch 4 实现提交 `099b661`；复现性修复 `fb567fb7`；许可证和发布收尾 `e1719fdb`；标签 `v0.1.0`。 |
 
 ## 批次 0 验收清单
 
@@ -80,7 +80,7 @@
 | B3.4 repeat-tool reminder 与 stream idle watchdog | 缺口成立 | 已验收 | 有界有序参数摘要、阈值 3/5/8；观察器不 veto 且跳过调用不计数。stream watchdog 与 native deadline/取消分类分离。 |
 | B3.5 jobs/diff 汇总过滤与注意力并发 | 部分成立 | 已验收／有界 | 精确 run settlement waiter、审批等待观察和 jobs 差值投影完成；五秒后台晋升和新优先槽维持暂缓。 |
 | B3.6 文件拆分/死代码清理 | 无职责候选支撑宽泛拆分 | 已核实 | 删除无生产引用的 `DoomLoopDetector` 与孤立测试；未进行没有具体 owner/反例依据的大模块改写。 |
-| B4.1 README/安装/许可证/发布工作流 | 文档和发布配置缺口成立 | 本地验收通过，公开发布待触发 | README、INSTALL、Linux/macOS 标签 workflow、MIT LICENSE 及根/shell 包元数据通过本地验证。`v0.1.0` workflow 待版本标签推送后构建三平台产物并发布。 |
+| B4.1 README/安装/许可证/发布工作流 | 文档和发布配置缺口成立 | 已验收并发布 | README、INSTALL、MIT LICENSE、根/shell 包元数据；GitHub Actions `45310333037` 对 Linux x64 与 macOS arm64/x64 执行构建、版本/help 检查及 SHA-256 校验，全部成功；GitHub Release `v0.1.0` 已公开。Linux release asset 已下载并通过 sidecar、`--version` 与 `--help` 验收。 |
 | B4.2 固定门控包刷新 | 版本缺口成立，实际相差五提交 | 已验收 | pinned archive、全部清单哈希与全哈希 commit `ea5054127f4679a8939a747c6495e0df8534b70e` 一致，脚本契约通过。 |
 | B4.3 外部工作区门控资产携带 | 缺口成立 | 已验收 | initializer 与 hook assets 带 digest、Node/runtime 限制和 profile 隔离；实际构建产物包含资源。 |
 | B4.4 外部工作区一键初始化 | 原建议绕过 writer 不成立 | 已验收／有界 | `/init architecture` 只生成隔离快照提案；`/init apply` 复用普通 patch 审批、完整分组校验和逐文件读回。 |
@@ -156,14 +156,17 @@
 - 连续两次 `npm run build:ts` 均产生 build ID `35d4adf87af8` 和 artifact digest `d6e54b51256adfc06c5db9e4d8910d710f807f3a811d8ad947b5b58326aab896`。连续两次 `npm run build:exe` 均生成 SHA-256 `99d1ef521b429b73935cf53d6ac3795af817834b02fccd79a382b3f9fafe0402`、112,670,848 字节；Linux 可执行文件 `--version` 返回 `0.1.0`，最终 `checkBuild` 为 `fresh`。
 - 验证只在 Linux 侧进行。B0.6 仍因 Casa/NOFX 认证失败和 Workbuddy 本地服务未监听而部分验证。记录这批构建证据时，许可证信息尚未收到，因此当时没有创建 LICENSE 或发布公开 Release；后续授权与处理见下方许可证记录。
 
-## MIT 许可证与发布资格（2026-11-24）
+## MIT 许可证与 v0.1.0 发布（2026-11-24）
 
 - 用户确认 SPDX `MIT`、版权主体 `h-hei133`、版权年份 `2026`。根目录 `LICENSE`、README 许可证说明、根与 shell 包 `license` 字段及 lockfile 元数据一致。
 - 本地 YAML 解析校验确认 release workflow 监听 `v*` 标签，根与 shell 包版本均为 `0.1.0`，产物矩阵仅包含 Linux x64 和 macOS arm64/x64；发布 job 校验三个可执行文件及 SHA-256 sidecar 后调用 GitHub Release 创建流程。
 - `npm install --package-lock-only --ignore-scripts --offline` 成功。六项静态门禁通过，严格文档门报告 35 条既有历史源码路径 advisory。
 - Linux `npm run build:ts`、`npm run build:exe`、编译产物 `--version` 与 `--help` 通过；当前 manifest 为 `fresh`，build ID `3cf42ea7d9803af3df25b793e89bebace01905f0fc48aa959869fb6ebf7ded06`，artifact digest `d6e54b51256adfc06c5db9e4d8910d710f807f3a811d8ad947b5b58326aab896`，可执行文件为 112,670,848 字节，SHA-256 `99d1ef521b429b73935cf53d6ac3795af817834b02fccd79a382b3f9fafe0402`。
 - `npm run verify:release:core` 的首轮退出为配置错误，合成 HOME 缺失。改用隔离 `.tmp/release-home` 与 `.tmp/release-test` 后，环境门通过，但权限/记忆门因缺失测试路径 `src/orchestration/runMvpIntegratedFlow.test.ts` 且隔离打印流程受 Stop hook 默认拒绝而失败；这是该本地门禁当前未通过的证据，不能计为发布核心门通过。GitHub release workflow 本身不调用该门禁。
-- 本地 release workflow 静态和 Linux 产物校验通过。远端版本标签与三平台 workflow 尚未执行，公开 Release 状态待补记。
+- 推送 `main` 和版本标签 `v0.1.0` 后，GitHub Actions run `45310333037` 的三个平台构建、版本与 help 检查、checksum 生成均通过；发布 job 对六个资产完成 SHA-256 校验并成功创建 Release。GitHub Release 地址为 `https://github.com/h-hei133/cheers/releases/tag/v0.1.0`。
+- Release 共六个资产：`cheers-linux-x64`（112,670,848 字节）、`cheers-darwin-arm64`（81,658,850 字节）、`cheers-darwin-x64`（87,244,880 字节）及各自 `.sha256` 文件。Linux 资产下载后在 Linux 主机按 sidecar 校验通过，`--version` 为 `0.1.0`，`--help` 正常退出。
+- GitHub Actions 注明 `checkout@v4`、`setup-node@v4`、`upload-artifact@v4` 和 `download-artifact@v4` 当前使用的 Node 20 action runtime 将被 runner 强制切至 Node 24；本次 job 成功，该提示作为后续 action 版本维护信息保留。
+- 仓库本地 `npm run verify:release:core` 仍未通过：release 核心权限/记忆脚本引用不存在的 `src/orchestration/runMvpIntegratedFlow.test.ts`，且其隔离 CLI 路径被 Stop hook 默认拒绝。该门禁不在 `.github/workflows/release.yml` 执行链内，不能记作通过，也不影响本次 workflow 已报告成功的发布证据。
 
 ## 完成及提交规则
 
