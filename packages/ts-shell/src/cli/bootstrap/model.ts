@@ -2,6 +2,7 @@ import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import { refreshShellRuntimeConfig } from '../../core/shell/runtimeContext.js';
 import { configurationAdmission } from '../../core/shell/configuration.js';
 import { sessionVirtualModels } from '../../core/catalog/models.js';
+import { loadCatalog } from '../../core/models/catalogStore.js';
 import { parseModelSelection } from '../../core/models/virtual/selection.js';
 import { setVirtualModel } from '../../core/commands/model/virtual.js';
 import { setModel } from '../../core/commands/model/selection.js';
@@ -20,6 +21,11 @@ export async function applyStartupModel(context: ShellRuntimeContext, options: S
   const definitions = sessionVirtualModels(context.cwd, context.session.id);
   const parsed = parseModelSelection(options.model, definitions, options.provider);
   const logical = readLogicalModel(context.session.id);
+  const separator = options.model?.indexOf('/') ?? -1;
+  const prefix = separator > 0 ? options.model?.slice(0, separator).trim() : undefined;
+  const catalogProvider = prefix && !options.provider ? loadCatalog().find(provider => provider.id === prefix) : undefined;
+  const explicitProviderTarget = parsed.kind === 'physical' && !options.provider
+    && (catalogProvider !== undefined || parsed.provider !== undefined);
   const command = { cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id,
     runtimeConfig: context.runtimeConfig, readConfiguration: () => context.configuration.current, resolveConfigTarget: context.resolveConfigTarget,
     refreshRuntimeConfig: () => refreshShellRuntimeConfig(context), admission: configurationAdmission(context),
@@ -33,8 +39,9 @@ export async function applyStartupModel(context: ShellRuntimeContext, options: S
     if (!outcome.startsWith('Model switched to ') && !outcome.startsWith('Model preference saved for ')) throw new Error(outcome);
     // Once accepted, future selections must not reapply the launch model to credentials.
     options.model = undefined; options.thinking = undefined;
-  } else if (logical && options.model) {
-    const outcome = await setModel([parsed.model!], command, false, thinkingEffort ?? parsed.thinkingEffort);
+  } else if (options.model && (logical || explicitProviderTarget)) {
+    const target = catalogProvider ? options.model : parsed.model!;
+    const outcome = await setModel([target], command, false, thinkingEffort ?? parsed.thinkingEffort);
     if (!outcome.startsWith('Model switched to ')) throw new Error(outcome);
   } else if (logical && thinkingEffort !== undefined) {
     const outcome = await setVirtualModel({ ...logical, thinkingEffort }, command);
