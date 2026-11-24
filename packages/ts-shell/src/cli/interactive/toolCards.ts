@@ -1,6 +1,9 @@
 import { splitFencedDiff, type Block } from "../../presentation/tui/transcript/blocks.js";
 import type { Transcript } from "../../presentation/tui/transcript/container.js";
 import type { ImageContent } from "../../model-adapters/multimodal.js";
+import { redactExportText } from '../../core/security/redaction.js';
+import { displayReportText } from '../../core/commands/report/projection.js';
+import { truncateTextBytes } from '../../core/tools/truncation.js';
 
 /**
  * The live cards for tool calls in flight.
@@ -34,14 +37,15 @@ export class ToolCards {
   ) {}
 
   /** Open a card for a call that just started. */
-  start(toolName: string, taskId: string, args?: Readonly<Record<string, unknown>>): void {
-    const detail = summarize(toolName, args);
+  start(toolName: string, taskId: string, args?: Readonly<Record<string, unknown>>, detail = summarize(toolName, args)): void {
+    const code = scriptCode(toolName, args);
     this.cards.set(
       taskId,
       this.transcript.append({
         kind: "tool",
         title: toolName,
         ...(detail ? { detail } : {}),
+        ...(code ? { code, collapsed: true } : {}),
         text: "",
         status: "running",
         finalized: false,
@@ -131,7 +135,7 @@ export class ToolCards {
    * says it was taken, and the picture is what was taken.
    */
   finish(taskId: string, success: boolean, failureReason?: string, output?: string,
-    images?: readonly ImageContent[]): void {
+    images?: readonly ImageContent[], diff?: string, nestedCallCount?: number): void {
     const block = this.cards.get(taskId);
     if (!block) return;
     const pending = this.outputBuffer.get(taskId);
@@ -140,13 +144,15 @@ export class ToolCards {
     if (output !== undefined) {
       this.transcript.setText(block, output);
     }
-    splitFencedDiff(block, this.transcript);
+    if (diff) this.transcript.setDiff(block, diff);
+    else splitFencedDiff(block, this.transcript);
     this.transcript.update(block, current => {
       current.status = success ? "ok" : "failed";
       if (current.approval === "awaiting") current.approval = "interrupted";
       if (output !== undefined) current.previewTruncated = false;
       current.failureReason = success ? undefined : failureReason;
-      current.collapsed = success;
+      current.collapsed = current.code ? current.collapsed ?? true : success;
+      if (nestedCallCount !== undefined) current.nestedCallCount = nestedCallCount;
       current.finalized = true;
       if (images?.length) current.images = images;
     });
@@ -180,9 +186,16 @@ export class ToolCards {
  * to nothing, so a new tool is legible before this list learns about it.
  */
 export function summarize(toolName: string, args?: Readonly<Record<string, unknown>>): string | undefined {
-  if (!args) return undefined;
+  if (!args || toolName === 'codemode') return undefined;
   const primary = named(toolName, args) ?? firstString(args);
   return primary ? `${primary}${detailSuffix(toolName, args)}` : undefined;
+}
+
+export function scriptCode(toolName: string, args?: Readonly<Record<string, unknown>>): string | undefined {
+  if (toolName !== 'codemode' || typeof args?.code !== 'string') return undefined;
+  const safe = displayReportText(redactExportText(args.code));
+  const trimmed = truncateTextBytes(safe, 64 * 1024);
+  return trimmed === safe ? safe : trimmed + '\n[Code shortened.]';
 }
 
 /** The argument this tool carries its intent in, if it sent one. */

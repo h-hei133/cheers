@@ -10,6 +10,7 @@ export async function applyPatchPlan(plan: PatchPlan, identity: EditOperationIde
   readonly assertFileAccess?: (absolutePath: string) => void;
   readonly abortSignal?: AbortSignal;
   readonly onEditOperationPrepared?: (operationId: string) => void;
+  readonly beforeCommit?: () => void;
 } = {}): Promise<OperationReceipt | undefined> {
   if (identity.sessionId !== plan.scope.sessionId || path.resolve(identity.workspaceRoot) !== plan.scope.workspace.path) throw new Error('Patch approval belongs to another session or workspace.');
   if (!plan.files.length) return undefined;
@@ -26,6 +27,7 @@ export async function applyPatchPlan(plan: PatchPlan, identity: EditOperationIde
     const prepared = await prepareOperation(identity, files);
     access.onEditOperationPrepared?.(prepared.operationId);
     access.abortSignal?.throwIfAborted();
+    access.beforeCommit?.();
     return commitOperation(prepared, { compensate: true });
   });
 }

@@ -5,6 +5,7 @@ import { isRecord } from '../values/record.js';
 import { stopUnknown } from './stop/result.js';
 import { hookUnknown } from './translation.js';
 import type { HookDecision } from './types.js';
+import { bundledHookCommand, isBundledHookPath, materializeHookAsset } from './assets.js';
 
 export interface WriteHookArtifact {
   readonly version: 1;
@@ -59,19 +60,56 @@ function runtimePrefix(): string {
 /** The declared command and actual invocation are derived from the same pinned artifact. */
 export function writeHookCommand(value: unknown, transport: 'single' | 'stdio' = 'single'): string {
   if (!validArtifact(value)) return 'false';
+  if (isBundledHookPath(value.path, 'write')) return bundledHookCommand('write', value.sha256);
   return `${runtimePrefix()}exec ${quote(process.execPath)} ${quote(value.path)} gate write ${transport === 'stdio' ? '--stdio' : '--emit-result'}`;
 }
 
 export function completionHookCommand(value: unknown): string {
   if (!validCompletionArtifact(value)) return 'false';
+  if (isBundledHookPath(value.path, 'stop')) return bundledHookCommand('stop', value.sha256);
   return `${runtimePrefix()}exec ${quote(process.execPath)} ${quote(value.path)} gate stop --emit-result`;
+}
+
+/** Prepare the exact declared file before passing it to the isolated hook process. */
+export async function resolveWriteHookCommand(value: unknown, workspaceRoot: string, admitted: () => void, signal?: AbortSignal): Promise<
+  { readonly command: string; readonly workerCommand: string; readonly bundledPath?: string } | HookDecision> {
+  if (!validArtifact(value)) return hookUnknown('version_mismatch');
+  if (!compatibleRuntime()) return hookUnknown('runtime_incompatible');
+  if (isBundledHookPath(value.path, 'write')) {
+    try {
+      const bundledPath = await materializeHookAsset('write', value.sha256, admitted, signal);
+      const descriptor = { ...value, path: bundledPath };
+      return { command: writeHookCommand(descriptor), workerCommand: writeHookCommand(descriptor, 'stdio'), bundledPath };
+    } catch { return hookUnknown('artifact_unreadable'); }
+  }
+  const failure = verifyPinnedArtifactFile(value.path, value.sha256, workspaceRoot);
+  return failure ? hookUnknown(failure) : { command: writeHookCommand(value), workerCommand: writeHookCommand(value, 'stdio') };
+}
+
+/** Prepare the exact declared file before passing it to the isolated stop process. */
+export async function resolveCompletionHookCommand(value: unknown, workspaceRoot: string, admitted: () => void, signal?: AbortSignal): Promise<
+  { readonly command: string; readonly bundledPath?: string } | HookDecision> {
+  if (!validCompletionArtifact(value)) return stopUnknown('version_mismatch');
+  if (!compatibleRuntime()) return stopUnknown('runtime_incompatible');
+  if (isBundledHookPath(value.path, 'stop')) {
+    try {
+      const bundledPath = await materializeHookAsset('stop', value.sha256, admitted, signal);
+      return { command: completionHookCommand({ ...value, path: bundledPath }), bundledPath };
+    } catch { return stopUnknown('artifact_unreadable'); }
+  }
+  const failure = verifyPinnedArtifactFile(value.path, value.sha256, workspaceRoot);
+  return failure ? stopUnknown(failure) : { command: completionHookCommand(value) };
 }
 
 type ArtifactFailure = 'runtime_incompatible' | 'artifact_invalid' | 'version_mismatch' | 'artifact_unreadable';
 
-function verifyPinnedArtifactFile(artifactPath: string, expectedSha256: string, workspaceRoot: string): ArtifactFailure | undefined {
+function compatibleRuntime(): boolean {
   const [major, minor] = process.versions.node.split('.').map(Number);
-  if (major! < 20 || (major === 20 && minor! < 3)) return 'runtime_incompatible';
+  return major! > 20 || major === 20 && minor! >= 3;
+}
+
+function verifyPinnedArtifactFile(artifactPath: string, expectedSha256: string, workspaceRoot: string): ArtifactFailure | undefined {
+  if (!compatibleRuntime()) return 'runtime_incompatible';
   let descriptor: number | undefined;
   try {
     const file = path.resolve(workspaceRoot, artifactPath);
@@ -100,12 +138,14 @@ function verifyPinnedArtifactFile(artifactPath: string, expectedSha256: string, 
 /** Compatibility belongs to the selected artifact, never to the tool's semantic capability. */
 export function checkWriteHookArtifact(value: unknown, workspaceRoot: string): HookDecision | undefined {
   if (!validArtifact(value)) return hookUnknown('version_mismatch');
+  if (isBundledHookPath(value.path, 'write')) return hookUnknown('artifact_unreadable');
   const failure = verifyPinnedArtifactFile(value.path, value.sha256, workspaceRoot);
   return failure ? hookUnknown(failure) : undefined;
 }
 
 export function checkCompletionHookArtifact(value: unknown, workspaceRoot: string): HookDecision | undefined {
   if (!validCompletionArtifact(value)) return stopUnknown('version_mismatch');
+  if (isBundledHookPath(value.path, 'stop')) return stopUnknown('artifact_unreadable');
   const failure = verifyPinnedArtifactFile(value.path, value.sha256, workspaceRoot);
   return failure ? stopUnknown(failure) : undefined;
 }

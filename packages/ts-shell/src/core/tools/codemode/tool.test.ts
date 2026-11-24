@@ -69,7 +69,11 @@ describe('codemode and NestedToolCallRunner', () => {
   it('batches nested tool calls, filters output, persists store/load, and records nested call telemetry', async () => {
     const registry = fixtureRegistry()
     const codemode = registry.get('codemode')!
-    const context = { workspaceRoot: workspace, sessionId: 'sess-codemode', taskId: 'cm-1' }
+    const context = { workspaceRoot: workspace, sessionId: 'sess-codemode', taskId: 'cm-1',
+      executeNestedTool: (name: string, args: Record<string, unknown>) => registry.get(name)!.execute(args, {
+        workspaceRoot: workspace, taskId: 'fixture',
+      }),
+    }
 
     const first = await codemode.execute(
       {
@@ -114,6 +118,14 @@ describe('codemode and NestedToolCallRunner', () => {
     expect(second.success).toBe(true)
     expect(second.output).toContain('2')
     expect(second.output).not.toContain('unreachable')
+
+    const plan = await codemode.execute({ code: 'store("plan-write", "must not persist"); return "planned";' },
+      { ...context, agentMode: 'plan' })
+    expect(plan.success).toBe(false)
+    expect(plan.error ?? plan.output).toContain('Plan mode prohibits persistent script storage')
+    const planRead = await codemode.execute({ code: 'return load("plan-write");' }, context)
+    expect(planRead.success).toBe(true)
+    expect(planRead.output).not.toContain('must not persist')
   })
 
   it('enforces sandbox isolation and NestedCallRecorder byte/count limits', async () => {

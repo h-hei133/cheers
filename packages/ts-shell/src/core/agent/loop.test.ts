@@ -77,6 +77,25 @@ it('keeps declaration entries while finding a continued request reason', async (
 });
 
 describe("runAgentLoop", () => {
+  it('reminds about repeated calls in the result and still executes them', async () => {
+    const { emit } = collect();
+    const calls: AgentMessage[][] = [];
+    let executions = 0;
+    const produced = await runAgentLoop([userMessage('inspect this file')], [], {
+      streamStep: async messages => {
+        calls.push([...messages]);
+        return calls.length <= 3 ? toolStep([{ id: `read-${calls.length}`, name: 'read', args: { path: '/private/project/a.ts' } }])
+          : textStep('Finished after inspecting the result.');
+      },
+      tools: [{ name: 'read', execute: async () => { executions++; return { output: 'No matching content.', isError: false }; } }],
+    }, emit, undefined);
+    expect(executions).toBe(3);
+    const thirdResult = calls[3]?.find(message => message.role === 'tool' && message.tool_call_id === 'read-3');
+    expect(thirdResult?.content).toContain('[Tool reminder]');
+    expect(String(thirdResult?.content)).not.toContain('/private/project');
+    expect(produced.at(-1)).toMatchObject({ role: 'assistant', content: 'Finished after inspecting the result.' });
+  });
+
   it("runs a text-only turn through the full lifecycle", async () => {
     const { seen, streamStep } = scriptedStream([textStep("hello")]);
     const { events, emit } = collect();

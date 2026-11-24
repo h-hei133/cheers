@@ -2,7 +2,7 @@ import type { McpGateway } from "../../core/mcp/gateway.js";
 import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type { ProviderCredentialResolution } from "../../core/shell/providerCredentials.js";
-import type { EscalationPrompt, EscalationResponse } from "../../core/shell/approval/contract.js";
+import type { ApprovalInteraction, EscalationPrompt, EscalationResponse } from "../../core/shell/approval/contract.js";
 import type { PermissionScope } from "../approval/permissionScope.js";
 import type { InteractiveAsk } from "../../core/tools/ask/contract.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
@@ -17,6 +17,7 @@ import type { CatalogProvider } from "../../core/models/catalog.js";
 export function streamCliRuntimePrompt(input: {
   readonly inputAdmission?: CliRuntimeInvocationInput['inputAdmission'];
   readonly effectiveInput?: string;
+  readonly requestEnvironment?: CliRuntimeInvocationInput['requestEnvironment'];
   readonly virtualModel?: CliRuntimeInvocationInput['virtualModel'];
   readonly virtualModels?: CliRuntimeInvocationInput['virtualModels'];
   readonly convertToLlm?: CliRuntimeInvocationInput['convertToLlm'];
@@ -38,6 +39,8 @@ export function streamCliRuntimePrompt(input: {
   readonly prepareToolSelection?: () => { readonly config: RuntimeConfig; readonly admission: NonNullable<CliRuntimeInvocationInput['admission']> };
   readonly prompt: string;
   readonly onPromptIdentity?: CliRuntimeInvocationInput['onPromptIdentity'];
+  readonly retainedTools?: CliRuntimeInvocationInput['retainedTools'];
+  readonly onDiscoveryLoad?: CliRuntimeInvocationInput['onDiscoveryLoad'];
   readonly readPromptIdentity?: CliRuntimeInvocationInput['readPromptIdentity'];
   readonly continuityContext?: string;
   readonly onPromptAccepted?: () => void;
@@ -49,7 +52,7 @@ export function streamCliRuntimePrompt(input: {
   readonly workspaceRoots?: CliRuntimeInvocationInput['workspaceRoots'];
   readonly signal: AbortSignal;
   readonly maxTurns: number;
-  readonly escalationPromptHandler: (prompt: EscalationPrompt) => Promise<EscalationResponse>;
+  readonly escalationPromptHandler: (prompt: EscalationPrompt, interaction?: ApprovalInteraction) => Promise<EscalationResponse>;
   readonly providerCredentialResolution: ProviderCredentialResolution;
   readonly agentMode: "plan" | "build";
   readonly permissionScope?: PermissionScope;
@@ -82,6 +85,7 @@ export function streamCliRuntimePrompt(input: {
   const start = (selected = input.prepareToolSelection?.()) => runCliRuntimeInvocation({
     inputAdmission:input.inputAdmission,
     effectiveInput:input.effectiveInput,
+    requestEnvironment: input.requestEnvironment,
     virtualModel: input.virtualModel,
     virtualModels: input.virtualModels,
     ...(input.convertToLlm ? { convertToLlm: input.convertToLlm } : {}),
@@ -103,6 +107,8 @@ export function streamCliRuntimePrompt(input: {
     sessionId: input.sessionId,
     prompt: input.prompt,
     ...(input.onPromptIdentity ? { onPromptIdentity: input.onPromptIdentity } : {}),
+    ...(input.retainedTools?.length ? { retainedTools: input.retainedTools } : {}),
+    ...(input.onDiscoveryLoad ? { onDiscoveryLoad: input.onDiscoveryLoad } : {}),
     ...(input.readPromptIdentity ? { readPromptIdentity: input.readPromptIdentity } : {}),
     ...(input.onPromptAccepted ? { onPromptAccepted: input.onPromptAccepted } : {}),
     ...(input.continuityContext ? { continuityContext: input.continuityContext } : {}),

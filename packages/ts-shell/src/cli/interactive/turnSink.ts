@@ -252,7 +252,7 @@ export class TurnSink implements RendererSink {
         return;
       case "tool.started":
         this.preparation.clear();
-        this.openTool(event.toolName, event.taskId, event.args);
+        this.openTool(event.toolName, event.taskId, event.args, event.detail);
         return;
       case "approval.requested":
         this.tools.approval(event.taskId, "awaiting");
@@ -269,7 +269,7 @@ export class TurnSink implements RendererSink {
         this.tools.settle(event.taskId, event.success);
         return;
       case "tool.result":
-        this.closeTool(event.taskId, event.success, event.failureReason, event.output, event.images);
+        this.closeTool(event.taskId, event.success, event.failureReason, event.output, event.images, event.diff, event.nestedCallCount);
         return;
       case "query.retrying":
         this.preparation.clear();
@@ -359,11 +359,13 @@ export class TurnSink implements RendererSink {
     failureReason?: string,
     output?: string,
     images?: readonly ImageContent[],
+    diff?: string,
+    nestedCallCount?: number,
   ): void {
     // Whatever has not been flushed belongs before the result, which carries the
     // whole output anyway; flushing first keeps the card's order honest.
     this.tools.flush();
-    this.tools.finish(taskId, success, failureReason, output, images);
+    this.tools.finish(taskId, success, failureReason, output, images, diff, nestedCallCount);
     this.label = "working";
     this.onChange();
   }
@@ -373,11 +375,12 @@ export class TurnSink implements RendererSink {
     toolName: string,
     taskId: string,
     args?: Readonly<Record<string, unknown>>,
+    detail?: string,
   ): void {
     this.finalizeAssistant();
     this.prose = undefined;
     this.label = toolName;
-    this.tools.start(toolName, taskId, args);
+    this.tools.start(toolName, taskId, args, detail);
   }
 
   /**

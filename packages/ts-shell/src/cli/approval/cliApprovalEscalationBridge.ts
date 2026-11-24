@@ -6,7 +6,7 @@ import {
 } from "../../entrypoints/cliApprovalModule.js";
 import type { PermissionScope } from "./permissionScope.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
-import type { EscalationPrompt, EscalationResponse } from "../../core/shell/approval/contract.js";
+import type { ApprovalInteraction, EscalationPrompt, EscalationResponse } from "../../core/shell/approval/contract.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import { persistApprovalAuditDecision } from "./cliApprovalAuditBridge.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
@@ -29,8 +29,9 @@ export function createCliApprovalEscalationBridge(input: {
   readonly getPermissionScope?: () => PermissionScope;
   readonly promptInteractiveApproval?: (
     prompt: EscalationPrompt,
+    signal?: AbortSignal,
   ) => Promise<InteractiveApprovalResult>;
-}): (prompt: EscalationPrompt) => Promise<EscalationResponse> {
+}): (prompt: EscalationPrompt, interaction?: ApprovalInteraction) => Promise<EscalationResponse> {
   return createCliEscalationPromptHandler(
     input.renderer,
     input.readline(),

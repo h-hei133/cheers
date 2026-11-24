@@ -1,6 +1,7 @@
 import type { CommandHookConfig, HookDecision, InProcessHookConfig, StopPayload } from '../types.js';
-import { checkCompletionHookArtifact, completionHookCommand } from '../artifact.js';
-import { STOP_TIMEOUT_MS, type StopCheck, type StopDispatchOptions } from './model.js';
+import { captureWorkspaceRoot } from '../../workspace/roots.js';
+import { resolveCompletionHookCommand } from '../artifact.js';
+import { STOP_TIMEOUT_MS, type ArchitectureCheck, type StopCheck, type StopDispatchOptions } from './model.js';
 import { normalizeStopResult, stopCheck, stopUnknown } from './result.js';
 import { boundedStopOperation, runStopCommand } from './run.js';
 
@@ -10,14 +11,15 @@ export async function dispatchStop(input: {
   readonly inProcess: readonly InProcessHookConfig[];
   readonly commands: readonly CommandHookConfig[];
   readonly current: () => boolean;
-  readonly allowed: (hook: CommandHookConfig, active: () => boolean) => Promise<boolean>;
+  readonly sourceRevision: (hook: CommandHookConfig) => string | undefined;
+  readonly allowed: (hook: CommandHookConfig, sourceRevision: string | undefined, active: () => boolean) => Promise<boolean>;
   readonly options: StopDispatchOptions;
 }): Promise<HookDecision> {
   const checks: StopCheck[] = [];
   let unproven: HookDecision | undefined;
   const { payload, options } = input;
-  const accept = (identity: string, result: HookDecision, started: number): HookDecision => {
-    const check = stopCheck(identity, result, Date.now() - started);
+  const accept = (identity: string, result: HookDecision, started: number, architecture?: ArchitectureCheck): HookDecision => {
+    const check = { ...stopCheck(identity, result, Date.now() - started), ...(architecture ? { architecture } : {}) };
     if (result.stopDisposition === 'completed_unproven') unproven ??= result;
     checks.push(check);
     options.onResult?.(check);
@@ -34,24 +36,47 @@ export async function dispatchStop(input: {
   for (const hook of input.commands.filter(hook => hook.event === 'Stop')) {
     const started = Date.now();
     const timeoutMs = hook.timeoutMs ?? STOP_TIMEOUT_MS;
+    const revision = input.sourceRevision(hook);
+    const current = () => input.current() && (hook.sourceCurrent?.() ?? true) && input.sourceRevision(hook) === revision;
     let active = true;
-    const admission = await boundedStopOperation(async () => input.current() && await input.allowed(hook, () => active && !options.signal?.aborted)
-      && input.current() ? { decision: 'allow' } : stopUnknown('not_authorized'), timeoutMs, options.signal);
+    const admission = await boundedStopOperation(async () => current()
+      && await input.allowed(hook, revision, () => active && !options.signal?.aborted && current()) && current()
+      ? { decision: 'allow' } : stopUnknown('not_authorized'), timeoutMs, options.signal);
     active = false;
     let result: HookDecision;
-    let command = hook.command;
+    let architecture: ArchitectureCheck | undefined;
     if (admission.decision !== 'allow') {
       result = admission;
     } else if (hook.completionGate !== undefined) {
-      command = completionHookCommand(hook.completionGate);
-      const invalidArtifact = checkCompletionHookArtifact(hook.completionGate, payload.workspaceRoot);
-      result = invalidArtifact
-        ?? await runStopCommand(command, payload, timeoutMs, options.signal, [process.execPath]).catch(() => stopUnknown('process_failed'));
+      const assertCurrent = () => {
+        if (!current()) throw new Error('The hook declaration changed.');
+      };
+      const prepared = await resolveCompletionHookCommand(hook.completionGate, payload.workspaceRoot, assertCurrent, options.signal);
+      if ('decision' in prepared) result = prepared;
+      else if (!current()) result = stopUnknown('registration_changed');
+      else {
+        const workspace = prepared.bundledPath && architectureWorkspace(payload.workspaceRoot);
+        result = await runStopCommand(prepared.command, payload, timeoutMs, options.signal,
+          [process.execPath, ...(prepared.bundledPath ? [prepared.bundledPath] : [])]).catch(() => stopUnknown('process_failed'));
+        if (prepared.bundledPath && (!workspace || architectureWorkspace(payload.workspaceRoot) !== workspace)) {
+          result = stopUnknown('registration_changed');
+        } else if (workspace && result.decision === 'allow') {
+          const verdict = result.reasonCode === 'proven' && result.proofVerdict === 'proven' ? 'proven'
+            : result.reasonCode === 'advisory_only' && result.proofVerdict === 'partial' ? 'partial' : undefined;
+          if (verdict) architecture = { sessionId: payload.sessionId, workspaceIdentity: workspace, verdict };
+        }
+      }
     } else {
-      result = await runStopCommand(command, payload, timeoutMs, options.signal).catch(() => stopUnknown('process_failed'));
+      result = await runStopCommand(hook.command, payload, timeoutMs, options.signal).catch(() => stopUnknown('process_failed'));
     }
-    const decision = accept(command, input.current() ? result : stopUnknown('registration_changed'), started);
+    const decision = current() ? accept(hook.command, result, started, architecture)
+      : accept(hook.command, stopUnknown('registration_changed'), started);
     if (decision.decision !== 'allow') return decision;
   }
   return { ...(unproven ?? { decision: 'allow', reasonCode: checks.length ? 'explicit_allow' : 'not_configured' }), stopChecks: checks };
+}
+
+function architectureWorkspace(root: string): string | undefined {
+  try { return captureWorkspaceRoot(root, root, 'read').identity; }
+  catch { return undefined; }
 }

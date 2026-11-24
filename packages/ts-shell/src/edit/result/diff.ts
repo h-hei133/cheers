@@ -1,6 +1,17 @@
 import { neutraliseForDisplay } from '../../core/text/safety.js';
 import { createUnifiedDiff, type DiffFacts } from '../../presentation/tui/transcript/diff.js';
 
+const recordedDiffs = new WeakMap<object, string>();
+
+/** Observe the committed change without adding file contents to result metadata. */
+export function recordEditDiff(metadata: object, diff: string): void {
+  if (diff) recordedDiffs.set(metadata, diff);
+}
+
+export function recordedEditDiff(metadata: object | undefined): string | undefined {
+  return metadata && recordedDiffs.get(metadata);
+}
+
 /** Quote changed text so controls and line-ending markers remain visible in an approval. */
 export function editDiff(file: string, before: string, after: string, facts?: DiffFacts): string {
   return createUnifiedDiff(file, before, after, facts).split('\n').map(line => /^[ +\-]/.test(line)

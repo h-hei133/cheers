@@ -64,7 +64,7 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
   return {
     name: CODEMODE_TOOL_NAME,
     description:
-      'Run JavaScript in an isolated sandbox to compose, batch (Promise.allSettled), chain, and filter tool calls in a single turn. Globals: `await tools.<name>(args)`, `ALL_TOOLS`, `text(value)`, `await image(dataUriOrObj)`, `console.log(...)`, `store(key, value)` / `load(key)` (branch-scoped), `await searchTools(query, { limit?, namespace? })`, `await describeTool(name)`, `await describeNamespace(name)`, `models.list()` / `models.get(provider, id)`, `await models.generateImages(model, { prompt, references? })`, `await models.classify(model, { state, questions, images? })` for admitted models, `exit()`, and top-level `return`.',
+      'Run JavaScript in an isolated sandbox to compose, batch (Promise.allSettled), chain, and filter tool calls in a single turn. Globals: `await tools.<name>(args)`, `ALL_TOOLS`, `text(value)`, `await image(dataUriOrObj)`, `console.log(...)`, `store(key, value)` / `load(key)` (branch-scoped), `await searchTools(query, { limit?, namespace? })`, `await describeTool(name)`, `await describeNamespace(name)`, `models.list()` / `models.get(provider, id)`, `await models.generateImages(model, { prompt, references? })`, `await models.classify(model, { state, questions, images? })` for admitted models, `exit()`, and top-level `return`. The literal-only shell tag $`command` uses the same bash permission gate and supports .text(), .json(), and .nothrow().',
     argsSchema: {
       type: 'object',
       additionalProperties: false,
@@ -89,6 +89,7 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
       const code = typeof args.code === 'string' ? args.code : ''
       if (!code.trim()) return deniedResult('Error: codemode requires a non-empty `code` string.')
       if (context.abortSignal?.aborted) return deniedResult('Script failed\n\nScript error: Operation aborted.')
+      if (context.agentMode === 'plan' && args.record === true) return deniedResult('Plan mode prohibits recording scripts.')
 
       let parsedScript: ReturnType<typeof parseCodemodeScript>
       let replayMode: ReturnType<typeof parseReplayMode>
@@ -116,7 +117,6 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
         callable = projectCallableCatalog([...catalog.keys()].filter(name => name !== CODEMODE_TOOL_NAME))
         runner = new NestedToolCallRunner({
           parentToolCallId: context.taskId || 'codemode',
-          resolveTool: name => catalog.get(name),
           context: { ...context, abortSignal: scriptController.signal },
         })
         storeHandle = loadCodemodeStore(context.sessionId, context.workspaceRoot)
@@ -129,6 +129,7 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
           maxOutputChars: parsedScript.maxOutputChars,
           maxStoreValueChars: MAX_STORE_VALUE_CHARS,
           maxStoreTotalChars: MAX_STORE_TOTAL_CHARS,
+          readOnly: context.agentMode === 'plan',
         }
         if (replayMode) replay = prepareReplay(replayMode, context, code, workerInputs)
         worker = new Worker(CODEMODE_WORKER_SOURCE, {
@@ -151,10 +152,16 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
         throw err
       }
 
-      const handleRpc = async ({ op, payload }: ScriptRpc): Promise<ScriptReply> => {
+      const handleRpc = async ({ op, payload }: ScriptRpc, beginApprovalWait: () => () => void): Promise<ScriptReply> => {
         try {
           if (op === 'call') {
-            return { ok: true, json: JSON.stringify(await runner.call(String(payload.name ?? ''), payload.args)),
+            return { ok: true, json: JSON.stringify(await runner.call(String(payload.name ?? ''), payload.args, beginApprovalWait)),
+              ...(runner.terminate ? { terminate: true } : {}) }
+          }
+          if (op === 'shell') {
+            const command = payload.command
+            if (typeof command !== 'string' || !catalog.has('bash')) throw new Error('The shell tool is unavailable in this script.')
+            return { ok: true, json: JSON.stringify(await runner.shell(command, beginApprovalWait)),
               ...(runner.terminate ? { terminate: true } : {}) }
           }
           if (op === 'generateImages') {
@@ -162,7 +169,7 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
               throw new Error('Image generation is unavailable in this script.')
             }
             return { ok: true, json: JSON.stringify(await runner.call('generate_image', { model: payload.model, prompt: payload.prompt,
-              ...(payload.references !== undefined ? { references: payload.references } : {}) })),
+              ...(payload.references !== undefined ? { references: payload.references } : {}) }, beginApprovalWait)),
               ...(runner.terminate ? { terminate: true } : {}) }
           }
           if (op === 'classify') {
@@ -170,7 +177,7 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
               throw new Error('Classification is unavailable in this script.')
             }
             const result = await runner.call('classify', { model: payload.model, state: payload.state, questions: payload.questions,
-              ...(payload.images !== undefined ? { images: payload.images } : {}) })
+              ...(payload.images !== undefined ? { images: payload.images } : {}) }, beginApprovalWait)
             if (typeof result !== 'string') throw new Error('Classification result could not be verified.')
             return { ok: true, json: JSON.stringify(JSON.parse(result)),
               ...(runner.terminate ? { terminate: true } : {}) }
@@ -208,6 +215,7 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
           throw new Error(`Unknown codemode RPC op: ${op}`)
         } catch (err) {
           return { ok: false, json: err instanceof Error ? err.message : String(err),
+            ...(runner.stop ? { stop: runner.stop } : {}),
             ...(runner.terminate ? { terminate: true } : {}) }
         }
       }
@@ -223,8 +231,9 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
         if (replay) return settleReplay(replay, result, output, storeHandle.assertCurrent, context.abortSignal)
 
         const nestedCalls = runner.recorder.snapshot()
+        const stop = result.stop ?? runner.stop
         let storeStatus: CodemodeStoreStatus = 'unchanged'
-        if (result.ok && result.writes) {
+        if (result.ok && !stop && result.writes) {
           try {
             storeStatus = storeHandle.commit(result.writes, () => {
               context.abortSignal?.throwIfAborted()
@@ -234,14 +243,19 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
             const failure = error instanceof CodemodeStoreError ? error : new CodemodeStoreError('unavailable', 'unknown')
             const projected = output.result('Script failed',
               failure.message + (nestedCalls?.calls.some(call => call.status === 'ok') ? ' Completed nested tool effects were not rolled back.' : ''))
-            return { ...deniedResult(projected.text, { ...projected.metadata,
+            const metadata = { ...projected.metadata,
               ...(nestedCalls ? { nestedCalls } : {}), codemodeStore: { status: failure.status, reason: failure.reason },
-            }), ...(runner.terminate ? { terminate: true } : {}), ...(projected.images ? { images: projected.images } : {}) }
+            }
+            output.observe(metadata)
+            return { ...deniedResult(projected.text, metadata), ...(runner.terminate ? { terminate: true } : {}),
+              ...(projected.images ? { images: projected.images } : {}) }
           }
         }
-        const projected = output.result(result.ok ? 'Script completed' : 'Script failed', result.error)
+        const projected = output.result(result.ok && !stop ? 'Script completed' : 'Script failed', result.error)
         const metadata = { ...projected.metadata, ...(nestedCalls ? { nestedCalls } : {}), codemodeStore: { status: storeStatus } }
-        return { ...(result.ok ? approvedResult(projected.text, metadata) : deniedResult(projected.text, metadata)),
+        output.observe(metadata)
+        return { ...(result.ok && !stop ? approvedResult(projected.text, metadata) : deniedResult(projected.text, metadata)),
+          ...(stop ? { stop } : {}),
           ...(result.terminate || runner.terminate ? { terminate: true } : {}), ...(projected.images ? { images: projected.images } : {}) }
       } finally {
         scriptController.abort()

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { validateToolArguments } from '../../core/tools/arguments.js';
 import { neutraliseForDisplay } from '../../core/text/safety.js';
-import { editDiff } from '../result/diff.js';
+import { editDiff, recordEditDiff } from '../result/diff.js';
 import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult, ToolPreparation } from '../../tools/types.js';
 import { EditOperationError } from '../recovery/operation/write.js';
 import { readOperation } from '../recovery/operation/store.js';
@@ -11,7 +11,7 @@ import { patchLimits } from './parse.js';
 import { hashContent } from '../authority/content.js';
 import { inspectPatchPlan } from './inspection.js';
 
-export function createPatchToolDefinition(): ToolDefinition<ToolPreparation> {
+export function createPatchToolDefinition(beforeCommit?: () => void): ToolDefinition<ToolPreparation> {
   return {
     name: 'apply_patch',
     description: 'Apply one approved text patch across files as one recorded operation. Use exact *** Begin Patch / *** End Patch, Add File (+ lines), Delete File, or Update File (@@ exact unique context, +/-/space lines; optional Move to and End of File). Renames stay in one workspace and never overwrite. Partial/unknown outcomes remain visible; no cross-file crash atomicity.',
@@ -34,10 +34,15 @@ export function createPatchToolDefinition(): ToolDefinition<ToolPreparation> {
       const inspection = inspectPatchPlan(plan);
       const targets = inspection.targets;
       const selections = Object.freeze(plan.groups.map(group => Object.freeze({ id: group.id, label: group.label, files: group.files })));
-      const renderPreview = (value: PatchPlan): string => ['Patch plan', `Revision: ${value.revision}`, ...value.files.map(file => {
+      const renderChanges = (value: PatchPlan): string[] => value.files.map(file => {
         const before = file.before.state === 'exists' ? file.before.content : '';
-        return `${file.content === undefined ? 'Delete' : file.rename ? 'Rename endpoint' : file.before.state === 'absent' ? 'Add' : 'Update'}: ${JSON.stringify(path.join(file.workspaceRoot, file.relativePath))}\n${editDiff(file.relativePath, before, file.content ?? '', file.rename ? { oldPath: file.rename.source, newPath: file.rename.target } : undefined)}`;
-      }), 'Files commit separately. A later failure may require guarded compensation.'].join('\n\n');
+        return editDiff(file.relativePath, before, file.content ?? '', file.rename ? { oldPath: file.rename.source, newPath: file.rename.target } : undefined);
+      });
+      const renderPreview = (value: PatchPlan): string => ['Patch plan', `Revision: ${value.revision}`,
+        ...renderChanges(value).map((diff, index) => {
+          const file = value.files[index]!;
+          return `${file.content === undefined ? 'Delete' : file.rename ? 'Rename endpoint' : file.before.state === 'absent' ? 'Add' : 'Update'}: ${JSON.stringify(path.join(file.workspaceRoot, file.relativePath))}\n${diff}`;
+        }), 'Files commit separately. A later failure may require guarded compensation.'].join('\n\n');
       const preview = renderPreview(plan);
       if (Buffer.byteLength(preview) > patchLimits.previewBytes) throw new Error('Patch preview is too large; split the operation before requesting approval.');
       const writeCandidate = targets.length === 1 ? inspection.writeCandidates[0] : undefined;
@@ -77,8 +82,13 @@ export function createPatchToolDefinition(): ToolDefinition<ToolPreparation> {
               requestedGroupIds: chosen,
               selectedGroupIds: selectedPlan.selected,
               skippedGroupIds: plan.groups.filter(group => !selectedPlan.selected.includes(group.id)).map(group => group.id),
-            } }, actual);
-          return receipt ? projectResult(receipt) : { success: true, output: 'Patch contains no changes. No edit operation was recorded.' };
+            } }, beforeCommit ? { ...actual, beforeCommit } : actual);
+          if (!receipt) return { success: true, output: 'Patch contains no changes. No edit operation was recorded.' };
+          const result = projectResult(receipt);
+          if (actual.nested && result.success && result.metadata) {
+            recordEditDiff(result.metadata, renderChanges(selectedPlan).filter(Boolean).join('\n'));
+          }
+          return result;
         } catch (error) {
           if (error instanceof EditOperationError) {
             try { return projectResult(readOperation(selectedPlan.scope, error.operationId), error.status); }

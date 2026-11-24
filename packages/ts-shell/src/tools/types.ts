@@ -8,6 +8,8 @@ export interface ToolExecutionContext {
   readonly commandProof?: import('../runtime/execution/proof.js').CommandProofObserver;
   readonly assertSourceAccess?: (absolute: string) => void;
   readonly taskId: string
+  /** The host uses this to request a bounded, display-only nested receipt. */
+  readonly nested?: boolean
   readonly workspaceRoot: string
   readonly workspaceRoots?: readonly WorkspaceRoot[]
   /** Session artifact storage stays bound to the primary root while file tools select a grant. */
@@ -55,13 +57,18 @@ export interface ToolExecutionContext {
     args: Record<string, unknown>,
     callId: string,
     signal?: AbortSignal,
+    beginApprovalWait?: () => () => void,
   ) => Promise<ToolExecutionResult>
+  /** Plan mode permits scripts to inspect the current branch without writing it. */
+  readonly agentMode?: 'plan' | 'build'
 }
 
 export interface ToolExecutionResult {
   readonly success: boolean
   /** An ordinary tool or hook may require the owning run to end. */
   readonly terminate?: boolean
+  readonly stop?: 'approval-denied'
+  readonly denial?: 'with-feedback' | 'without-feedback'
   readonly output?: string
   readonly error?: string
   /** outputNotice reserves essential page/recovery facts when model text is shortened. */

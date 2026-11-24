@@ -333,6 +333,31 @@ describe("createCliEscalationPromptHandler with promptInteractiveApproval", () =
     expect(renderer.lines).toEqual([]);
   });
 
+  it('never accepts a persistent script grant from an interactive caller', async () => {
+    const renderer = createRenderer();
+    const trustPolicy = new ApprovalTrustPolicy();
+    let offered: EscalationPrompt | undefined;
+    const interactiveApproval = vi.fn(async (prompt: EscalationPrompt) => {
+      offered = prompt;
+      return { decision: 'allow-always' as const };
+    });
+    const handler = createCliEscalationPromptHandler(renderer, null, () => 'compact', trustPolicy,
+      () => '/script-project', undefined, undefined, undefined, () => 'ask', interactiveApproval);
+    const prompt: EscalationPrompt = { ...createPrompt(), id: 'script-preview', context: {
+      toolName: 'codemode', operation: 'execute', target: 'codemode',
+      preview: 'return "reviewed";',
+      previewKind: 'execution',
+    }, options: [{ value: 'allow-once', label: 'Once', description: 'Current call' },
+      { value: 'allow-always', label: 'Always', description: 'Standing grant' },
+      { value: 'deny', label: 'Deny', description: 'Refuse the call' }] };
+    const response = await handler(prompt);
+    expect(offered?.options.map(option => option.value)).toEqual(['allow-once', 'deny']);
+    expect(response).toMatchObject({ decision: 'deny', denialSource: 'policy' });
+    expect(response.userComment).toContain('one-time approval');
+    expect(trustPolicy.listGrants('/script-project')).toEqual([]);
+    expect(offered?.context.preview).toBe('return "reviewed";');
+  });
+
   it("preserves the exact group selection and revision returned by the interactive host", async () => {
     const renderer = createRenderer();
     const trustPolicy = new ApprovalTrustPolicy();
@@ -412,7 +437,8 @@ describe("createCliEscalationPromptHandler with promptInteractiveApproval", () =
     const result = await handler(prompt);
     expect(result).toMatchObject({
       decision: "deny",
-      userComment: expect.stringContaining("allow-always is not available"),
+      userComment: expect.stringContaining("one-time approval"),
+      denialSource: 'policy',
     });
     expect(rememberAllowAlways).not.toHaveBeenCalled();
   });

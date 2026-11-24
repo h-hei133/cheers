@@ -13,6 +13,7 @@ import {
   type AgentTool,
   type AgentToolCall,
 } from "./tools.js";
+import { ToolRepetition } from './repeat.js';
 
 function assistantMessage(): AgentMessage {
   return { role: "assistant", content: "" };
@@ -187,6 +188,14 @@ describe("prepareToolCall", () => {
 });
 
 describe("executeToolBatch", () => {
+  it('adds repetition observations to the ordered tool result', async () => {
+    const repetition = new ToolRepetition();
+    const calls = Array.from({ length: 3 }, (_, index) => makeCall({ id: `read-${index}` }));
+    const batch = await executeToolBatch([makeTool()], assistantMessage(), calls, undefined, 'parallel', undefined,
+      collect().emit, repetition);
+    expect(batch.messages[2]?.content).toContain('[Tool reminder]');
+  });
+
   it.each(["parallel", "sequential"] as const)("publishes the same bounded receipt consumed by context in %s mode", async mode => {
     const notice = "artifact://receipt " + "界\n".repeat(3000) + "verification failed";
     const metadata = { outputNotice: notice, status: "partial" };

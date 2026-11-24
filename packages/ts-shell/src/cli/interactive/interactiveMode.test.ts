@@ -277,7 +277,7 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
       await vi.waitFor(() => expect(frame()).toContain(`Settings — ${scope} configuration`));
       host.view.editor.setDraftText('held scope draft');
       terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
       terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
       expect(frame()).toContain(`Settings — current session — from ${scope} configuration`);
       expect(frame()).toContain('Session /');
@@ -576,6 +576,9 @@ function build(overrides: {
   scheduler?: ManualScheduler;
   startup?: StartupSurface;
   onFirstFrame?: () => void;
+  onInputReady?: (signal: AbortSignal) => Promise<void>;
+  resumeOnStart?: boolean;
+  connectOnStart?: () => boolean;
   tuiMode?: 'regular' | 'fullscreen';
   terminal?: RecordingTerminal;
 } = {}): {
@@ -616,6 +619,9 @@ function build(overrides: {
     scheduler: overrides.scheduler,
     startup: overrides.startup,
     onFirstFrame: overrides.onFirstFrame,
+    onInputReady: overrides.onInputReady,
+    resumeOnStart: overrides.resumeOnStart,
+    connectOnStart: overrides.connectOnStart,
     setInteractiveApprovalPrompt: handler => { approval.current = handler; },
     setReadline: (value) => {
       readline.current = value;
@@ -623,6 +629,46 @@ function build(overrides: {
   });
   return { mode, renderer, readline, terminal, approval };
 }
+
+it.each(['regular', 'fullscreen'] as const)('opens connection setup after the %s host is ready', async tuiMode => {
+  const terminal = new RecordingTerminal();
+  const originalStart = terminal.start.bind(terminal);
+  vi.spyOn(terminal, 'start').mockImplementation((input, resize, disconnect, options) => {
+    originalStart(input, resize, disconnect, options);
+    options?.onInputReady?.();
+  });
+  let settle!: () => void;
+  const startupReady = new Promise<void>(resolve => { settle = resolve; });
+  const connectOnStart = vi.fn(() => true);
+  const { mode } = build({ tuiMode, terminal, onInputReady: () => startupReady, connectOnStart });
+  const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView };
+  mode.start();
+  try {
+    expect(host.overlay.active).toBe(false);
+    expect(connectOnStart).not.toHaveBeenCalled();
+    settle();
+    await mode.inputReady;
+    expect(connectOnStart).toHaveBeenCalledOnce();
+    expect(host.overlay.active).toBe(true);
+    expect(stripAnsi(host.view.renderFrame({ columns: 80, rows: 24 }).rows.join('\n'))).toContain('Provider');
+    terminal.input('\x1b');
+    await vi.waitFor(() => expect(host.overlay.active).toBe(false));
+    expect(connectOnStart).toHaveBeenCalledOnce();
+  } finally { settle(); mode.stop(); }
+});
+
+it.each(['resume', 'draft'] as const)('keeps explicit %s startup input ahead of connection setup', async startupIntent => {
+  const connectOnStart = vi.fn(() => true);
+  const { mode } = build({ resumeOnStart: startupIntent === 'resume', connectOnStart });
+  const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView };
+  if (startupIntent === 'draft') host.view.editor.setDraftText('retained startup draft');
+  mode.start();
+  try {
+    expect(connectOnStart).not.toHaveBeenCalled();
+    expect(host.overlay.active).toBe(startupIntent === 'resume');
+    if (startupIntent === 'draft') expect(host.view.editor.getText()).toBe('retained startup draft');
+  } finally { mode.stop(); }
+});
 
 it.each(['regular', 'fullscreen'] as const)('shows compaction unavailability on %s startup', tuiMode => {
   const { mode } = build({ tuiMode });
@@ -759,6 +805,27 @@ it('keeps a waiting message out of the conversation and shows it above the promp
   } finally { mode.stop(); }
 });
 
+it.each(['regular', 'fullscreen'] as const)('queues and recalls a pending draft through the %s terminal', tuiMode => {
+  const { mode, terminal } = build({ tuiMode });
+  const host = mode as unknown as { busy: boolean; queue: SubmissionQueue; view: InteractiveView };
+  mode.start();
+  try {
+    host.busy = true;
+    terminal.input('first pending');
+    terminal.input('\t');
+    const command = `/queue cancel ${host.queue.control.entries()[0]!.id}`;
+    host.view.editor.setDraftText(command);
+    terminal.input('\t');
+    expect(host.queue.control.entries().map(entry => entry.text)).toEqual(['first pending', command]);
+    expect(host.view.transcript.all().filter(block => block.kind === 'user')).toHaveLength(0);
+    expect(host.view.editor.getText()).toBe('');
+    terminal.input('later draft');
+    terminal.input('\x1b[1;3A');
+    expect(host.view.editor.getText()).toBe(`${command}\n\nlater draft`);
+    expect(host.queue.control.entries().map(entry => entry.text)).toEqual(['first pending']);
+  } finally { mode.stop(); }
+});
+
 it('records a steered message only when the running turn actually takes it', () => {
   const { mode } = build();
   const host = mode as unknown as { busy: boolean; onSubmit(text: string, disposition?: 'steer' | 'followUp'): void;
@@ -855,17 +922,19 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
     terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
     host.view.editor.setText('held draft\nkept through role editing');
     terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
-    terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+    terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
+    terminal.input('\t\x1b[B\r');
     terminal.input('Advisor'); await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
     terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('advisor model'));
     if (surface === 'assignment') {
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
+      terminal.input('\t\x1b[B\r');
       terminal.input('other'); await vi.waitFor(() => expect(frame()).toContain('▸ other'));
       terminal.input('\r');
     } else if (surface === 'thinking') {
       terminal.input('\x1b[B\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('Role thinking effort'));
       terminal.input('\x1b[A\x1b[A\r');
-    } else terminal.input('\x1b[B\r');
+    } else terminal.input('\t\x1b[B\r');
     await vi.waitFor(() => expect(writer).toHaveBeenCalledTimes(1));
     await vi.waitFor(() => expect(frame()).toContain('unverified'));
     expect(frame()).toContain(new SessionModelWriteError('verification-failed', 'unknown').message);
@@ -881,7 +950,7 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
       terminal.input('\r');
     } else expect(frame()).toContain('Reasoning effort: low');
     await vi.waitFor(() => expect(frame()).toContain('▸ Choose model'));
-    terminal.input('\x1b[B\r');
+    terminal.input('\t\x1b[B\r');
     await vi.waitFor(() => expect(writer).toHaveBeenCalledTimes(2));
     await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
     expect(readSessionModel(session.id)).toEqual({ ...baseline, roles: { summary: baseline.roles!.summary } });
@@ -938,15 +1007,17 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
       terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
       host.view.editor.setText('held role sign-in draft\nkept through failure');
       terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
+      terminal.input('\t\x1b[B\r');
       terminal.input('Advisor'); await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Choose model'));
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
+      terminal.input('\t\x1b[B\r');
       terminal.input('gpt-5.4-mini'); await vi.waitFor(() => expect(frame()).toContain('▸ gpt-5.4-mini'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Account sign-in'));
       terminal.input(route === 'account' ? '\x1b[B\r' : '\x1b[B\x1b[B\r');
       await vi.waitFor(() => expect(frame()).toContain(route === 'account' ? 'Confirm account sign-in' : 'API key'));
-      if (route === 'account') terminal.input('\x1b[B\r');
+      if (route === 'account') terminal.input('\t\x1b[B\r');
       else { terminal.input('synthetic-role-host-key'); await vi.waitFor(() => expect(frame()).toContain('••••')); terminal.input('\r'); }
       await vi.waitFor(() => expect(publication).toHaveBeenCalledTimes(1));
       await vi.waitFor(() => expect(host.busy).toBe(false));
@@ -965,7 +1036,8 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
       expect(saved.providerConnections!.find(row => row.id === 'default')).toEqual(before.providerConnections![0]);
       fs.writeFileSync(statePath, stateBytes); expect(readSessionModel(session.id)).toEqual(original);
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Choose model'));
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
+      terminal.input('\t\x1b[B\r');
       terminal.input('gpt-5.4-mini'); await vi.waitFor(() => expect(frame()).toContain('▸ gpt-5.4-mini'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
       expect(readSessionModel(session.id)).toEqual({ ...original, roles: { ...original.roles,
@@ -1014,7 +1086,8 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
       terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
       host.view.editor.setText('held role refusal draft\nkept through cancellation');
       terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
+      terminal.input('\t\x1b[B\r');
       terminal.input('Advisor'); await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Choose model'));
       if (action === 'effort') {
@@ -1034,7 +1107,7 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
           advisor: { ...target, thinkingEffort: 'low' } } });
         terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
       } else {
-        terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('advisor follows the default'));
+        terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('advisor follows the default'));
         await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
         expect(readSessionModel(session.id)).toEqual({ ...before.selection!, roles: { summary: target, subagent: target } });
       }
@@ -1077,15 +1150,17 @@ it.each(['regular', 'fullscreen'] as const)(
       terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
       host.view.editor.setText('held role retry draft\nkept through admission');
       terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
+      terminal.input('\t\x1b[B\r');
       terminal.input('Advisor'); await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Choose model'));
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
+      terminal.input('\t\x1b[B\r');
       terminal.input('inspect-me'); await vi.waitFor(() => expect(frame()).toContain('▸ inspect-me'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
       const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath()); writeUserRuntimeConfigFile({ ...edit.value, topP: 0.8 }, edit);
       const changed = fs.readFileSync(getUserRuntimeConfigPath());
-      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('▸ inspect-me'));
+      terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('▸ inspect-me'));
       expect(frame()).toContain('Model selection expired'); expect(modelState.readSessionModelEdit(session.id)).toEqual(before);
       terminal.input('other'); await vi.waitFor(() => expect(frame()).toContain('▸ other'));
       expect(context.runtimeConfig.topP).toBe(0.7);
@@ -1210,12 +1285,13 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
     mode.start();
     try {
       expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
-      terminal.input(`/${entry}\r`); await vi.waitFor(() => expect(frame()).toContain(entry === 'model' ? 'All models' : 'Settings'));
+      terminal.input(`/${entry}\r`); await vi.waitFor(() => expect(frame()).toContain(entry === 'model' ? 'Registry' : 'Settings'));
       host.view.editor.setText('held ready model draft\nkept through cancellation');
       if (entry === 'settings') {
         terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
-        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
       }
+      terminal.input('\t\x1b[B\r');
       terminal.input('ready-model'); await vi.waitFor(() => expect(frame()).toContain('▸ ready-model'));
       terminal.input('\r'); await vi.waitFor(() => expect(hook).toHaveBeenCalledWith(expect.objectContaining({ eventName: 'PreModelSwitch' })));
       if (ending === 'reopen') {
@@ -1266,21 +1342,22 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
     mode.start();
     try {
       expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
-      terminal.input(`/${entry}\r`); await vi.waitFor(() => expect(frame()).toContain(entry === 'settings' ? 'Settings' : 'All models'));
+      terminal.input(`/${entry}\r`); await vi.waitFor(() => expect(frame()).toContain(entry === 'settings' ? 'Settings' : 'Registry'));
       host.view.editor.setText('held effort recovery draft\nkept through refusal');
       if (entry === 'settings') {
         terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
-        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
       }
+      terminal.input('\t\x1b[B\r');
       terminal.input('blocked-model'); await vi.waitFor(() => expect(frame()).toContain('▸ blocked-model'));
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
-      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('▸ high'));
+      terminal.input('\x1b[13;5u'); await vi.waitFor(() => expect(frame()).toContain('Choose effort'));
+      terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('▸ auto'));
       if (ending === 'post-workspace' || ending === 'post-ready') {
         const hook = vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
           if (event.eventName === 'PostModelSwitch' && ending === 'post-workspace') context.workspaceIssue = 'Workspace is unavailable.';
           return undefined;
         });
-        switchHook = hook; terminal.input('\x1b[A\r');
+        switchHook = hook; terminal.input('\x1b[B\x1b[B\r');
         await vi.waitFor(() => expect(hook).toHaveBeenCalledWith(expect.objectContaining({ eventName: 'PostModelSwitch' })));
         await vi.waitFor(() => expect(host.view.transcript.all().map(block => block.text).join('\n')).toContain('Model switched to blocked-model.'));
         if (ending === 'post-workspace') expect(host.overlay.active).toBe(false);
@@ -1303,7 +1380,7 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
           }
           return undefined;
         });
-        switchHook = hook; terminal.input('\x1b[A\r');
+        switchHook = hook; terminal.input('\x1b[B\x1b[B\r');
         await vi.waitFor(() => expect(hook).toHaveBeenCalledWith(expect.objectContaining({ eventName: 'PreModelSwitch' })));
         await vi.waitFor(() => expect(host.busy).toBe(false));
         expect(JSON.stringify(modelState.readSessionModelEdit(session.id))).toBe(JSON.stringify(selection));
@@ -1316,13 +1393,13 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
       }
       const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath()); writeUserRuntimeConfigFile({ ...edit.value, topP: 0.8 }, edit);
       const changed = fs.readFileSync(getUserRuntimeConfigPath());
-      terminal.input('\x1b[A\r');
+      terminal.input('\x1b[B\x1b[B\r');
       await vi.waitFor(() => expect(frame()).toContain('▸ blocked-model')); expect(frame()).toContain('Model selection expired');
       expect(modelState.readSessionModelEdit(session.id)).toEqual(selection); expect(context.configuration.current).toBe(accepted);
       expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(changed); expect(context.runtimeConfig.topP).toBe(0.7);
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
-      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('▸ high'));
-      terminal.input('\x1b[A\r'); await vi.waitFor(() => expect(frame()).toContain('Model switched to blocked-model'));
+      terminal.input('\x1b[13;5u'); await vi.waitFor(() => expect(frame()).toContain('Choose effort'));
+      terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('▸ auto'));
+      terminal.input('\x1b[B\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('Model switched to blocked-model'));
       expect(readSessionModel(session.id)).toEqual({ ...target, connectionId: 'relay', model: 'blocked-model', thinkingEffort: 'medium' });
       if (entry === 'settings') expect(frame()).toContain('▸ Models and roles');
       else expect(frame()).toContain('▸ blocked-model');
@@ -1356,24 +1433,25 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
     mode.start();
     try {
       expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
-      terminal.input(`/${entry}\r`); await vi.waitFor(() => expect(frame()).toContain(entry === 'settings' ? 'Settings' : 'All models'));
+      terminal.input(`/${entry}\r`); await vi.waitFor(() => expect(frame()).toContain(entry === 'settings' ? 'Settings' : 'Registry'));
       host.view.editor.setText('held refusal draft\nkept through revalidation');
       if (entry === 'settings') {
         terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
-        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
       }
+      terminal.input('\t\x1b[B\r');
       terminal.input('review-me'); await vi.waitFor(() => expect(frame()).toContain('▸ review-me'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
       const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
       writeUserRuntimeConfigFile({ ...edit.value, topP: 0.8 }, edit);
       const changed = fs.readFileSync(getUserRuntimeConfigPath());
-      terminal.input('\x1b[B\r');
+      terminal.input('\t\x1b[B\r');
       await vi.waitFor(() => expect(frame()).toContain('Model selection expired'));
       await vi.waitFor(() => expect(frame()).toContain('▸ review-me')); expect(host.busy).toBe(false);
       expect(context.configuration.current).toBe(accepted); expect(context.runtimeConfig.topP).toBe(0.7);
       expect(frame()).not.toContain('API key');
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
-      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
+      terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
       terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('▸ review-me'));
       terminal.input('\x1b');
       if (entry === 'settings') await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
@@ -1420,10 +1498,11 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
       terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
       host.view.editor.setText('held browser owner draft\nkept through failure');
       terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
+      terminal.input('\t\x1b[B\r');
       terminal.input('verify-me'); await vi.waitFor(() => expect(frame()).toContain('▸ verify-me'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
-      armed = true; terminal.input('\x1b[B\r');
+      armed = true; terminal.input('\t\x1b[B\r');
       await vi.waitFor(() => expect(frame()).toContain(failure === 'refresh' ? 'Model catalogue could not be refreshed' : 'Model details could not be verified'));
       expect(host.overlay.active).toBe(false); expect(frame()).not.toContain('private return diagnostic');
       expect(context.configuration.current).toBe(accepted); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
@@ -1432,10 +1511,11 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
       context.workspaceIssue = undefined;
       host.view.editor.setText('/settings'); terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
       terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
+      terminal.input('\t\x1b[B\r');
       terminal.input('verify-me'); await vi.waitFor(() => expect(frame()).toContain('▸ verify-me'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
-      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
+      terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
       terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('▸ verify-me'));
       expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(modelState.readSessionModelEdit(session.id)).toEqual(selection);
       expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
@@ -1474,20 +1554,21 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
     mode.start();
     try {
       expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
-      terminal.input(`/${entry}\r`); await vi.waitFor(() => expect(frame()).toContain(entry === 'settings' ? 'Settings' : 'All models'));
+      terminal.input(`/${entry}\r`); await vi.waitFor(() => expect(frame()).toContain(entry === 'settings' ? 'Settings' : 'Registry'));
       host.view.editor.setText('held admission draft\nkept through read failure');
       if (entry === 'settings') {
         terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
-        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
       }
+      terminal.input('\t\x1b[B\r');
       terminal.input('verify-me'); await vi.waitFor(() => expect(frame()).toContain('▸ verify-me'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
-      terminal.input('\x1b[B\r');
+      terminal.input('\t\x1b[B\r');
       await vi.waitFor(() => expect(frame()).toContain('Model details could not be verified'));
       await vi.waitFor(() => expect(frame()).toContain('▸ verify-me')); expect(host.busy).toBe(false);
       expect(frame()).not.toContain('private admission diagnostic'); expect(context.configuration.current).toBe(accepted);
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
-      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
+      terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
       terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('▸ verify-me'));
       terminal.input('\x1b');
       if (entry === 'settings') await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
@@ -1523,23 +1604,24 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
     mode.start();
     try {
       expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
-      terminal.input(`/${entry}\r`); await vi.waitFor(() => expect(frame()).toContain(entry === 'settings' ? 'Settings' : 'All models'));
+      terminal.input(`/${entry}\r`); await vi.waitFor(() => expect(frame()).toContain(entry === 'settings' ? 'Settings' : 'Registry'));
       host.view.editor.setText('held model inspection draft\nkept through refresh failure');
       if (entry === 'settings') {
         terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
-        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
       }
+      terminal.input('\t\x1b[B\r');
       terminal.input('inspect-me'); await vi.waitFor(() => expect(frame()).toContain('▸ inspect-me'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
       terminal.input('\x1b[B'); await vi.waitFor(() => expect(frame()).toContain('▸ Configure connection'));
       read.mockImplementationOnce(() => { throw new Error('private refresh diagnostic'); });
       terminal.input('\r');
-      await vi.waitFor(() => expect(frame()).toContain('All models'));
+      await vi.waitFor(() => expect(frame()).toContain('Registry'));
       await vi.waitFor(() => expect(host.busy).toBe(false));
       expect(frame()).toContain('Model catalogue could not be refreshed'); expect(frame()).toContain('▸ inspect-me');
       expect(frame()).not.toContain('private refresh diagnostic'); expect(context.configuration.current).toBe(accepted);
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
-      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
+      terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
       terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('▸ inspect-me'));
       terminal.input('\x1b');
       if (entry === 'settings') await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
@@ -1583,7 +1665,7 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Edit value'));
       if (scope === 'project') {
         terminal.input('\x1b[B\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('Choose save scope'));
-        terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('save to project'));
+        terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('save to project'));
       }
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Edit Allowed tools'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Apply'));
@@ -2289,10 +2371,11 @@ describe("session wiring", () => {
     try {
       terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
       terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
+      terminal.input('\t\x1b[B\r');
       terminal.input(model); await vi.waitFor(() => expect(frame()).toContain(focused));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Configure connection'));
-      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
+      terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
       terminal.input(apiKey); await vi.waitFor(() => expect(frame()).toContain('••••'));
       expect(frame()).not.toContain(apiKey);
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain(focused));
@@ -2346,7 +2429,8 @@ describe("session wiring", () => {
     const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
     mode.start();
     try {
-      terminal.input('/model\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('/model\r'); await vi.waitFor(() => expect(frame()).toContain('Registry'));
+      terminal.input('\t\x1b[B\r');
       terminal.input('key-model'); await vi.waitFor(() => expect(frame()).toContain('▸ key-model'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Configure connection'));
       terminal.input('\x1b[B'); terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
@@ -2425,7 +2509,8 @@ describe("session wiring", () => {
     mode.start();
     try {
       terminal.input('/model\r');
-      await vi.waitFor(() => expect(frame()).toContain('All models'));
+      await vi.waitFor(() => expect(frame()).toContain('Registry'));
+      terminal.input('\t\x1b[B\r');
       terminal.input('gpt-5.4-mini'); await vi.waitFor(() => expect(frame()).toContain('▸ gpt-5.4-mini'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Account sign-in'));
       terminal.input('\x1b[B'); terminal.input('\r');
@@ -2937,7 +3022,7 @@ describe("session wiring", () => {
     try {
       host.openPicker('/undo');
       await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 30).join('\n'))).toContain('Review latest file operation'));
-      terminal.input('\x1b[B\r');
+      terminal.input('\t\x1b[B\r');
       await vi.waitFor(() => expect(host.pager.active).toBe(true));
       const report = host.view.transcript.all().find(block => block.report?.facts.status === 'preview')!;
       expect(report.text).toContain('-"after"'); expect(report.text).toContain('+"before"');
@@ -2948,7 +3033,7 @@ describe("session wiring", () => {
       terminal.input('\r'); expect(host.overlay.active).toBe(false); expect(restore).not.toHaveBeenCalled();
       host.openPicker('/undo');
       await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 30).join('\n'))).toContain('Review latest file operation'));
-      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(host.pager.active).toBe(true));
+      terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(host.pager.active).toBe(true));
       terminal.input('\r\x1b[B\x1b[B\r');
       await vi.waitFor(() => expect(restore).toHaveBeenCalledOnce());
       await vi.waitFor(() => expect(host.view.transcript.all().some(block => block.report?.facts.status === 'restored-verified')).toBe(true));

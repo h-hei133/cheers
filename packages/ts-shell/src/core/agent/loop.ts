@@ -25,6 +25,7 @@ import {
   type AgentToolExecutionMode,
   type ToolHooks,
 } from "./tools.js";
+import { ToolRepetition } from './repeat.js';
 
 export interface AssistantStep {
   /** Physical handoff evidence for retry routing, absent for local preparation failures. */
@@ -410,6 +411,7 @@ async function driveLoop(
     config.beforeToolCall || config.afterToolCall
       ? { beforeToolCall: config.beforeToolCall, afterToolCall: config.afterToolCall }
       : undefined;
+  const repetition = new ToolRepetition();
   let pending: AgentMessage[] = [];
   let completedStep: NextStepSnapshot | undefined;
 
@@ -479,7 +481,7 @@ async function driveLoop(
         }
       }
 
-      if (!await deliverInput(pending, config, emit, context, produced) && !withoutInput && pending.length) {
+      if (!await deliverInput(pending, config, emit, context, produced, repetition) && !withoutInput && pending.length) {
         await emit({ type: 'agent_end', messages: [...produced] });
         return;
       }
@@ -524,6 +526,7 @@ async function driveLoop(
       }
 
       const toolResults: AgentMessage[] = [];
+      let toolStop = false;
       hasMoreToolCalls = false;
       if (step.toolCalls.length > 0) {
         if (step.toolsAllowed === false) {
@@ -542,9 +545,11 @@ async function driveLoop(
             config.toolExecution,
             signal,
             emit,
+            repetition,
           );
           toolResults.push(...batch.messages);
           hasMoreToolCalls = !batch.terminate;
+          toolStop = Boolean(batch.stop);
         }
       }
       for (const result of toolResults) {
@@ -560,8 +565,8 @@ async function driveLoop(
 
       const snapshot: NextStepSnapshot = { message: assistant, toolResults, messages: [...context] };
       const turnDecision = await config.finishTurn?.(snapshot, signal);
-      const stopping = !signal?.aborted && turnDecision?.action !== 'end' ? await config.shouldStopAfterStep?.(snapshot) : false;
-      const endRequested = turnDecision?.action === "end" || Boolean(stopping) || Boolean(signal?.aborted);
+      const stopping = !toolStop && !signal?.aborted && turnDecision?.action !== 'end' ? await config.shouldStopAfterStep?.(snapshot) : false;
+      const endRequested = toolStop || turnDecision?.action === "end" || Boolean(stopping) || Boolean(signal?.aborted);
       const continueRequested = turnDecision?.action === "continue" && !endRequested;
       await emit({
         type: "turn_end",
@@ -613,9 +618,10 @@ async function driveLoop(
 }
 
 async function deliverInput(pending: readonly AgentMessage[], config: AgentLoopConfig, emit: AgentEventSink,
-  context: AgentMessage[], produced: AgentMessage[]): Promise<boolean> {
+  context: AgentMessage[], produced: AgentMessage[], repetition?: ToolRepetition): Promise<boolean> {
   const accepted = config.commitInput?.(pending) ?? { messages: pending };
   for (const message of accepted.messages) {
+    if (message.role === 'user') repetition?.reset();
     await emit({ type: 'message_start', message });
     await emit({ type: 'message_end', message });
     context.push(message);

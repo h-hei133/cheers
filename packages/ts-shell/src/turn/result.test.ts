@@ -8,8 +8,10 @@ import { HookDispatcher } from '../core/hooks/hookDispatcher.js';
 import type { QueryEvent } from '../core/query/runtime/events.js';
 import { readOnlyTool } from '../core/tools/capability.js';
 import { createCoreToolRegistry } from '../core/tools/registry.js';
+import type { ScriptHookOutput } from '../core/hooks/types.js';
 import { runEventHandlers } from '../extensions/events/dispatch.js';
 import type { ExtensionToolResultEvent } from '../extensions/events/model.js';
+import { SessionManager } from '../session/SessionManager.js';
 import type { SessionMessage } from '../session/schema/sessionMessage.js';
 import type { ToolDefinition } from '../tools/types.js';
 import { runPreparedTool } from './invoke.js';
@@ -25,6 +27,7 @@ beforeEach(() => {
   vi.stubEnv('HOME', root);
   vi.stubEnv('USERPROFILE', root);
   vi.stubEnv('CHEERS_TEST_ROOT', root);
+  new SessionManager().createNewWithId('result', root);
 });
 afterEach(() => {
   for (const release of releases.splice(0)) release();
@@ -55,6 +58,95 @@ function deferred() {
   const promise = new Promise<void>(resolve => { release = resolve; });
   return { promise, release };
 }
+
+it.each([false, true])('publishes a redacted script payload and preserves receipts on errors (%s)', async failed => {
+  const hooks = new HookDispatcher();
+  const observations: ScriptHookOutput[] = [];
+  const getter = vi.fn(() => { throw new Error('Untrusted accessor'); });
+  const event = failed ? 'PostToolUseFailure' : 'PostToolUse';
+  hooks.registerInProcessHook({ event, matcher: '^codemode$', handler: () => ({
+    decision: 'allow', updatedToolOutput: 'x'.repeat(65 * 1024),
+  }) });
+  hooks.registerInProcessHook({ event, matcher: '^codemode$', handler: () => Object.defineProperty(
+    { decision: 'allow' as const }, 'then', { get: getter },
+  ) });
+  hooks.registerInProcessHook({ event, matcher: '^codemode$', handler: payload => {
+    if (payload.eventName === event && payload.script) observations.push(payload.script);
+    return { decision: 'allow', hookSpecificOutput: { updatedToolOutput: 'Filtered script result' } };
+  } });
+  fs.writeFileSync(path.join(root, 'source.txt'), 'FIXTURE_SOURCE\n');
+  const code = `console.log('stdout'); console.error('stderr');
+    await tools.read({ path: 'source.txt' });
+    ${failed ? 'throw new Error(' : 'return ('}'Bearer FIXTURE_PRIVATE');`;
+  const messages: SessionMessage[] = [], events: QueryEvent[] = [];
+  let nextMessage: unknown;
+  let step = 0;
+  const run = runTurn({ ...gate(hooks), prompt: 'Inspect the file', tools: createCoreToolRegistry(), maxSteps: 3,
+    history: [], signal: new AbortController().signal, onMessage: message => messages.push(message),
+    step: async history => {
+      if (++step === 1) return { text: '', stopReason: 'stop', toolCalls: [{ id: 'script', name: 'codemode', args: { code } }] };
+      nextMessage = history.find(message => message.role === 'tool')?.content;
+      return { text: 'Done', stopReason: 'stop', toolCalls: [] };
+    },
+  });
+  for await (const event of run.events) events.push(event);
+  expect(getter).not.toHaveBeenCalled();
+  expect(observations).toEqual([expect.objectContaining({ stdout: 'stdout', stderr: 'stderr', toolsUsed: ['read'],
+    code: expect.stringContaining('Bearer [redacted]'), result: expect.stringContaining('Bearer [redacted]') })]);
+  expect(JSON.stringify(observations)).not.toMatch(/FIXTURE_PRIVATE|FIXTURE_SOURCE/);
+  const saved = messages.find(message => message.role === 'tool');
+  expect(saved?.content).toBe(`${failed ? 'Script failed' : 'Script completed'}\n\nFiltered script result`);
+  expect(nextMessage).toBe(saved?.content);
+  expect(saved?.metadata).toMatchObject({ scriptStatus: failed ? 'failed' : 'ok',
+    nestedCalls: { complete: true, calls: [{ name: 'read', status: 'ok' }] } });
+  expect(events).toContainEqual(expect.objectContaining({ type: 'tool.result', taskId: 'script', success: !failed }));
+});
+
+it('discards text from a script hook whose registration changed during dispatch', async () => {
+  const hooks = new HookDispatcher();
+  const tool = createCoreToolRegistry().get('codemode')!;
+  const successor = vi.fn();
+  hooks.registerInProcessHook({ event: 'PostToolUse', handler: async () => {
+    hooks.registerInProcessHook({ event: 'PostToolUse', handler: successor });
+    return { decision: 'allow', updatedToolOutput: 'Retired output' };
+  } });
+  const result = await runPreparedTool(tool, { code: "return 'Bearer FIXTURE_PRIVATE';" }, gate(hooks));
+  expect(result).toMatchObject({ isError: false, output: 'Script completed\n\nBearer [redacted]' });
+  expect(successor).not.toHaveBeenCalled();
+});
+
+it('puts only the approved patch diff on the nested card and receipt', async () => {
+  fs.writeFileSync(path.join(root, 'selected.txt'), 'before\n');
+  fs.writeFileSync(path.join(root, 'excluded.txt'), 'before\n');
+  const input = ['*** Begin Patch', '*** Update File: selected.txt', '@@', '-before', '+after',
+    '*** Update File: excluded.txt', '@@', '-before', '+unselected', '*** End Patch'].join('\n');
+  const code = `return await tools.apply_patch({ input: ${JSON.stringify(input)} });`;
+  const tools = createCoreToolRegistry(), events: QueryEvent[] = [], messages: SessionMessage[] = [];
+  const run = runTurn({ ...gate(), permissionScope: 'ask', prompt: 'Change only selected.txt', tools, maxSteps: 3,
+    history: [], signal: new AbortController().signal, onMessage: message => messages.push(message),
+    escalationPromptHandler: async prompt => {
+      const group = prompt.context.selections?.find(selection => selection.label.startsWith('Update selected.txt'));
+      const selected = group ? [group.id] : undefined;
+      return { decision: 'allow-once', promptId: prompt.id, respondedAt: 0,
+        ...(selected ? { selected, selectionRevision: prompt.context.selectionPreview?.(selected).revision } : {}) };
+    },
+    step: async history => history.some(message => message.role === 'tool')
+      ? { text: 'Done', stopReason: 'stop', toolCalls: [] }
+      : { text: '', stopReason: 'stop', toolCalls: [{ id: 'script', name: 'codemode', args: { code } }] },
+  });
+  for await (const event of run.events) events.push(event);
+  expect(fs.readFileSync(path.join(root, 'selected.txt'), 'utf8')).toBe('after\n');
+  expect(fs.readFileSync(path.join(root, 'excluded.txt'), 'utf8')).toBe('before\n');
+  const nested = events.find(event => event.type === 'tool.result' && event.parentToolCallId === 'script');
+  expect(nested).toMatchObject({ taskId: 'script/1', success: true, diff: expect.stringContaining('selected.txt') });
+  expect(nested && 'diff' in nested ? nested.diff : '').not.toMatch(/excluded\.txt|unselected/);
+  expect(events).toContainEqual(expect.objectContaining({ type: 'approval.resolved', taskId: 'script/1',
+    parentToolCallId: 'script', outcome: 'approved' }));
+  const result = messages.find(message => message.role === 'tool');
+  expect(result?.content).not.toContain('@@');
+  expect(result?.metadata).toMatchObject({ nestedCalls: { complete: true, calls: [{ status: 'ok',
+    metadata: { status: 'committed', operationId: expect.any(String), diff: expect.stringContaining('selected.txt') } }] } });
+});
 
 it('publishes one ordered result from a native read to the model, saved history and tool card', async () => {
   fs.writeFileSync(path.join(root, 'document.txt'), 'original file text\n');

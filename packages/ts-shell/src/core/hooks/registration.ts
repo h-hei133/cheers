@@ -101,6 +101,7 @@ export function registerDeclaredHooks(
     // approval attaches to this command in this file rather than to a name.
     fingerprint: hookFingerprint(hook),
     sourcePath: hook.sourcePath,
+    ...(hook.sourceCurrent ? { sourceCurrent: hook.sourceCurrent } : {}),
   } satisfies CommandHookConfig));
   dispatcher.setCommandHookTrust({
     workspaceRoot: path.resolve(workspaceRoot),

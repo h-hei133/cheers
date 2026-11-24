@@ -152,7 +152,7 @@ export async function runSubagent(
      * The gate a subagent's tool calls pass through, when the caller has one.
      *
      * The session's own calls go through this, and a subagent's are calls like
-     * any other: plan mode, the approval scope, the doom-loop check and the
+     * any other: plan mode, the approval scope and the
      * user's refusals all live here. A subagent that ran without them was a run
      * of the same loop answering to none of the same rules.
      */

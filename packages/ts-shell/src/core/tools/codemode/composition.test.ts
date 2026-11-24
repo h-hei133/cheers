@@ -74,8 +74,14 @@ function config(settings: Partial<RuntimeConfig> = {}): RuntimeConfig {
 async function executeScript(tools: ReadonlyMap<string, ToolDefinition>, consumer: Consumer, code: string,
   hooks = quietHooks, signal?: AbortSignal): Promise<ToolExecutionResult> {
   if (consumer === 'direct') {
+    const script = tools.get('codemode')!;
+    const nested = script.nestedToolCatalog?.() ?? tools;
     return tools.get('codemode')!.execute({ code }, { workspaceRoot: workspace, sessionId: SESSION_ID,
-      taskId: 'composition-owner', abortSignal: signal })
+      taskId: 'composition-owner', abortSignal: signal,
+      executeNestedTool: (name, args, taskId, abortSignal) => nested.get(name)!.execute(args, {
+        workspaceRoot: workspace, sessionId: SESSION_ID, taskId, abortSignal,
+      }),
+    })
   }
   const gate: ToolGateOptions = { sessionId: SESSION_ID, workspaceRoot: workspace,
     permissionScope: 'allow-all', hooks, emit: () => {} }
@@ -407,9 +413,13 @@ it('persists one filtered parent result after two real builtin reads in runTurn'
   for await (const event of run.events) events.push(event)
 
   expect(modelCalls).toBe(2)
-  const outerResults = events.filter(event => event.type === 'tool.result')
+  const outerResults = events.filter(event => event.type === 'tool.result' && !event.parentToolCallId)
   expect(outerResults).toHaveLength(1)
   expect(outerResults[0]).toMatchObject({ taskId: 'read-composition', toolName: 'codemode', success: true })
+  expect(events.filter(event => event.type === 'tool.result' && event.parentToolCallId)).toMatchObject([
+    { type: 'tool.result', taskId: 'read-composition/1', parentToolCallId: 'read-composition', toolName: 'read', success: true },
+    { type: 'tool.result', taskId: 'read-composition/2', parentToolCallId: 'read-composition', toolName: 'read', success: true },
+  ])
   const toolMessages = persisted.filter(message => message.role === 'tool')
   expect(toolMessages).toHaveLength(1)
   expect(toolMessages[0]).toMatchObject({ tool_call_id: 'read-composition', content: 'Script completed\n\nalpha, beta' })

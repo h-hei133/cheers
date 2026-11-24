@@ -54,6 +54,22 @@ async function run(input: unknown, overrides: Partial<ToolGateOptions> = {}) {
 }
 
 describe('recorded patch batches', () => {
+  it('checks dependent source freshness after recovery preparation and before the first write', async () => {
+    const identity = { sessionId: 'patch-session', workspaceRoot: workspace, callId: 'dependent-source' };
+    const plan = planPatch(two(), identity);
+    let recoveryPrepared = false;
+    await expect(applyPatchPlan(plan, identity, {
+      onEditOperationPrepared: () => { recoveryPrepared = true; },
+      beforeCommit: () => {
+        expect(recoveryPrepared).toBe(true);
+        throw new Error('Dependent source changed.');
+      },
+    })).rejects.toThrow('Dependent source changed.');
+    expect(fs.readFileSync(a, 'utf8')).toBe('before-a\n');
+    expect(fs.readFileSync(b, 'utf8')).toBe('before-b\n');
+    expect(readOperations(scope())).toEqual([]);
+  });
+
   it('commits mixed operations once, preserves raw shape and executable rename, and undoes the group', async () => {
     fs.writeFileSync(a, '\ufeffheader\r\nbefore-a\r\nlast');
     fs.chmodSync(b, 0o755);

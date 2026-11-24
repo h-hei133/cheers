@@ -3,12 +3,13 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ToolExecutionContext } from '../../../tools/types.js'
+import { getRuntimeConfig } from '../../../config/runtimeConfig.js'
 import { registerCatalogContribution } from '../../catalog/contributions.js'
 import { sessionModelCatalog } from '../../catalog/models.js'
 import type { CatalogModel, CatalogProvider } from '../../models/catalog.js'
 import { loadCatalog, writeCatalogCache } from '../../models/catalogStore.js'
 import { createCodemodeToolDefinition } from './tool.js'
-import { classificationTool, imageGenerationTool } from '../../../cli/provider/media.js'
+import { classificationTool, imageGenerationTool, mediaTools } from '../../../cli/provider/media.js'
 import * as media from '../../../provider/request/media.js'
 import { pngImage } from '../../../test-utils/image.js'
 import { adaptTools } from '../../../turn/tools.js'
@@ -201,6 +202,62 @@ describe('native model metadata inside the actual script worker', () => {
     expect(allowed.approval).toHaveBeenCalledOnce()
     expect(request).toHaveBeenCalledOnce()
     expect(request).toHaveBeenCalledWith(expect.objectContaining({ model: classifier.id, state, questions, images: [png] }))
+  })
+
+  it('resolves media tools on their configured endpoint connections independently of the foreground model', async () => {
+    const { id: sessionId } = new SessionManager().createNew(workspace)
+    const openRouter = { id: 'images', provider: 'openai-compatible' as const, authType: 'api-key' as const,
+      apiKey: 'synthetic-image-key', baseUrl: 'https://openrouter.ai/api/v1', createdAt: 'now', updatedAt: 'now' }
+    const openAi = { id: 'classification', provider: 'openai' as const, authType: 'api-key' as const,
+      apiKey: 'synthetic-classification-key', baseUrl: 'https://api.openai.com/v1', createdAt: 'now', updatedAt: 'now' }
+    const runtimeConfig = { ...getRuntimeConfig(workspace),
+      provider: 'anthropic' as const, providerConnections: [openRouter, openAi], providerCredentials: {},
+      activeProviderConnectionId: undefined, sessionConnection: undefined }
+    const catalog: readonly CatalogProvider[] = [{
+      id: 'openrouter', label: 'Image fixture', runtime: 'openai-compatible', auth: 'api-key', baseUrl: openRouter.baseUrl,
+      models: [{ id: 'fixture-image', modelType: 'image', input: ['text'], output: ['image'] }],
+    }, {
+      id: 'openai', label: 'Classification fixture', runtime: 'openai', auth: 'api-key', baseUrl: openAi.baseUrl,
+      models: [{ id: 'fixture-classifier', modelType: 'classifier', input: ['text'],
+        compat: { endpoint: 'openai-decisions' } }],
+    }]
+    const tools = mediaTools({ providerMode: 'real', workspaceRoot: workspace, sessionId, runtimeConfig, providerCatalog: catalog,
+      providerCredentialResolution: { provider: 'anthropic', expectedEnvVarName: 'ANTHROPIC_API_KEY',
+        credential: { provider: 'anthropic', source: 'cli', authMode: 'api-key', apiKey: 'foreground-only',
+          envVarName: 'ANTHROPIC_API_KEY' } } })
+    expect(tools.map(tool => tool.name)).toEqual(['generate_image', 'classify'])
+
+    const imageRequest = vi.spyOn(media, 'requestGeneratedImages').mockResolvedValue([pngImage(1, 1)])
+    const imageTool = tools.find(tool => tool.name === 'generate_image')!
+    await imageTool.execute({ model: 'fixture-image', prompt: 'A blue square' }, { workspaceRoot: workspace, sessionId, taskId: 'image' })
+    expect(imageRequest).toHaveBeenCalledWith(expect.objectContaining({ provider: 'openai-compatible',
+      baseUrl: openRouter.baseUrl, headers: expect.objectContaining({ Authorization: 'Bearer synthetic-image-key' }),
+      credential: { credentialId: 'openai-compatible:images', generation: expect.any(String) } }))
+
+    const classificationRequest = vi.spyOn(media, 'requestClassification').mockResolvedValue({ shape: { type: 'bool', probability: 1 } })
+    const classificationTool = tools.find(tool => tool.name === 'classify')!
+    await classificationTool.execute({ model: 'fixture-classifier', state: {}, questions: { shape: { type: 'bool',
+      instructions: 'Is this square?', criteria: { true: 'Yes', false: 'No' } } } }, { workspaceRoot: workspace, sessionId, taskId: 'classification' })
+    expect(classificationRequest).toHaveBeenCalledWith(expect.objectContaining({ provider: 'openai',
+      baseUrl: openAi.baseUrl, headers: expect.objectContaining({ Authorization: 'Bearer synthetic-classification-key' }),
+      credential: { credentialId: 'openai:classification', generation: expect.any(String) } }))
+  })
+
+  it('keeps media calls inside a closed foreground account pool', () => {
+    const { id: sessionId } = new SessionManager().createNew(workspace)
+    const config = {
+      ...getRuntimeConfig(workspace), provider: 'anthropic' as const,
+      providerConnections: [{ id: 'images', provider: 'openai-compatible' as const, authType: 'api-key' as const,
+        apiKey: 'synthetic-image-key', baseUrl: 'https://openrouter.ai/api/v1', createdAt: 'now', updatedAt: 'now' }],
+      accountPool: { anthropic: { connections: ['parent'] } },
+    }
+    const catalog: readonly CatalogProvider[] = [{ id: 'openrouter', label: 'Image fixture', runtime: 'openai-compatible',
+      auth: 'api-key', baseUrl: 'https://openrouter.ai/api/v1',
+      models: [{ id: 'fixture-image', modelType: 'image', input: ['text'], output: ['image'] }] }]
+    expect(imageGenerationTool({ providerMode: 'real', workspaceRoot: workspace, sessionId, runtimeConfig: config,
+      providerCatalog: catalog, providerCredentialResolution: { provider: 'anthropic', expectedEnvVarName: 'ANTHROPIC_API_KEY',
+        credential: { provider: 'anthropic', source: 'connection', connectionId: 'parent', authMode: 'api-key',
+          apiKey: 'synthetic-parent-key', envVarName: 'ANTHROPIC_API_KEY' } } })).toBeUndefined()
   })
 
   it('uses the captured physical and virtual catalogue despite ambient replacements', async () => {

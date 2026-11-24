@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { PermissionScope } from "../shell/approval/scope.js";
-import type { EscalationPrompt } from "../shell/approval/contract.js";
+import { oneTimeApproval, type EscalationPrompt } from "../shell/approval/contract.js";
 import { isReadOnlyBashCommand } from "../shell/approval/evaluator.js";
 import { matchDenyRule, type DenyRule } from "../shell/approval/deny.js";
 import type { ToolDefinition } from "../../tools/types.js";
@@ -48,6 +48,7 @@ export const READ_ONLY_BROWSER_ACTIONS: Record<string, true> = {
 /** Plan eligibility only; approval and deny rules still apply to eligible calls. */
 export function toolPlanMode(name: string, tool?: ToolDefinition): "allowed" | "read-only" | "blocked" {
   if (Object.hasOwn(READ_ONLY_TOOLS, name) || nativeReadOnly(tool)) return "allowed";
+  if (name === 'codemode') return 'read-only';
   if (name === "bash" || name === "browser" || name === 'lsp' || name === 'desktop') return "read-only";
   return tool?.mcpAnnotations?.readOnlyHint === true ? "allowed" : "blocked";
 }
@@ -59,7 +60,8 @@ export function planModeBlock(
   tool?: ToolDefinition,
 ): string | undefined {
   if (agentMode !== "plan" || toolPlanMode(name, tool) === "allowed") return undefined;
-  if (name === 'lsp' && args.backend === 'scanner') return undefined;
+  if (name === 'codemode' && args.record !== true) return undefined;
+  if (name === 'lsp' && (args.backend === 'scanner' || args.operation === 'discover')) return undefined;
   if (name === 'desktop' && args.action === 'capabilities') return undefined;
   if (name === "bash" && typeof args.command === "string" && isReadOnlyBashCommand(args.command)) return undefined;
   if (name === "browser" && typeof args.action === "string" && Object.hasOwn(READ_ONLY_BROWSER_ACTIONS, args.action.toLowerCase().trim())) return undefined;
@@ -101,9 +103,10 @@ export function evaluateToolPermissionScope(
     isReadOnly = safeArgs.action === 'capabilities'; operation = isReadOnly ? 'read' : 'execute';
     target = `desktop:${String(safeArgs.action ?? '(no action)')}:${String(safeArgs.windowId ?? safeArgs.scope ?? 'selected snapshot')}`;
   } else if (toolName === 'lsp') {
-    isReadOnly = safeArgs.backend === 'scanner';
+    isReadOnly = safeArgs.backend === 'scanner' || safeArgs.operation === 'discover';
     operation = isReadOnly ? 'read' : 'execute';
-    target = isReadOnly ? String(safeArgs.filePath ?? safeArgs.symbol ?? 'lsp scanner') : executionApprovalTarget(safeArgs, safeArgs.server, workspaceRoot);
+    target = safeArgs.operation === 'discover' ? 'installed language-server candidates'
+      : isReadOnly ? String(safeArgs.filePath ?? safeArgs.symbol ?? 'lsp scanner') : executionApprovalTarget(safeArgs, safeArgs.server, workspaceRoot);
   } else if (Object.hasOwn(READ_ONLY_TOOLS, toolName) || nativeReadOnly(tool)) {
     operation = "read";
     target = String(safeArgs.path ?? safeArgs.filePath ?? safeArgs.pattern ?? safeArgs.query ?? safeArgs.url ?? toolName);
@@ -299,7 +302,7 @@ export function buildToolEscalationPrompt(
     },
     options: [
       { value: "allow-once", label: "Allow Once", description: "Allow this operation once" },
-      { value: "allow-always", label: "Allow Always", description: "Always allow similar operations in this project" },
+      ...(!oneTimeApproval(toolName) ? [{ value: "allow-always" as const, label: "Allow Always", description: "Always allow similar operations in this project" }] : []),
       { value: "deny", label: "Deny", description: "Deny this operation" },
     ],
     defaultOption: "deny",

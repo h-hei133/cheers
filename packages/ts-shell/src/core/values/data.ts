@@ -17,6 +17,8 @@ export function createDataSnapshot(isProxy: (value: unknown) => boolean) {
     readonly bytes: number; readonly nodes: number; readonly depth: number;
     /** Explicit VM boundary; the result still contains only host-owned inert JSON data. */
     readonly allowCrossRealm?: boolean;
+    /** Produce stable object order for wire schemas while preserving array order. */
+    readonly sortKeys?: boolean;
   }): JsonValue {
     let bytes = 0, nodes = 0;
     const ancestors = new Set<object>();
@@ -46,6 +48,7 @@ export function createDataSnapshot(isProxy: (value: unknown) => boolean) {
       ancestors.add(item);
       const keys = Reflect.ownKeys(item);
       if (keys.length > limits.nodes - nodes || keys.some(key => typeof key !== 'string')) throw new Error('Message data exceeds its structural limit.');
+      if (!array && limits.sortKeys) keys.sort();
       const target: Record<string, JsonValue> = Object.create(null);
       const entries: JsonValue[] = [];
       if (array && item.length > limits.nodes - nodes) throw new Error('Message data exceeds its structural limit.');

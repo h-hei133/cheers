@@ -5,6 +5,9 @@ export interface EscalationResponse {
   decision: EscalationDecision;
   respondedAt: number;
   userComment?: string;
+  /** A reason explicitly entered by the person denying the call. */
+  denialFeedback?: string;
+  denialSource?: 'user' | 'policy';
   /** Group ids the user approved; absent means the host collected no selection. */
   selected?: readonly string[];
   /** Revision of the exact selected subset shown to the user. */
@@ -47,4 +50,15 @@ export interface EscalationOption {
   value: EscalationDecision;
   label: string;
   description: string;
+}
+
+export interface ApprovalInteraction {
+  readonly signal?: AbortSignal;
+  /** The host calls this only while awaiting a person's answer. */
+  readonly beginWait?: () => () => void;
+}
+
+export function oneTimeApproval(toolName: string): boolean {
+  const name = toolName.trim().toLowerCase();
+  return name === 'codemode' || name === 'apply_patch' || name.startsWith('mcp__');
 }

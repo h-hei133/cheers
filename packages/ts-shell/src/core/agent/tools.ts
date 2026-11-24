@@ -5,6 +5,7 @@ import type { AgentEventSink } from "./events.js";
 import { recordCount, recordTiming } from "../../observability/metrics.js";
 import { toolRequest, traceOperation } from '../../observability/tracing/context.js';
 import type { AgentMessage } from "./state.js";
+import type { ToolRepetition } from "./repeat.js";
 
 export interface AgentToolCall {
   readonly id: string;
@@ -17,6 +18,7 @@ export interface AgentToolResult {
   readonly isError: boolean;
   readonly images?: readonly ImageContent[];
   readonly terminate?: boolean;
+  readonly stop?: 'approval-denied';
   /**
    * Structured facts a tool wants recorded beside its prose.
    *
@@ -53,6 +55,7 @@ export interface BeforeToolCallDecision {
   readonly block: boolean;
   readonly reason?: string;
   readonly terminate?: boolean;
+  readonly denial?: 'with-feedback' | 'without-feedback';
 }
 
 export interface AfterToolCallContext {
@@ -76,6 +79,7 @@ export interface ToolHooks {
   readonly beforeToolCall?: (
     context: BeforeToolCallContext,
     signal?: AbortSignal,
+    beginApprovalWait?: () => () => void,
   ) => Promise<BeforeToolCallDecision | undefined>;
   readonly afterToolCall?: (
     context: AfterToolCallContext,
@@ -90,6 +94,7 @@ export type PreparedToolCall =
 export interface ExecutedToolBatch {
   readonly messages: AgentMessage[];
   readonly terminate: boolean;
+  readonly stop?: 'approval-denied';
 }
 
 export const TOOL_OUTPUT_LIMIT = DEFAULT_MAX_BYTES;
@@ -142,6 +147,7 @@ export function createToolResultMessage(
   output: string,
   metadata?: Record<string, unknown>,
   images?: readonly ImageContent[],
+  stop?: AgentToolResult['stop'],
 ): AgentMessage {
   const bounded = boundToolMedia({ output, images, metadata }, createToolMediaBudget());
   const retained = bounded.images ?? [];
@@ -150,7 +156,7 @@ export function createToolResultMessage(
     role: "tool",
     tool_call_id: toolCallId,
     content: retained.length ? [{ type: "text", text }, ...retained] : text,
-    ...(bounded.metadata ? { metadata: bounded.metadata } : {}),
+    ...(stop ? { metadata: { ...bounded.metadata, toolStop: stop } } : bounded.metadata ? { metadata: bounded.metadata } : {}),
   };
 }
 
@@ -269,6 +275,7 @@ export async function executeToolBatch(
   mode: AgentToolExecutionMode | undefined,
   signal: AbortSignal | undefined,
   emit: AgentEventSink,
+  repetition?: ToolRepetition,
 ): Promise<ExecutedToolBatch> {
   const requested = mode ?? "parallel";
   const forcedSequential = calls.some((call) =>
@@ -276,8 +283,8 @@ export async function executeToolBatch(
   );
   const batch =
     requested === "sequential" || forcedSequential
-      ? await runSequential(tools, assistantMessage, calls, hooks, signal, emit)
-      : await runParallel(tools, assistantMessage, calls, hooks, signal, emit);
+      ? await runSequential(tools, assistantMessage, calls, hooks, signal, emit, repetition)
+      : await runParallel(tools, assistantMessage, calls, hooks, signal, emit, repetition);
   if (!signal?.aborted) {
     return batch;
   }
@@ -292,7 +299,7 @@ export async function executeToolBatch(
     await emitExecutionEnd(emit, call, true);
     messages.push(await emitToolResultMessage(createToolResultMessage(call.id, abortedResult().output), emit));
   }
-  return { messages, terminate: batch.terminate };
+  return { ...batch, messages };
 }
 
 export function shouldTerminateBatch(results: readonly AgentToolResult[]): boolean {
@@ -406,6 +413,15 @@ export async function finalizeExecutedCall(
   }
 }
 
+function observedToolMessage(call: AgentToolCall, result: AgentToolResult, repetition?: ToolRepetition): AgentMessage {
+  const reminder = repetition?.observe(call);
+  if (!reminder) return createToolResultMessage(call.id, result.output, result.metadata, result.images, result.stop);
+  const originalNotice = result.metadata?.outputNotice;
+  const outputNotice = typeof originalNotice === 'string' ? `${originalNotice}\n\n${reminder}` : reminder;
+  const output = result.output ? `${result.output}\n\n${reminder}` : reminder;
+  return createToolResultMessage(call.id, output, { ...result.metadata, outputNotice }, result.images, result.stop);
+}
+
 async function runSequential(
   tools: readonly AgentTool[],
   assistantMessage: AgentMessage,
@@ -413,34 +429,42 @@ async function runSequential(
   hooks: ToolHooks | undefined,
   signal: AbortSignal | undefined,
   emit: AgentEventSink,
+  repetition?: ToolRepetition,
 ): Promise<ExecutedToolBatch> {
   const messages: AgentMessage[] = [];
   const results: AgentToolResult[] = [];
   const mediaBudget = createToolMediaBudget();
+  let stop: AgentToolResult['stop'];
   for (const call of calls) {
+    const directAttempt = !stop;
     await emit({ type: "tool_execution_start", toolCallId: call.id, toolName: call.name, args: call.args });
-    const prepared = await prepareToolCall(tools, assistantMessage, call, hooks, signal);
     let result: AgentToolResult;
-    if (prepared.kind === "immediate") {
-      result = prepared.result;
+    if (stop) {
+      result = { isError: true, output: 'Tool call skipped after the user stopped script execution.' };
     } else {
-      const executed = await executePreparedCall(prepared.tool, call, prepared.args, signal, emit);
-      result = await finalizeExecutedCall(assistantMessage, call, prepared.args, executed, hooks, signal);
+      const prepared = await prepareToolCall(tools, assistantMessage, call, hooks, signal);
+      if (prepared.kind === "immediate") {
+        result = prepared.result;
+      } else {
+        const executed = await executePreparedCall(prepared.tool, call, prepared.args, signal, emit);
+        result = await finalizeExecutedCall(assistantMessage, call, prepared.args, executed, hooks, signal);
+      }
     }
+    stop ??= result.stop;
     result = boundToolMedia(result, mediaBudget);
     await emitExecutionEnd(emit, call, result.isError);
     results.push(result);
     messages.push(
-      await emitToolResultMessage(
-        createToolResultMessage(call.id, result.output, result.metadata, result.images),
-        emit,
-      ),
+      await emitToolResultMessage(observedToolMessage(call, result,
+        directAttempt && !signal?.aborted ? repetition : undefined), emit),
     );
+    // A hard stop skips later siblings without making further tool attempts.
+    if (stop) repetition = undefined;
     if (signal?.aborted) {
       break;
     }
   }
-  return { messages, terminate: shouldTerminateBatch(results) };
+  return { messages, terminate: Boolean(stop) || shouldTerminateBatch(results), ...(stop ? { stop } : {}) };
 }
 
 async function runParallel(
@@ -450,6 +474,7 @@ async function runParallel(
   hooks: ToolHooks | undefined,
   signal: AbortSignal | undefined,
   emit: AgentEventSink,
+  repetition?: ToolRepetition,
 ): Promise<ExecutedToolBatch> {
   const pending: Array<() => Promise<AgentToolResult>> = [];
   const mediaBudget = createToolMediaBudget();
@@ -490,11 +515,9 @@ async function runParallel(
   const paired = calls.slice(0, results.length);
   for (let index = 0; index < paired.length; index += 1) {
     messages.push(
-      await emitToolResultMessage(
-        createToolResultMessage(paired[index].id, results[index].output, results[index].metadata, results[index].images),
-        emit,
-      ),
+      await emitToolResultMessage(observedToolMessage(paired[index]!, results[index]!, signal?.aborted ? undefined : repetition), emit),
     );
   }
-  return { messages, terminate: shouldTerminateBatch(results) };
+  const stop = results.find(result => result.stop)?.stop;
+  return { messages, terminate: Boolean(stop) || shouldTerminateBatch(results), ...(stop ? { stop } : {}) };
 }

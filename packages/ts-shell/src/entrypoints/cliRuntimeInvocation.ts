@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
 import { checkRealProviderReadiness } from "../core/shell/providerReadiness.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
-import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
+import type { ApprovalInteraction, EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
 import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliSurface.js";
 import type { PermissionScope } from "../core/shell/approval/scope.js";
 import type { InteractiveAsk } from "../core/tools/ask/contract.js";
@@ -57,7 +57,7 @@ import { assertAdmission, admittedFetch, type Admission } from '../core/network/
 import { decodeWorkspaceRoots, type WorkspaceRoot } from '../core/workspace/model.js';
 import type { RequestPolicy } from '../core/agent/request/model.js';
 import { createProviderStep, delegatedSteps, providerToolsAvailable } from '../cli/provider/step.js';
-import { classificationTool, imageGenerationTool } from '../cli/provider/media.js';
+import { mediaTools } from '../cli/provider/media.js';
 import { scopedRuntimeConfig, assertScopedModel } from '../config/scope/projection.js';
 import { credentialBlockMessage } from '../core/shell/providerCredentials.js';
 import { scopeAdmission } from '../config/scope/admission.js';
@@ -71,6 +71,7 @@ type ProviderMode = "synthetic" | "real";
 export interface CliRuntimeInvocationInput {
   readonly inputAdmission?: InputAdmissionReceipt;
   readonly effectiveInput?: string;
+  readonly requestEnvironment?: string;
   readonly virtualModel?: SessionVirtualModelSelection;
   readonly virtualModels?: VirtualModelRegistry;
   readonly convertToLlm?: TurnOptions['convertToLlm'];
@@ -80,6 +81,8 @@ export interface CliRuntimeInvocationInput {
   readonly thinkingPreference?: ReturnType<typeof captureThinkingPreference>;
   /** Receives the exact schema/system identity prepared for this run. */
   readonly onPromptIdentity?: (identity: PromptIdentitySnapshot) => void;
+  readonly retainedTools?: readonly string[];
+  readonly onDiscoveryLoad?: (names: readonly string[]) => void;
   /** Last accepted request identity from this same live session. */
   readonly readPromptIdentity?: () => PromptIdentitySnapshot | undefined;
   readonly background?: TurnOptions['background'];
@@ -111,7 +114,7 @@ export interface CliRuntimeInvocationInput {
   readonly mcpGateway?: McpGateway;
   readonly signal: AbortSignal;
   readonly maxTurns: number;
-  readonly escalationPromptHandler: (prompt: EscalationPrompt) => Promise<EscalationResponse>;
+  readonly escalationPromptHandler: (prompt: EscalationPrompt, interaction?: ApprovalInteraction) => Promise<EscalationResponse>;
   readonly providerCredentialResolution: ProviderCredentialResolution;
   readonly agentMode: "plan" | "build";
   readonly permissionScope?: PermissionScope;
@@ -346,9 +349,9 @@ async function startTurn(
     text:request.effectiveInput ?? request.prompt, images:request.attachments?.images, signal:request.signal});
   const hooks = admittedHooks ?? prepareSessionHooks({workspaceRoot:request.workspaceRoot, admission:request.admission,
     escalationPromptHandler:request.escalationPromptHandler, allowUntrustedHooks:request.runtimeConfig?.allowUntrustedHooks}, dependencies.hooks);
-  const mediaTool = imageGenerationTool(request) ?? classificationTool(request);
+  const mediaToolsForRun = mediaTools(request);
   const { tools, discovery, promptContext, currentOverhead } = await preparePromptRequest({
-    ...request, ...(mediaTool ? { featureTools: [...request.featureTools ?? [], mediaTool] } : {}),
+    ...request, ...(mediaToolsForRun.length ? { featureTools: [...request.featureTools ?? [], ...mediaToolsForRun] } : {}),
     builtinTools: browserTools(),
     toolsAvailable: providerToolsAvailable(request),
     worktrees: async workspace => (await import("../workflow/git/worktree/manager.js")).createTaskWorktree(workspace),
@@ -359,7 +362,11 @@ async function startTurn(
     request.onPromptIdentity?.(runtimePromptIdentity);
   };
   publishPromptIdentity();
-  discovery?.subscribe(publishPromptIdentity);
+  const featureNames = new Set([...request.featureTools ?? [], ...mediaToolsForRun].map(tool => tool.name));
+  discovery?.subscribe(() => {
+    publishPromptIdentity();
+    request.onDiscoveryLoad?.(discovery.loadedNames().filter(name => !featureNames.has(name)));
+  });
   const compaction = withRequestOverhead(request.compaction, currentOverhead(), currentOverhead, () => runtimePromptIdentity);
   // The step and the tool set both exist here, so this is where a subagent's
   // run can be bound. The tool layer receives a function and never the model
@@ -427,6 +434,7 @@ async function startTurn(
     interactiveAsk: request.interactiveAsk,
     history: request.historyMessages ?? [],
     storedPrompt: request.storedPrompt,
+    requestEnvironment: request.requestEnvironment,
     onMessage: request.onTurnMessage ?? (() => {}),
     step,
     tools,

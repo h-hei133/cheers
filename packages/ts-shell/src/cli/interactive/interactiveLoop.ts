@@ -48,11 +48,12 @@ export interface InteractiveLoopInput {
   readonly scheduler?: RenderScheduler;
   readonly setReadline: (readline: readline.Interface | null) => void;
   readonly setInteractiveApprovalPrompt?: (
-    handler: ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined,
+    handler: ((prompt: EscalationPrompt, signal?: AbortSignal) => Promise<InteractiveApprovalResult>) | undefined,
   ) => void;
   /** Theme paths this run was started with, so `/theme` can still select them. */
   readonly themePaths?: readonly string[];
   readonly resumeOnStart?: boolean;
+  readonly connectOnStart?: () => boolean;
   /** Owns resource cleanup and its total budget before terminating the process. */
   readonly exit?: (code?: number) => void;
   readonly stopSignal?: AbortSignal;
@@ -125,6 +126,7 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
         setReadline: input.setReadline,
         setInteractiveApprovalPrompt: input.setInteractiveApprovalPrompt,
         ...(input.resumeOnStart ? { resumeOnStart: true } : {}),
+        connectOnStart: input.connectOnStart,
         exit: code => { release(); exit(code); resolve(); },
       });
     } catch (error) { startup?.dispose(); reject(error); return; }

@@ -38,6 +38,7 @@ export interface HookDecision {
   readonly feedback?: string;
   readonly additionalContext?: string;
   readonly hookSpecificOutput?: Record<string, unknown>;
+  readonly updatedToolOutput?: string;
   readonly hookVerdict?: {
     readonly status: 'allow' | 'allow_with_advisory' | 'block' | 'unknown' | 'unsupported';
     readonly source: 'adapter' | 'hook';
@@ -75,6 +76,7 @@ export interface PostToolUsePayload extends BaseHookEventPayload {
   readonly args: Record<string, unknown>;
   readonly output: string;
   readonly success: boolean;
+  readonly script?: ScriptHookOutput;
 }
 
 export interface PostToolUseFailurePayload extends BaseHookEventPayload {
@@ -83,6 +85,15 @@ export interface PostToolUseFailurePayload extends BaseHookEventPayload {
   readonly toolCallId: string;
   readonly args: Record<string, unknown>;
   readonly error: string;
+  readonly script?: ScriptHookOutput;
+}
+
+export interface ScriptHookOutput {
+  readonly code: string;
+  readonly result: string;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly toolsUsed: readonly string[];
 }
 
 export interface PreModelSwitchPayload extends BaseHookEventPayload {
@@ -215,6 +226,7 @@ export interface CommandHookConfig {
   readonly fingerprint?: string;
   /** Where it was declared, so the approval prompt can name the source. */
   readonly sourcePath?: string;
+  readonly sourceCurrent?: () => boolean;
 }
 
 export interface HooksConfiguration {

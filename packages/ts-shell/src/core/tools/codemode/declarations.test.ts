@@ -66,6 +66,9 @@ async function runScript(registry: ReadonlyMap<string, ToolDefinition>, code: st
     workspaceRoot: workspace,
     sessionId: SESSION_ID,
     taskId: 'declaration-consumer',
+    executeNestedTool: (name, args, taskId, abortSignal) => registry.get(name)!.execute(args, {
+      workspaceRoot: workspace, sessionId: SESSION_ID, taskId, abortSignal,
+    }),
   })
   expect(result.success, result.error ?? result.output).toBe(true)
   return result

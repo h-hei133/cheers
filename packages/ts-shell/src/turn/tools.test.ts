@@ -129,8 +129,10 @@ describe("createToolHooks", () => {
       const result = await hooks.beforeToolCall!(call(tool.name, args));
       expect(Boolean(result?.block), tool.name).toBe(mode === "blocked");
       if (mode === "read-only") {
-        const mutation = tool.name === "bash" ? { command: "rm file" } : { action: "click" };
-        expect((await hooks.beforeToolCall!(call(tool.name, mutation)))?.block).toBe(true);
+        const mutation = tool.name === "bash" ? { command: "rm file" }
+          : tool.name === 'codemode' ? { code: "await tools.write({ path: 'file', content: 'value' });", record: true }
+            : tool.name === 'lsp' ? { operation: 'restart' } : { action: "click" };
+        expect((await hooks.beforeToolCall!(call(tool.name, mutation)))?.block, `${tool.name} mutation`).toBe(true);
       }
     }
     expect(report.output).toContain("| task | blocked |");
@@ -200,42 +202,6 @@ describe("createToolHooks", () => {
     // An approval round trip is reported as a request and then as a tool call, so
     // a hook can observe both the decision being asked for and what ran.
     expect(setup.dispatched).toEqual(["PermissionRequest", "PreToolUse", "PostToolUse"]);
-  });
-
-  it("stops a model that repeats the same call three times", async () => {
-    const hooks = createToolHooks(gate({ permissionScope: "allow-all" }));
-    expect(await hooks.beforeToolCall!(call("read", { path: "a" }))).toBeUndefined();
-    expect(await hooks.beforeToolCall!(call("read", { path: "a" }))).toBeUndefined();
-    const third = await hooks.beforeToolCall!(call("read", { path: "a" }));
-    expect(third?.block).toBe(true);
-    expect(third?.reason).toContain("Doom Loop detected");
-    expect(third?.reason).toContain("requested 3 consecutive times");
-    expect(third?.reason).not.toContain("state progression");
-    expect(third?.reason).not.toContain("executed");
-  });
-
-  it("describes repeated request patterns without claiming to inspect their results", async () => {
-    const hooks = createToolHooks(gate({ permissionScope: "allow-all" }));
-    for (let index = 0; index < 9; index++) {
-      expect(await hooks.beforeToolCall!(call(index % 2 === 0 ? "read" : "glob", { path: "a" }))).toBeUndefined();
-    }
-    const repeated = await hooks.beforeToolCall!(call("glob", { path: "a" }));
-    expect(repeated?.block).toBe(true);
-    expect(repeated?.reason).toContain("2-request pattern repeated 5 times");
-    expect(repeated?.reason).not.toContain("state progression");
-  });
-
-  it("does not count denied calls toward the doom loop", async () => {
-    const escalationPromptHandler = vi.fn(async (prompt: { id: string }) => ({
-      promptId: prompt.id,
-      decision: "deny" as const,
-      respondedAt: 1,
-    }));
-    const hooks = createToolHooks(gate({ permissionScope: "ask", escalationPromptHandler }));
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const denied = await hooks.beforeToolCall!(call("write", { path: "a" }));
-      expect(denied?.reason).toContain("User denied permission");
-    }
   });
 
   it("blocks when a PreToolUse hook returns block", async () => {

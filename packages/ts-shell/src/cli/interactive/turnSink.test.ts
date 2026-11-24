@@ -4,6 +4,7 @@ import { TurnSink } from "./turnSink.js";
 import { Transcript } from "../../presentation/tui/transcript/container.js";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
 import { createProviderReadinessCliTerminalEvent } from "../../entrypoints/providerReadinessCliSurface.js";
+import { restoreConversation } from './history.js';
 
 const WIDTH = 60;
 
@@ -17,6 +18,42 @@ function build(): { sink: TurnSink; transcript: Transcript; rows: () => string }
     rows: () => transcript.render(WIDTH).rows.join("\n"),
   };
 }
+
+it('shows live nested approval and changes and restores the folded script from its saved receipt', () => {
+  const { sink, transcript, rows } = build();
+  const code = 'await tools.write({ path: "sample.txt", content: "after" });';
+  const diff = '--- a/sample.txt\n+++ b/sample.txt\n@@ -1 +1 @@\n-before\n+after';
+  const nested = { taskId: 'script/1', parentToolCallId: 'script', toolName: 'write' };
+  sink.begin('turn', 'Apply edits');
+  sink.handleEvent({ type: 'tool.started', taskId: 'script', toolName: 'codemode', args: { code } });
+  const script = transcript.last()!;
+  sink.handleEvent({ type: 'tool.started', ...nested, detail: 'sample.txt' });
+  sink.handleEvent({ type: 'approval.requested', ...nested });
+  expect(rows()).toContain('awaiting approval');
+  sink.handleEvent({ type: 'approval.resolved', ...nested, outcome: 'approved' });
+  sink.handleEvent({ type: 'tool.result', ...nested, success: true, diff });
+  sink.handleEvent({ type: 'tool.result', taskId: 'script', toolName: 'codemode', success: true,
+    output: 'Script completed', nestedCallCount: 1 });
+  const text = stripAnsi(rows());
+  expect(text).toContain('approval approved');
+  expect(text).toContain('Code (1 tools)');
+  expect(text).toContain('+after');
+  expect(text).not.toContain('await tools.write');
+  transcript.setCollapsed(script, false);
+  expect(stripAnsi(rows())).toContain('await tools.write');
+
+  const restored = restoreConversation([
+    { role: 'assistant', content: '', tool_calls: [{ id: 'script', type: 'function',
+      function: { name: 'codemode', arguments: JSON.stringify({ code }) } }] },
+    { role: 'tool', content: 'Filtered script result', tool_call_id: 'script', metadata: { scriptStatus: 'failed',
+      nestedCalls: { complete: true, calls: [{ name: 'write', status: 'ok', arguments: { path: 'sample.txt' },
+        metadata: { approval: { decision: 'allow-once' }, status: 'committed', diff } }] } } },
+  ]);
+  expect(restored.blocks).toMatchObject([
+    { title: 'codemode', code, nestedCallCount: 1, collapsed: true, status: 'failed' },
+    { title: 'write', detail: 'sample.txt', approval: 'approved', diff, status: 'ok' },
+  ]);
+});
 
 describe("streaming assistant text", () => {
   it.each(['end', 'failure', 'next-message', 'tool'] as const)('keeps %s-finalized partial output outside confirmed message boundaries', action => {

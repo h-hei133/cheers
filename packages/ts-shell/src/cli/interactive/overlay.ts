@@ -610,14 +610,14 @@ export class OverlayHost {
       if (event.keyId === "enter") {
         const reason = this.denyDraft.trim();
         const onDeny = this.picker?.onDeny;
-        this.close();
         void onDeny?.(reason || undefined);
+        if (this.subMode === "deny-reason") this.close();
         return true;
       }
       if (event.keyId === "escape" || (event.ctrl && (event.keyId === "c" || event.keyId === "ctrl+c"))) {
         const onDeny = this.picker?.onDeny;
-        this.close();
         void onDeny?.(undefined);
+        if (this.subMode === "deny-reason") this.close();
         return true;
       }
       if (event.keyId === "backspace") {

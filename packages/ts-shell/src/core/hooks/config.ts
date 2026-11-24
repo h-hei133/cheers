@@ -154,7 +154,8 @@ function readOne(configPath: string): HookConfigLoadResult {
       }
       for (const command of commands) {
         hooks.push({ event: eventName, matcher, ...command, sourcePath: configPath,
-          ...(eventName === 'PostToolUse' || eventName === 'PostToolUseFailure' ? { sourceCurrent } : {}) });
+          ...(eventName === 'PostToolUse' || eventName === 'PostToolUseFailure'
+            || command.completionGate !== undefined || command.writeGate !== undefined ? { sourceCurrent } : {}) });
       }
     }
   }

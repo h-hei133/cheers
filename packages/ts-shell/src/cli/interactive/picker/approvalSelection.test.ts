@@ -3,6 +3,7 @@ import { approvalPicker, promptApproval } from './approval.js';
 import type { EscalationPrompt } from '../../../core/shell/approval/contract.js';
 import type { Picker } from '../overlay.js';
 import { REPORT_BYTES } from '../../../core/commands/report/contract.js';
+import { MAX_SCRIPT_TIMEOUT_MS, parseCodemodeScript } from '../../../core/tools/codemode/options.js';
 
 const prompt: EscalationPrompt = {
   id: 'esc_groups', title: 'apply patch', message: 'apply patch', context: { toolName: 'apply_patch', operation: 'write', target: 'a.txt',
@@ -44,6 +45,26 @@ it('binds a whole-plan approval to the full preview revision', async () => {
     selected: ['group-a', 'group-b'],
     selectionRevision: 'full-revision',
   });
+});
+
+it('offers only one-time script approval and preserves a reasoned denial as feedback', async () => {
+  const script: EscalationPrompt = { ...prompt, id: 'script', context: {
+    toolName: 'codemode', operation: 'execute', target: 'codemode', preview: 'return await tools.read({});', previewKind: 'execution',
+  }, options: [{ value: 'allow-once', label: 'Allow once', description: 'Current script' },
+    { value: 'allow-always', label: 'Allow always', description: 'Persistent' },
+    { value: 'deny', label: 'Deny', description: 'Stop' }] };
+  const opened: Picker[] = [];
+  const host = { pager: { open: () => undefined, close: () => undefined },
+    overlay: { open: (picker: Picker) => { opened.push(picker); }, close: () => undefined }, render: () => undefined };
+  const settled = promptApproval(script, host);
+  expect((await opened[0]!.load()).map(option => option.id)).toEqual(['allow-once', 'deny']);
+  opened[0]!.onDeny?.('Use the existing result.');
+  await expect(settled).resolves.toMatchObject({ decision: 'deny', denialFeedback: 'Use the existing result.' });
+});
+
+it('caps interactive script execution at ten minutes', () => {
+  expect(MAX_SCRIPT_TIMEOUT_MS).toBe(600_000)
+  expect(parseCodemodeScript('// @options: {"timeout_ms": 900000}\nreturn 1').timeoutMs).toBe(600_000)
 });
 
 it('keeps the three-choice picker when there is only one group', async () => {

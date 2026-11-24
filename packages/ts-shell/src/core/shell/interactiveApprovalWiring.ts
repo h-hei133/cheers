@@ -1,4 +1,4 @@
-import type { EscalationPrompt } from "./approval/contract.js";
+import { oneTimeApproval, type EscalationPrompt } from "./approval/contract.js";
 import type {
   ApprovalEvaluation,
   ApprovalTrustPolicy,
@@ -23,7 +23,7 @@ export function applyInteractiveApprovalDecisionWiring(input: {
 }): InteractiveApprovalWiringResult {
   // The caller returns allow-once to the waiting request; it is not a future grant.
   if (input.decision === "allow-always" && input.prompt.context.grantOwner !== 'caller'
-    && !input.prompt.context.toolName.startsWith('mcp__')) {
+    && !oneTimeApproval(input.prompt.context.toolName)) {
     return {
       persistedGrant: input.trustPolicy.rememberAllowAlways(
         input.prompt,

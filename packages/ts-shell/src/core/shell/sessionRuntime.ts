@@ -69,6 +69,7 @@ export type PromptRun =
 
 export interface SessionRuntimeDependencies {
   readonly prepareInput?: (input: PromptInputRequest) => Promise<PreparedPromptInput>;
+  readonly requestEnvironment?: (sessionId: string) => string | undefined;
   readonly captureQueuedInput?: CaptureQueuedPromptInput;
   readonly inputSource?: PromptInputRequest['source'];
   /** Native provenance owner may validate a one-use submission before durable prompt publication. */
@@ -91,6 +92,7 @@ export interface SessionRuntimeDependencies {
     onPromptAccepted?: () => void,
     inputAdmission?: InputAdmissionReceipt,
     effectiveInput?: string,
+    requestEnvironment?: string,
   ) => PromptRun;
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;
   readonly compactInjectionStateStore?: CompactInjectionStateStore;
@@ -321,21 +323,25 @@ export class ShellSessionRuntime {
         ? buildSessionResumeContext({ currentPrompt: effectivePrompt, snapshot: continuityState })
         : undefined;
 
+      let requestEnvironmentSnapshot: string | undefined;
       if (!options?.runtimeSeed) {
         preparedInput?.check();
         provenancePending = this.deps.admitPrompt !== undefined;
         await this.deps.admitPrompt?.(effectivePrompt, promptMetadata, signal);
         preparedInput?.check();
         preparingInput = false;
+        requestEnvironmentSnapshot = this.deps.requestEnvironment?.(sessionId);
+        const savedMetadata = requestEnvironmentSnapshot === undefined ? promptMetadata
+          : Object.freeze({ ...promptMetadata, requestEnvironment: requestEnvironmentSnapshot });
         if (preparedInput?.checkWrite) {
-          this.deps.sessionManager.persistUserPromptBarrier(sessionId, effectivePrompt, promptMetadata, attachments?.images, preparedInput.checkWrite);
+          this.deps.sessionManager.persistUserPromptBarrier(sessionId, effectivePrompt, savedMetadata, attachments?.images, preparedInput.checkWrite);
         } else if (attachments?.images.length) {
-          this.deps.sessionManager.persistUserPromptBarrier(sessionId, effectivePrompt, promptMetadata, attachments.images);
+          this.deps.sessionManager.persistUserPromptBarrier(sessionId, effectivePrompt, savedMetadata, attachments.images);
         } else {
-          this.deps.sessionManager.persistUserPromptBarrier(sessionId, effectivePrompt, promptMetadata);
+          this.deps.sessionManager.persistUserPromptBarrier(sessionId, effectivePrompt, savedMetadata);
         }
         if (preparedInput) {
-          try {preparedInput.published();} catch (error) {refusedInputSource = true; throw error;}
+          try {preparedInput.published(requestEnvironmentSnapshot);} catch (error) {refusedInputSource = true; throw error;}
         }
       }
 
@@ -363,6 +369,7 @@ export class ShellSessionRuntime {
         preparedPrompt?.accept,
         preparedInput?.admission,
         effectivePrompt,
+        requestEnvironmentSnapshot,
       );
       const events = Symbol.asyncIterator in run ? run : run.events;
       const input = Symbol.asyncIterator in run ? undefined : run.input;

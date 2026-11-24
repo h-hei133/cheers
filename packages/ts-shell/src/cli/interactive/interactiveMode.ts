@@ -73,7 +73,7 @@ import { decodeAdvisor } from '../../advisor/codec.js';
 import { readBoundSessionState } from '../../session/store/bound.js';
 import { isResearchControl, researchCommandFor } from '../runtime/research.js';
 import { gitWorkbenchFor } from '../runtime/git.js';
-import { recoverQueuedDrafts, SubmissionQueue } from './inputQueue.js';
+import { recallQueuedDraft, recoverQueuedDrafts, SubmissionQueue } from './inputQueue.js';
 import { openSettings } from "./settings.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { createViewState, type ViewState } from "../../presentation/tui/surface/contract.js";
@@ -100,6 +100,7 @@ import { catalogScope } from './catalogScope.js';
 import { ComposerPreference, readStatusItems, writeStatusItems } from "./tuiSettings.js";
 import type { ImageContent } from "../../model-adapters/multimodal.js";
 import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
+import { ArchitectureStatus } from './architecture.js';
 import { couldBeCommand, slashArgumentHint, slashSuggestions } from "./slashSuggestions.js";
 import { couldBeFileReference } from "./fileSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
@@ -161,12 +162,13 @@ export interface InteractiveModeOptions {
   readonly initialMcpGateway: CliMcpGateway;
   readonly setReadline?: (readline: ReadlineInterface | null) => void;
   readonly setInteractiveApprovalPrompt?: (
-    handler: ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined,
+    handler: ((prompt: EscalationPrompt, signal?: AbortSignal) => Promise<InteractiveApprovalResult>) | undefined,
   ) => void;
   readonly exit?: (code?: number) => void;
   /** Theme paths this run was started with, so `/theme` can still select them. */
   readonly themePaths?: readonly string[];
   readonly resumeOnStart?: boolean;
+  readonly connectOnStart?: () => boolean;
   /** Output device; defaults to the process terminal. */
   readonly terminal?: TerminalDevice;
   /** Frame scheduler; defaults to real timers. */
@@ -184,6 +186,7 @@ export class InteractiveMode {
   private readonly stash: DraftStash;
   private readonly stdin: StdinBuffer;
   private readonly sink: TurnSink;
+  private readonly architecture = new ArchitectureStatus();
   private readonly questions: QuestionBridge;
   private readonly readline: ReadlineInterface;
   private readonly gesture: { lastCancelAt?: number; lastEscapeAt?: number } = {};
@@ -318,6 +321,7 @@ export class InteractiveMode {
       if (this.options.resumeOnStart && !this.stopped && !this.closing) { this.openPicker('/resume'); return; }
       if (this.stopped || this.closing || this.extensionUi.active || this.busy || this.pickerPending || this.overlay.active || this.questions.question()) return;
       const next = this.queue.shift(); if (next !== undefined) this.runQueued(next, this.queue.takeAttachments());
+      else if (!this.state.editor.getText() && this.options.connectOnStart?.()) this.openPicker('/connect');
     }).catch(() => {});
     this.extensionBinding = new ExtensionUiBinding(options.runtimeContext, () => this.extensionUi?.clear());
     this.alternateScreen = options.runtimeContext.runtimeConfig.tuiMode !== "regular";
@@ -413,6 +417,7 @@ export class InteractiveMode {
             queued: this.queue.length + (this.options.sessionRuntime.input?.()?.pending().followUps.length ?? 0),
             peers: readPeerSessionCount(this.options.runtimeContext.session.id, { refresh: !this.pager.active && !this.overlay.active }),
             promptContext: this.promptContext.read(),
+            architecture: this.architecture.read(this.options.runtimeContext),
           }),
         statusItems: () => {
           const revision = this.options.runtimeContext.configuration.current.revision;
@@ -541,11 +546,11 @@ export class InteractiveMode {
     });
     this.readline = this.questions.asReadline(() => { void this.shutdown(); });
     this.options.setReadline?.(this.readline);
-    this.options.setInteractiveApprovalPrompt?.((prompt) => {
+    this.options.setInteractiveApprovalPrompt?.((prompt, signal) => {
       this.extensionUi.cancelDialogs();
       return promptApproval(prompt,
         { pager: this.pager, overlay: this.overlay, render: () => this.tui.requestRender() },
-        this.options.sessionRuntime.getCurrentRunController()?.signal);
+        signal ?? this.options.sessionRuntime.getCurrentRunController()?.signal);
     });
     this.tui.setFrameProvider(recordingFrameProvider(options.runtimeContext, this.view));
     this.state.editor.placeholder = DEFAULT_PLACEHOLDER;
@@ -661,6 +666,7 @@ export class InteractiveMode {
       this.extensionBinding.refresh(this.extensionUi.host);
     });
     this.releaseEvents = this.options.sessionRuntime.observeEvents(event => {
+      if (this.architecture.observe(event, this.options.runtimeContext)) this.tui.requestRender();
       if (event.type === 'message.custom') appendCustomMessage(this.historyTarget(), event.sessionId, event.message);
       else this.sink.handleEvent(event);
     });
@@ -728,8 +734,9 @@ export class InteractiveMode {
     // recolouring something not yet on screen.
     this.theme.refresh();
     this.promptContext.start();
-    if (this.options.resumeOnStart && !this.options.onInputReady) {
-      this.openPicker("/resume");
+    if (!this.options.onInputReady) {
+      if (this.options.resumeOnStart) this.openPicker('/resume');
+      else if (!this.state.editor.getText() && this.options.connectOnStart?.()) this.openPicker('/connect');
     }
   }
 
@@ -838,6 +845,7 @@ export class InteractiveMode {
     routeKey(event, {
       view: this.view,
       busy: this.busy,
+      awaitingAnswer: !this.startup.admitted() || Boolean(this.questions.question()),
       interruptible: this.startup.pending() || Boolean(this.options.sessionRuntime.commands?.current)
         || Boolean(schedulerForRuntime(this.options.sessionRuntime)?.ownerToken()) || directorInterruptible(this.options.runtimeContext),
       now: () => Date.now(),
@@ -852,7 +860,18 @@ export class InteractiveMode {
       vimMode: this.options.runtimeContext.runtimeConfig.vimMode === true && !this.questions.question(),
       slashScope: catalogScope(this.options.runtimeContext),
       actions: {
-        submit: (text, disposition, attachments) => this.onSubmit(text, disposition, attachments),
+        submit: (text, disposition, attachments, deferCommands) => deferCommands
+          ? this.onSubmit(text, disposition, attachments, deferCommands)
+          : this.onSubmit(text, disposition, attachments),
+        recallQueuedDraft: () => {
+          const current = this.state.editor.getText();
+          const recalled = recallQueuedDraft(this.options.sessionRuntime.input?.(), this.queue, this.state.pastes, current);
+          if (recalled === undefined) return;
+          this.replaceExternalDraft([recalled, current].filter(Boolean).join('\n\n'));
+          this.view.setSuggesting(false);
+          this.promptContext.update();
+          this.tui.requestRender();
+        },
         interrupt: () => void this.interrupt(),
         exit: () => this.shutdown(),
         redraw: () => this.tui.requestRender(),
@@ -943,25 +962,26 @@ export class InteractiveMode {
    * back after a typo is deleted, since a backspace carries no text of its own.
    * History recall is excluded, so the arrows keep working on a recalled prompt.
    */
-  private syncSuggestions(mayOpen: boolean): void {
+  private syncSuggestions(mayOpen: boolean): boolean {
     this.promptContext.update();
     const snapshot = this.state.editor.snapshot();
     const draft = snapshot.text;
     this.completionStatus = undefined;
-    if (this.catalogs.update(snapshot)) return;
+    if (this.catalogs.update(snapshot)) return true;
     const scope = catalogScope(this.options.runtimeContext);
     const matches = slashSuggestions(draft, snapshot, scope);
     if (!matches) {
       this.completionStatus = slashArgumentHint(snapshot, scope);
       this.view.setSuggesting(false);
-      return;
+      return false;
     }
     const prefix = draft.slice(0, snapshot.cursor);
     const couldStillBecomeSomething = couldBeCommand(prefix) || couldBeFileReference(prefix) ||
       (matches[0]?.edit?.from ?? 0) > 0;
-    if (!mayOpen && !this.view.suggestionsOpen && !couldStillBecomeSomething) return;
+    if (!mayOpen && !this.view.suggestionsOpen && !couldStillBecomeSomething) return false;
     this.state.suggestions.setItems(matches);
     this.view.setSuggesting(true);
+    return true;
   }
 
 
@@ -970,8 +990,18 @@ export class InteractiveMode {
     text: string,
     disposition?: "steer" | "followUp",
     attachments?: { readonly images: readonly ImageContent[] },
+    deferCommands?: true,
   ): void {
     if (this.closing || this.stopped) return;
+    if (deferCommands && this.busy) {
+      this.toast = undefined;
+      this.completionStatus = undefined;
+      this.catalogs.invalidate();
+      appendPromptHistory(this.options.runtimeContext.projectRoot, text);
+      this.queue.push(text, attachments);
+      this.tui.requestRender();
+      return;
+    }
     const invocation = parseCommandSource(text);
     if (invocation && !invocation.argsText.trim() && resolveCommandInvocation(
       [...createCommandRegistry(this.options.runtimeContext.cwd, this.options.runtimeContext.runtimeConfig).values()],
@@ -1195,7 +1225,8 @@ export class InteractiveMode {
         // interrupted turn cannot leave a question the model never saw.
         input.steer(text);
       } else {
-        input.followUp(text);
+        if (input.recallFollowUp) input.followUp(text, undefined, { source: 'interactive' });
+        else input.followUp(text);
       }
       this.tui.requestRender();
       return;

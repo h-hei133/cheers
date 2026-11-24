@@ -40,6 +40,22 @@ describe("ApprovalTrustPolicy", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
+  it('retains old script grants for revocation without giving them authority', () => {
+    const prompt = buildPrompt('codemode');
+    prompt.context.toolName = 'codemode';
+    prompt.context.operation = 'execute';
+    const timestamp = new Date().toISOString();
+    const grant = { projectRoot: normalizeExpectedProjectRoot(tempDir), toolName: 'codemode', operation: 'execute',
+      scopeKey: 'codemode:execute:exact:codemode', scopeLabel: 'codemode/execute(codemode)',
+      createdAt: timestamp, updatedAt: timestamp };
+    fs.writeFileSync(policyPath, JSON.stringify({ grants: [grant] }));
+    const policy = new ApprovalTrustPolicy(policyPath);
+    expect(policy.listGrants(tempDir)).toHaveLength(1);
+    expect(policy.evaluate(prompt, tempDir).matchedGrant).toBeUndefined();
+    expect(() => policy.rememberAllowAlways(prompt, tempDir)).toThrow('Script approval covers one call.');
+    expect(policy.listGrants(tempDir)).toHaveLength(1);
+  });
+
   it("persists allow-always by project-scoped command signature", () => {
     const policy = new ApprovalTrustPolicy(policyPath);
     const projectA = path.join(tempDir, "project-a");

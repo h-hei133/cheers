@@ -64,12 +64,14 @@ export type QueryEvent =
     readonly type: 'tool.started'
     readonly toolName: string
     readonly taskId: string
+    readonly parentToolCallId?: string
+    readonly detail?: string
     /** Arguments the call was made with, so a card can say what it is doing. */
     readonly args?: Readonly<Record<string, unknown>>
   }
   | ({ readonly type: 'tool.preview' } & ToolPreview)
-  | { readonly type: 'approval.requested'; readonly toolName: string; readonly taskId: string }
-  | { readonly type: 'approval.resolved'; readonly toolName: string; readonly taskId: string; readonly outcome: 'approved' | 'denied'; readonly compensated?: boolean }
+  | { readonly type: 'approval.requested'; readonly toolName: string; readonly taskId: string; readonly parentToolCallId?: string }
+  | { readonly type: 'approval.resolved'; readonly toolName: string; readonly taskId: string; readonly outcome: 'approved' | 'denied'; readonly compensated?: boolean; readonly parentToolCallId?: string }
   /**
    * The call is over. Sent when the tool itself finishes, which for a batch of
    * parallel calls is well before the batch's result messages are assembled.
@@ -100,6 +102,9 @@ export type QueryEvent =
     readonly type: 'tool.result';
     readonly toolName: string;
     readonly taskId: string;
+    readonly parentToolCallId?: string;
+    readonly diff?: string;
+    readonly nestedCallCount?: number;
     readonly success: boolean;
     readonly compensated?: boolean;
     readonly failureReason?: string;

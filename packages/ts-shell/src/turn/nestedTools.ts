@@ -1,10 +1,20 @@
 import { finalizeExecutedCall, type AgentToolResult, type ToolHooks } from '../core/agent/tools.js';
+import type { ApprovalInteraction } from '../core/shell/approval/contract.js';
+import type { QueryEvent } from '../core/query/runtime/events.js';
+import { evaluateToolPermissionScope } from '../core/query/toolPolicy.js';
+import { redactExportText } from '../core/security/redaction.js';
+import { truncateHead, truncateTextBytes } from '../core/tools/truncation.js';
+import { displayReportText } from '../core/commands/report/projection.js';
+import { neutraliseForDisplay } from '../core/text/safety.js';
+import { recordedEditDiff } from '../edit/result/diff.js';
 import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '../tools/types.js';
 import { toolExecutionMode } from './execution.js';
 
 export interface GatedToolExecutorHost {
   readonly tools: ReadonlyMap<string, ToolDefinition>
   readonly hooks: ToolHooks
+  readonly parentToolCallId?: string
+  readonly emit?: (event: QueryEvent) => void
   readonly prepare: (
     tool: ToolDefinition,
     args: Record<string, unknown>,
@@ -27,7 +37,8 @@ export function createGatedNestedToolExecutor(
 ): NonNullable<ToolExecutionContext['executeNestedTool']> {
   let sequential: Promise<void> = Promise.resolve();
   const active = new Set<Promise<void>>();
-  return async (name, rawArgs, callId, childSignal) => {
+  let stopped = false;
+  return async (name, rawArgs, callId, childSignal, beginWait) => {
     if (name === 'codemode') {
       return { success: false, error: 'Recursive codemode calls are not allowed.' };
     }
@@ -35,9 +46,14 @@ export function createGatedNestedToolExecutor(
     if (!target) {
       return { success: false, error: `Unknown tool '${name}'.` };
     }
+    const isSequential = toolExecutionMode(target) === 'sequential'
+      || evaluateToolPermissionScope(name, rawArgs, 'ask', undefined, [], target).operation !== 'read';
     const owned = nestedSignal(parentSignal, childSignal);
-    const run = () => executeNested(host, target, rawArgs, callId, owned.signal);
-    const isSequential = toolExecutionMode(target) === 'sequential';
+    const run = async () => {
+      const result = await executeNested(host, target, rawArgs, callId, owned.signal, beginWait, () => stopped);
+      if (result.stop) stopped = true;
+      return result;
+    };
     // Calls arrive as a stream. A write waits for earlier reads and effects;
     // later reads wait for that write's complete gate and finalizer.
     const ready = isSequential ? Promise.all([sequential, ...active]) : sequential;
@@ -66,24 +82,38 @@ function nestedSignal(parent: AbortSignal | undefined, child: AbortSignal | unde
 }
 
 async function executeNested(host: GatedToolExecutorHost, target: ToolDefinition, rawArgs: Record<string, unknown>,
-  callId: string, signal: AbortSignal | undefined): Promise<ToolExecutionResult> {
+  callId: string, signal: AbortSignal | undefined, beginWait: ApprovalInteraction['beginWait'],
+  isStopped: () => boolean): Promise<ToolExecutionResult> {
   const assistantMessage = { role: 'assistant' as const, content: '' };
   let args = rawArgs;
   let executed = false;
+  let committedDiff: string | undefined;
   let result: AgentToolResult;
+  let denial: ToolExecutionResult['denial'];
+  const identity = { taskId: callId, toolName: target.name, parentToolCallId: host.parentToolCallId };
+  const detail = rawArgs.path ?? rawArgs.command;
+  const check = () => {
+    signal?.throwIfAborted();
+    if (isStopped()) throw new Error('Script stopped after a tool approval was denied.');
+  };
   try {
-    signal?.throwIfAborted();
+    host.emit?.({ type: 'tool.started', ...identity,
+      ...(typeof detail === 'string' ? { detail: truncateTextBytes(neutraliseForDisplay(redactExportText(detail)), 500) } : {}) });
+    check();
     args = await host.prepare(target, rawArgs, signal);
-    signal?.throwIfAborted();
+    check();
     const call = { id: callId, name: target.name, args };
-    const verdict = await host.hooks.beforeToolCall?.({ assistantMessage, call, args }, signal);
-    signal?.throwIfAborted();
+    const verdict = await host.hooks.beforeToolCall?.({ assistantMessage, call, args }, signal, beginWait);
     if (verdict?.block) {
+      denial = verdict.denial;
       result = { isError: true, output: verdict.reason || `Tool '${target.name}' was blocked.`,
+        ...(denial === 'without-feedback' ? { stop: 'approval-denied' as const } : {}),
         ...(verdict.terminate === true ? { terminate: true } : {}) };
     } else {
+      check();
       result = await host.execute(target, callId, args, signal);
       executed = true;
+      if (!result.isError && result.metadata?.status === 'committed') committedDiff = recordedEditDiff(result.metadata);
       result = await finalizeExecutedCall(assistantMessage, call, args, result, host.hooks, signal);
     }
   } catch (error) {
@@ -101,12 +131,31 @@ async function executeNested(host: GatedToolExecutorHost, target: ToolDefinition
     if (refusal) result = refusedResult(result, refusal);
     if (signal?.aborted) result = refusedResult(result, 'Operation aborted before nested result publication.');
   }
+  const diff = result.isError ? undefined : nestedDiff(committedDiff);
+  const failureReason = result.isError ? truncateTextBytes(neutraliseForDisplay(redactExportText(result.output)), 200) : undefined;
+  try { host.emit?.({ type: 'tool.result', ...identity, success: !result.isError,
+    ...(diff ? { diff } : {}), ...(failureReason ? { failureReason } : {}) }); }
+  catch { result = refusedResult(result, 'Nested tool observation could not be recorded.'); }
+  const metadata = result.metadata ? { ...result.metadata } : undefined;
+  if (metadata) {
+    delete metadata.diff;
+    if (diff && !result.isError) metadata.diff = diff;
+  }
   return {
     ...(result.isError ? { success: false, error: result.output } : { success: true, output: result.output }),
-    metadata: result.metadata,
+    metadata,
     ...(result.images ? { images: result.images } : {}),
     ...(result.terminate !== undefined ? { terminate: result.terminate } : {}),
+    ...(result.stop ? { stop: result.stop } : {}),
+    ...(denial ? { denial } : {}),
   };
+}
+
+function nestedDiff(source: string | undefined): string | undefined {
+  if (!source) return undefined;
+  const safe = truncateHead(redactExportText(displayReportText(source)), { maxBytes: 1_300, maxLines: 80 });
+  if (!safe.content) return undefined;
+  return safe.truncated ? safe.content + '\n\\ Diff preview shortened.' : safe.content;
 }
 
 function refusedResult(result: AgentToolResult, reason: string): AgentToolResult {

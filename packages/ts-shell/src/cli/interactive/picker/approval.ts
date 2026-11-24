@@ -1,4 +1,4 @@
-import type { EscalationPrompt } from "../../../core/shell/approval/contract.js";
+import { oneTimeApproval, type EscalationPrompt } from "../../../core/shell/approval/contract.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { OverlayHost, Picker } from "../overlay.js";
 import type { Pager } from '../../../presentation/tui/chrome/pager.js';
@@ -61,7 +61,7 @@ export function promptApproval(prompt: EscalationPrompt, host: { readonly pager:
           };
           refinedPreview = approvalPreview(refinedPrompt);
         } catch (error) {
-          settle({ decision: 'deny', reason: error instanceof Error ? error.message : 'The selected patch subset could not be prepared.' });
+          settle({ decision: 'deny', reason: error instanceof Error ? error.message : 'The selected patch subset could not be prepared.', denialSource: 'policy' });
           return;
         }
         if (settled) return;
@@ -92,8 +92,9 @@ export function promptApproval(prompt: EscalationPrompt, host: { readonly pager:
 
 export function approvalPreview(prompt: EscalationPrompt) {
   const preview = prompt.context?.preview;
-  return preview ? createReport({ title: prompt.context.previewKind === 'execution' ? 'Review execution request — close to choose approval' : 'Review file plan — close to choose approval', facts: { permission: 'pending' },
-    lines: preview.split('\n').map(text => ({ kind: 'text', spans: [span(text, 'code')] })) }) : undefined;
+  if (!preview) return undefined;
+  return createReport({ title: prompt.context.previewKind === 'execution' ? 'Review execution request — close to choose approval' : 'Review file plan — close to choose approval', facts: { permission: 'pending' },
+    lines: preview.split('\n').map(text => ({ kind: 'text', spans: [span(text, 'code')] })) });
 }
 
 /**
@@ -107,6 +108,8 @@ export type ApprovalDecision = "deny" | "allow-once" | "allow-always";
 export interface ApprovalSettleResult {
   readonly decision: ApprovalDecision;
   readonly reason?: string;
+  readonly denialFeedback?: string;
+  readonly denialSource?: 'policy';
   /** Group ids the user approved; a whole-plan approval selects every group. */
   readonly selected?: readonly string[];
   /** Exact selected-subset revision shown in the final approval preview. */
@@ -121,7 +124,7 @@ export function approvalPicker(
   onChooseGroups?: () => void,
 ): Picker {
   const toolName = prompt.context?.toolName || "tool";
-  const persistentAllowed = toolName !== 'apply_patch' && !toolName.startsWith('mcp__');
+  const persistentAllowed = !oneTimeApproval(toolName);
   const operation = prompt.context?.operation ? ` (${prompt.context.operation})` : "";
   const target = prompt.context?.target ? ` on '${prompt.context.target}'` : "";
   const permitted = (choice: ApprovalDecision) => !prompt.options.length || prompt.options.some(option => option.value === choice);
@@ -180,7 +183,7 @@ export function approvalPicker(
       return undefined;
     },
     onDeny: (reason?: string) => {
-      onSettle({ decision: "deny", reason });
+      onSettle({ decision: "deny", ...(reason ? { reason, denialFeedback: reason } : {}) });
     },
     previewEnd: () => {
       onSettle({ decision: "deny" });
@@ -208,7 +211,7 @@ function hunkPicker(
       onSelect({ decision: 'allow-once', selected: [...ids] });
       return undefined;
     },
-    onDeny: (reason?: string) => { onDeny({ decision: 'deny', ...(reason ? { reason } : {}) }); },
+    onDeny: (reason?: string) => { onDeny({ decision: 'deny', ...(reason ? { reason, denialFeedback: reason } : {}) }); },
     previewEnd: () => { onDeny({ decision: 'deny' }); },
   };
 }

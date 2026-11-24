@@ -61,8 +61,16 @@ export interface StopCheck {
   readonly proofVerdict: ProofVerdict;
   readonly evidenceIdentity: readonly string[];
   readonly durationMs: number;
+  /** Host observation of the workspace that ran the packaged architecture check. */
+  readonly architecture?: ArchitectureCheck;
   readonly stopDisposition?: 'completed_unproven';
   readonly stopRepair?: StopRepairProgress;
+}
+
+export interface ArchitectureCheck {
+  readonly sessionId: string;
+  readonly workspaceIdentity: string;
+  readonly verdict: 'proven' | 'partial';
 }
 
 export interface StopDispatchOptions {

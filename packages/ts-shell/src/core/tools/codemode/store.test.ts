@@ -42,7 +42,10 @@ function run(code: string, barrier?: () => void, id = sessionId): Promise<ToolEx
   const tools = new Map<string, ToolDefinition>([['barrier', { name: 'barrier', description: 'fixture boundary', argsSchema: {},
     execute: async () => { barrier?.(); return { success: true, output: 'ready' }; },
   }]]);
-  return createCodemodeToolDefinition(() => tools).execute({ code }, { workspaceRoot: workspace, sessionId: id, taskId: 'cm-store' });
+  return createCodemodeToolDefinition(() => tools).execute({ code }, {
+    workspaceRoot: workspace, sessionId: id, taskId: 'cm-store',
+    executeNestedTool: (name, args, taskId) => tools.get(name)!.execute(args, { workspaceRoot: workspace, sessionId: id, taskId }),
+  });
 }
 function switchLeaf(leafEntryId: string) {
   const files = layout();

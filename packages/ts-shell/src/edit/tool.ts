@@ -11,6 +11,7 @@ import { applyUnixReplacementsToOriginal, detectLineEnding, splitByteOrderMark, 
 import type { ExecutionService } from '../runtime/execution/service.js';
 import type { ToolDefinition, ToolExecutionContext, ToolPreparation } from '../tools/types.js';
 import { createUnifiedDiff } from '../presentation/tui/transcript/diff.js';
+import { recordEditDiff } from './result/diff.js';
 
 const wireSchema = {
   type: 'object',
@@ -159,8 +160,13 @@ async function prepareEdit(service: ExecutionService, args: Record<string, unkno
           assertFileAccess: absolute => { verifyWorkspace(); actual.assertFileAccess?.(absolute); }, abortSignal: actual.abortSignal,
           authority: { mode: 'approved-for-write', source: 'tool-runtime-approval', reason: 'The original prepared edit was approved.' },
           caller: 'core-tool:edit', reason: 'Commit the approved prepared replacement.', reportSafeTarget: containment.resolvedPath });
-        const meta = written ? { ...written } : { status: 'unverified' };
-        return approvedResult(output, firstChangedLine !== undefined ? { ...meta, firstChangedLine } : meta);
+        const metadata = { ...(written ? { ...written } : { status: 'unverified' }),
+          ...(firstChangedLine === undefined ? {} : { firstChangedLine }) };
+        if (actual.nested) {
+          if (written?.status === 'committed') recordEditDiff(metadata, diff || createUnifiedDiff(relative, raw ?? '', content));
+          return approvedResult(`Updated ${relative}`, metadata);
+        }
+        return approvedResult(output, metadata);
       } });
   });
 }

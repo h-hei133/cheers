@@ -83,6 +83,7 @@ export async function commandOutputResult(result: CommandExecutionResult, captur
   const output = [preview.content, outputNotice].filter(Boolean).join('\n\n');
   const metadata = { executionPath: result.executionPath, errorClass: result.errorClass,
     status: result.status, exitCode: result.exitCode, truncated, ...(outputArtifact ? { outputArtifact } : {}), ...(outputNotice ? { outputNotice } : {}),
+    ...(result.terminationFailed ? { terminationFailed: true } : {}), ...(result.spawnErrorCode ? { spawnErrorCode: result.spawnErrorCode } : {}),
     ...(!capture.complete ? { outputComplete: false } : {}), ...(cleanupUnknown ? { outputCleanup: 'unknown' } : {}) };
   if (result.status === 'completed' && result.exitCode === 0) return approvedResult(output, metadata);
   return deniedResult(output, { ...metadata, failureKind: result.failureKind

@@ -2,6 +2,15 @@ import type { ImageContent } from '../../../model-adapters/multimodal.js'
 import { boundToolMedia, createToolMediaBudget } from '../../agent/media.js'
 import { truncateTextBytes } from '../truncation.js'
 import { validateCodemodeImage } from './image.js'
+import { redactExportText } from '../../security/redaction.js'
+import { displayReportText } from '../../commands/report/projection.js'
+import type { ScriptTextKind } from './execution.js'
+
+const observations = new WeakMap<object, { readonly stdout: string; readonly stderr: string }>()
+
+export function scriptConsole(metadata: object | undefined) {
+  return metadata && observations.get(metadata)
+}
 
 export interface ScriptOutput {
   readonly text: string
@@ -12,7 +21,7 @@ export interface ScriptOutput {
 /** Apply early host limits and the existing final media budget before any result is retained. */
 export class CodemodeOutput {
   private readonly textItems: string[] = []
-  private readonly consoleLines: string[] = []
+  private readonly consoleLines: { readonly kind: 'console' | 'stderr'; readonly value: string }[] = []
   private readonly images: ImageContent[] = []
   private readonly media = createToolMediaBudget()
   private chars = 0
@@ -21,13 +30,13 @@ export class CodemodeOutput {
 
   constructor(private readonly maxBytes: number) {}
 
-  text(kind: 'text' | 'console', value: string): void {
+  text(kind: ScriptTextKind, value: string): void {
     if (++this.items > 10_000 || value.length > this.maxBytes * 4 - this.chars) {
       throw new Error('Exceeded codemode output buffer limit.')
     }
     this.chars += value.length
     if (kind === 'text') { if (value) this.textItems.push(value) }
-    else this.consoleLines.push(value)
+    else this.consoleLines.push({ kind, value })
   }
 
   image(item: unknown): void {
@@ -42,7 +51,7 @@ export class CodemodeOutput {
     const parts: string[] = [header]
     if (this.textItems.length === 1) parts.push(this.textItems[0]!)
     else this.textItems.forEach((item, index) => parts.push(`==> text ${index + 1}/${this.textItems.length} <==\n${item}`))
-    if (this.consoleLines.length) parts.push(`<console_output>\n${this.consoleLines.join('\n')}\n</console_output>`)
+    if (this.consoleLines.length) parts.push(`<console_output>\n${this.consoleLines.map(line => line.value).join('\n')}\n</console_output>`)
     if (error) parts.push(`Script error: ${error}`)
     let text = parts.join('\n\n')
     let notice = [additionalNotice, this.notice].filter(Boolean).join('\n')
@@ -55,5 +64,12 @@ export class CodemodeOutput {
     } else if (notice) text += '\n' + notice
     return { text, ...(this.images.length ? { images: [...this.images] } : {}),
       ...(notice ? { metadata: { outputNotice: notice } } : {}) }
+  }
+
+  observe(metadata: Record<string, unknown>): void {
+    observations.set(metadata, Object.freeze({
+      stdout: truncateTextBytes(redactExportText(displayReportText(this.consoleLines.filter(line => line.kind === 'console').map(line => line.value).join('\n'))), 16 * 1024),
+      stderr: truncateTextBytes(redactExportText(displayReportText(this.consoleLines.filter(line => line.kind === 'stderr').map(line => line.value).join('\n'))), 16 * 1024),
+    }))
   }
 }

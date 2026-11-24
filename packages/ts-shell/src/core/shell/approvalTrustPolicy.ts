@@ -62,12 +62,10 @@ export class ApprovalTrustPolicy {
       (grant) => grant.projectRoot === normalizedProjectRoot,
     );
     const sameOperationCandidates = projectScopedCandidates.filter(
-      (grant) =>
-        grant.toolName === scope.toolName && grant.operation === scope.operation,
+      (grant) => grant.toolName === scope.toolName && grant.operation === scope.operation
+        && scope.toolName !== 'codemode',
     );
-    const matchedGrant = sameOperationCandidates.find(
-      (grant) => grant.scopeKey === scope.scopeKey,
-    );
+    const matchedGrant = sameOperationCandidates.find(grant => grant.scopeKey === scope.scopeKey);
 
     return {
       cacheKey: buildCacheKey(normalizedProjectRoot, scope.scopeKey),
@@ -122,6 +120,7 @@ export class ApprovalTrustPolicy {
   ): PersistedApprovalGrant {
     const normalizedProjectRoot = normalizeProjectRoot(projectRoot);
     const scope = buildScope(prompt);
+    if (scope.toolName === 'codemode') throw new Error('Script approval covers one call.');
     const state = this.readState();
     const now = new Date().toISOString();
     const nextGrant: PersistedApprovalGrant = {

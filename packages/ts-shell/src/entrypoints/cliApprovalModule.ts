@@ -5,7 +5,7 @@ import { ApprovalTrustPolicy, type ApprovalEvaluation } from "../core/shell/appr
 import { applyInteractiveApprovalDecisionWiring } from "../core/shell/interactiveApprovalWiring.js";
 import { buildScope } from '../core/shell/approval/store.js';
 import { StreamingRenderer } from "../presentation/terminal/streaming.js";
-import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
+import { oneTimeApproval, type ApprovalInteraction, type EscalationPrompt, type EscalationResponse } from "../core/shell/approval/contract.js";
 import type { InteractiveApprovalResult } from "../cli/interactive/picker/approval.js";
 import {
   scopeAnswer,
@@ -53,8 +53,9 @@ export function createCliEscalationPromptHandler(
   getPermissionScope?: () => PermissionScope,
   promptInteractiveApproval?: (
     prompt: EscalationPrompt,
+    signal?: AbortSignal,
   ) => Promise<InteractiveApprovalResult>,
-): (prompt: EscalationPrompt) => Promise<EscalationResponse> {
+): (prompt: EscalationPrompt, interaction?: ApprovalInteraction) => Promise<EscalationResponse> {
   function emitApprovalAudit(record: ApprovalAuditRecord): void {
     if (!promptInteractiveApproval) {
       renderApprovalAuditSurface(renderer, record);
@@ -73,10 +74,12 @@ export function createCliEscalationPromptHandler(
     return { source: "default-deny", decision: "deny" };
   }
 
-  return async (prompt) => {
+  return async (prompt, interaction) => {
+    interaction?.signal?.throwIfAborted();
     const projectRoot = getProjectRoot();
     const isMcp = prompt.context.toolName.startsWith("mcp__");
-    if (isMcp) {
+    const oneTime = oneTimeApproval(prompt.context.toolName);
+    if (oneTime && prompt.options) {
       prompt = { ...prompt, options: prompt.options.filter(option => option.value !== "allow-always") };
     }
     // Some callers own a stricter grant identity and withdrawal contract. The
@@ -94,8 +97,8 @@ export function createCliEscalationPromptHandler(
       : undefined;
     // MCP grants only identify the tool name, not the current arguments.
     // Retain legacy entries for management without accepting their authority.
-    const hasAllowOnceCache = !requiresAnswer && !isMcp && trustPolicy.hasAllowOnce(evaluation.cacheKey);
-    const hasAllowAlwaysGrant = !requiresAnswer && !isMcp && Boolean(evaluation.matchedGrant);
+    const hasAllowOnceCache = !requiresAnswer && !oneTime && trustPolicy.hasAllowOnce(evaluation.cacheKey);
+    const hasAllowAlwaysGrant = !requiresAnswer && !oneTime && Boolean(evaluation.matchedGrant);
     const hasCachedGrant = hasAllowOnceCache || hasAllowAlwaysGrant;
     // A session scope answers before anything is put to the user, and only in the
     // interactive channel: the non-interactive path has its own explicit policy,
@@ -150,6 +153,7 @@ export function createCliEscalationPromptHandler(
       return createApprovalResponse({
         promptId: prompt.id,
         decision: "deny",
+        denialSource: 'policy',
         userComment: "CLI exact selection blocked: no interactive group-selection host is available.",
       });
     }
@@ -166,7 +170,7 @@ export function createCliEscalationPromptHandler(
         decisionSource: nonInteractiveDecisionPlan.source,
       });
       const resolvedDecision = isMcp && nonInteractiveDecisionPlan.decision === "allow-always"
-        ? "allow-once" : nonInteractiveDecisionPlan.decision;
+        ? "allow-once" : oneTime && nonInteractiveDecisionPlan.decision === 'allow-always' ? 'deny' : nonInteractiveDecisionPlan.decision;
       renderer.renderLine(
         formatNonInteractiveApprovalPolicyLine({
           resolvedDecision,
@@ -226,6 +230,7 @@ export function createCliEscalationPromptHandler(
       return createApprovalResponse({
         promptId: prompt.id,
         decision: resolvedDecision,
+        ...(resolvedDecision === 'deny' ? { denialSource: 'policy' as const } : {}),
         userComment: formatNonInteractiveApprovalComment({
           decision: resolvedDecision,
           decisionSource: nonInteractiveDecisionPlan.source,
@@ -297,7 +302,7 @@ export function createCliEscalationPromptHandler(
 
     if (!promptInteractiveApproval) {
       renderApprovalRequiredSurface(renderer, { prompt, includeRisk: true });
-      if (!isNonInteractive && prompt.context.explicitApproval && prompt.context.previewKind === 'execution' && prompt.context.preview) {
+      if (!isNonInteractive && (prompt.context.explicitApproval || oneTime) && prompt.context.previewKind === 'execution' && prompt.context.preview) {
         const preview = redactReportText(stripVTControlCharacters(prompt.context.preview), 48_000, { preserveLines: true, ellipsis: true });
         for (const line of preview.split('\n')) renderer.renderLine(line);
       }
@@ -318,7 +323,7 @@ export function createCliEscalationPromptHandler(
           "- Tip: use /view developer to see policy and full escalation details.",
         );
       }
-      renderer.renderLine(isMcp || prompt.context.explicitApproval
+      renderer.renderLine(oneTime || prompt.context.explicitApproval
         ? "Decision: y=allow-once, n=deny (default n)"
         : formatApprovalPromptDecisionMenuLine());
     }
@@ -326,6 +331,8 @@ export function createCliEscalationPromptHandler(
     let decision: "deny" | "allow-once" | "allow-always";
     let decisionInputKey: "y" | "a" | "n" | "other" | undefined;
     let denialReason: string | undefined;
+    let denialFeedback: string | undefined;
+    let denialSource: EscalationResponse['denialSource'] = isNonInteractive ? 'policy' : 'user';
     let selected: readonly string[] | undefined;
     let selectionRevision: string | undefined;
     if (isNonInteractive) {
@@ -333,11 +340,16 @@ export function createCliEscalationPromptHandler(
       decisionInputKey = "n";
       renderer.renderLine(formatDefaultNonInteractiveDenyLine());
     } else if (promptInteractiveApproval) {
+      const endWait = interaction?.beginWait?.();
       try {
-        const res = await promptInteractiveApproval(prompt);
+        const res = await promptInteractiveApproval(prompt, interaction?.signal);
         if (typeof res === "object" && res !== null) {
           decision = res.decision;
           denialReason = res.reason;
+          if (decision === 'deny') {
+            denialFeedback = res.denialFeedback;
+            denialSource = res.denialSource ?? denialSource;
+          }
           if (decision !== "deny") {
             selected = res.selected;
             selectionRevision = res.selectionRevision;
@@ -346,10 +358,12 @@ export function createCliEscalationPromptHandler(
           decision = res;
         } else {
           decision = "deny";
+          denialSource = 'policy';
         }
       } catch {
         decision = "deny";
-      }
+        denialSource = 'policy';
+      } finally { endWait?.(); }
       decisionInputKey =
         decision === "allow-once"
           ? "y"
@@ -357,7 +371,10 @@ export function createCliEscalationPromptHandler(
             ? "a"
             : "n";
     } else {
-      const answer = await askReadline(rl, "approval> ");
+      const endWait = interaction?.beginWait?.();
+      let answer: string;
+      try { answer = await askReadline(rl, "approval> ", interaction?.signal); }
+      finally { endWait?.(); }
       const normalized = answer.trim().toLowerCase();
       decisionInputKey =
         normalized === "y"
@@ -375,10 +392,11 @@ export function createCliEscalationPromptHandler(
             : "deny";
     }
 
-    if (prompt.context.toolName === "apply_patch" && decision === "allow-always") {
+    if (oneTime && !isMcp && decision === "allow-always") {
       decision = "deny";
       decisionInputKey = "n";
-      denialReason = "apply_patch requires an exact one-time group selection; allow-always is not available.";
+      denialSource = 'policy';
+      denialReason = "This call requires one-time approval; no persistent grant was saved.";
     }
     // A tool from an extension has no argument contract this program can read,
     // so a remembered grant could only be keyed on its name — and would then
@@ -392,9 +410,11 @@ export function createCliEscalationPromptHandler(
     if (prompt.context.explicitApproval && (decision === 'allow-always'
       || !prompt.options.some(option => option.value === decision))) {
       decision = 'deny'; decisionInputKey = 'n';
+      denialSource = 'policy';
       denialReason = 'This call requires one-time approval; no persistent grant was saved.';
     }
 
+    interaction?.signal?.throwIfAborted();
     if (!promptInteractiveApproval && decision === "allow-once") {
       renderer.renderLine(formatAllowOnceAppliedLine());
     }
@@ -445,6 +465,7 @@ export function createCliEscalationPromptHandler(
     return createApprovalResponse({
       promptId: prompt.id,
       decision,
+      ...(decision === 'deny' ? { denialSource, denialFeedback } : {}),
       userComment: denialReason
         ? decision === "deny" ? `User denied with reason: ${denialReason}` : denialReason
         : formatExplicitApprovalComment({
@@ -460,15 +481,24 @@ export function createCliEscalationPromptHandler(
 function askReadline(
   rl: ReadlineInterface | null,
   question: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   if (!rl) {
     return Promise.resolve("n");
   }
   return new Promise((resolve) => {
-    const closed = () => resolve('n');
+    const settle = (answer: string) => {
+      rl.off('close', closed);
+      signal?.removeEventListener('abort', closed);
+      resolve(answer);
+    };
+    const closed = () => settle('n');
+    if (signal?.aborted) { closed(); return; }
     rl.once('close', closed);
+    signal?.addEventListener('abort', closed, { once: true });
     try {
-      rl.question(question, answer => { rl.off('close', closed); resolve(answer); });
+      if (signal) rl.question(question, { signal }, settle);
+      else rl.question(question, settle);
     } catch {
       rl.off('close', closed);
       closed();

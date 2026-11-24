@@ -41,6 +41,7 @@ Object.defineProperty(vmCtx, '__MODELS_JSON', { value: JSON.stringify(workerData
 Object.defineProperty(vmCtx, '__MAX_OUTPUT_CHARS', { value: Number(workerData.maxOutputChars || 65536), enumerable: false, configurable: true });
 Object.defineProperty(vmCtx, '__MAX_STORE_VALUE', { value: Number(workerData.maxStoreValueChars || 262144), enumerable: false, configurable: true });
 Object.defineProperty(vmCtx, '__MAX_STORE_TOTAL', { value: Number(workerData.maxStoreTotalChars || 1048576), enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__READ_ONLY', { value: workerData.readOnly === true, enumerable: false, configurable: true });
 Object.defineProperty(vmCtx, '__DETERMINISM_JSON', { value: JSON.stringify(workerData.determinism ?? null), enumerable: false, configurable: true });
 
 if (workerData.determinism) {
@@ -62,6 +63,7 @@ const bootstrap = new vm.Script(\`
   const MAX_OUT = globalThis.__MAX_OUTPUT_CHARS;
   const MAX_VAL = globalThis.__MAX_STORE_VALUE;
   const MAX_TOT = globalThis.__MAX_STORE_TOTAL;
+  const READ_ONLY = globalThis.__READ_ONLY;
   const determinism = JSON.parse(globalThis.__DETERMINISM_JSON);
   const observations = new Set(${JSON.stringify(READ_ONLY_SCRIPT_OPERATIONS)});
   delete globalThis.__registerExit;
@@ -76,6 +78,7 @@ const bootstrap = new vm.Script(\`
   delete globalThis.__MAX_OUTPUT_CHARS;
   delete globalThis.__MAX_STORE_VALUE;
   delete globalThis.__MAX_STORE_TOTAL;
+  delete globalThis.__READ_ONLY;
   delete globalThis.__DETERMINISM_JSON;
 
 ${REPLAY_RUNTIME_SOURCE}
@@ -187,18 +190,49 @@ ${REPLAY_RUNTIME_SOURCE}
     },
   });
 
+  if (Object.hasOwn(toolsObj, 'bash')) {
+    globalThis.$ = (parts, ...values) => {
+      if (!Array.isArray(parts) || !Array.isArray(parts.raw) || parts.length !== 1 || values.length !== 0
+        || parts.raw.length !== 1 || typeof parts.raw[0] !== 'string') {
+        throw new TypeError('The shell tag requires a template literal without interpolations.');
+      }
+      const command = parts.raw[0];
+      let started;
+      const result = async (throwOnExit) => {
+        const output = await (started ??= rpc('shell', { command }));
+        if (throwOnExit && output.exitCode !== undefined) throw new Error(output.text || 'Command exited with code ' + output.exitCode + '.');
+        return output;
+      };
+      const view = (throwOnExit) => {
+        const text = async () => (await result(throwOnExit)).text;
+        return Object.freeze({
+          then: (resolve, reject) => text().then(resolve, reject),
+          text,
+          json: async () => {
+            const output = await result(throwOnExit);
+            if (!output.complete) throw new Error('Cannot parse JSON from incomplete shell output.');
+            return JSON.parse(output.text);
+          },
+          nothrow: () => view(false),
+        });
+      };
+      return view(true);
+    };
+  }
+
   globalThis.text = (v) => { const s = fmt(v); if (s) emitBounded('text', s); };
   globalThis.image = (item) => rpc('image', { item });
   globalThis.console = Object.freeze({
     log: (...a) => emitBounded('console', a.map(fmt).join(' ')),
     info: (...a) => emitBounded('console', a.map(fmt).join(' ')),
     warn: (...a) => emitBounded('console', a.map(fmt).join(' ')),
-    error: (...a) => emitBounded('console', a.map(fmt).join(' ')),
+    error: (...a) => emitBounded('stderr', a.map(fmt).join(' ')),
   });
 
   globalThis.store = (key, value) => {
     if (determinism) refuseEffect();
     if (typeof key !== 'string' || !key) throw new Error('store(key, value) requires a string key.');
+    if (READ_ONLY) throw new Error('Plan mode prohibits persistent script storage.');
     if (value === undefined) {
       storeMap.delete(key);
       writesMap.set(key, null);

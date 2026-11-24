@@ -132,7 +132,9 @@ export function settleReplay(replay: ReplayRun, outcome: ScriptOutcome, output: 
   try {
     const projected = output.result('Script completed', undefined, `Replay ID ${replay.id}`);
     const receipt = replay.complete(projected.text, validateStore);
-    return approvedResult(projected.text, { ...projected.metadata, codemodeReplay: receipt, codemodeStore: { status: 'unchanged' } });
+    const metadata = { ...projected.metadata, codemodeReplay: receipt, codemodeStore: { status: 'unchanged' } };
+    output.observe(metadata);
+    return approvedResult(projected.text, metadata);
   } catch (error) {
     return replayFailure(error, signal);
   }

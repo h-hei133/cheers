@@ -7,13 +7,14 @@ import { dispatchStop } from './stop/dispatch.js';
 import type { StopDispatchOptions } from './stop/model.js';
 import type { StopPayload } from './types.js';
 import { planSandboxedCommand } from "../../sandbox/osSandbox.js";
-import { checkWriteHookArtifact, writeHookCommand, writeHookProtocol, writeWorkerIdentity } from './artifact.js';
+import { resolveWriteHookCommand, writeHookProtocol, writeWorkerIdentity } from './artifact.js';
 import { WriteHookWorker } from './writeWorker.js';
 import { applyWriteHookPolicy, canonicalToolName, hookUnknown, mergeWriteHookResult, normalizeHookVeto, translateWriteInputs, translateWriteResult } from './translation.js';
 import { getExtensionEventRunners, type ExtensionEventRunner } from './extensionBridge.js';
 import {captureInputHookDecision} from './input/decision.js';
 import {callbackCancellation, captureCallbackResult} from '../values/promise.js';
 import {snapshotData} from '../values/data.js';
+import { captureScriptHookDecision, publishScriptOutput } from './script.js';
 import type {
   HookEventPayload,
   HookDecision,
@@ -238,11 +239,9 @@ export class HookDispatcher {
     if (payload.eventName === 'Stop') return dispatchStop({ payload: payload as StopPayload,
       inProcess: inProcessHooks, commands: commandHooks, options: stopOptions,
       current: () => trust === this.trust && commandHooks === this.commandHooks && inProcessHooks === this.inProcessHooks && !trust?.admission?.(),
-      allowed: async (hook, active) => {
-        const revision = hook.fingerprint === undefined || trust?.bypassed ? undefined : trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)');
-        return await this.declaredHookIsAllowed(hook, payload.workspaceRoot, revision, active)
-          && (revision === undefined || trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)') === revision);
-      } });
+      sourceRevision: hook => hook.fingerprint === undefined || trust?.bypassed ? undefined
+        : trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)'),
+      allowed: (hook, revision, active) => this.declaredHookIsAllowed(hook, payload.workspaceRoot, revision, active) });
     const eventType = payload.eventName;
     logger.debug(`Dispatching lifecycle hook event: ${eventType}`, {
       event: eventType,
@@ -251,22 +250,43 @@ export class HookDispatcher {
 
     let accumulatedDecision: HookDecision | null = null;
     const relevantEvent = payload.eventName;
+    const scriptResult = (payload.eventName === 'PostToolUse' || payload.eventName === 'PostToolUseFailure')
+      && 'toolName' in payload && payload.toolName === 'codemode';
+    const scriptCurrent = () => trust === this.trust && commandHooks === this.commandHooks && inProcessHooks === this.inProcessHooks
+      && !stopOptions.signal?.aborted && !trust?.admission?.();
+    let scriptOutput: { text: string; current: () => boolean } | undefined;
+    const captureOutput = (decision: HookDecision, current = scriptCurrent) => {
+      if (!scriptResult || !current()) return;
+      const text = decision.updatedToolOutput;
+      if (text !== undefined) scriptOutput = { text, current };
+    };
+    const settle = (decision: HookDecision): HookDecision => {
+      if (!scriptResult) return decision;
+      if (!scriptCurrent()) return { decision: 'allow' };
+      const { updatedToolOutput: _replacement, ...settled } = decision;
+      return scriptOutput?.current() ? publishScriptOutput(settled, scriptOutput.text, scriptOutput.current) : settled;
+    };
 
     // 1. Run in-process hooks
-    for (const hook of this.inProcessHooks) {
+    for (const hook of inProcessHooks) {
+      if (scriptResult && !scriptCurrent()) break;
       if (hook.event === relevantEvent && this.matches(hook.matcher, payload)) {
         try {
           const returned = relevantEvent === 'UserPromptSubmit'
             ? (await captureCallbackResult(() => hook.handler(payload), captureInputHookDecision, {cancellation:callbackCancellation(stopOptions.signal)})).value
+            : scriptResult ? (await captureCallbackResult(() => hook.handler(payload), captureScriptHookDecision,
+              { cancellation: callbackCancellation(stopOptions.signal) })).value
             : await hook.handler(payload);
+          if (scriptResult && !scriptCurrent()) break;
           const decision = relevantEvent === 'PreToolUse' ? normalizeHookVeto(returned) ?? returned : returned;
           if (decision) {
+            captureOutput(decision);
             if (decision.decision === "block" || decision.decision === "retry") {
               logger.warn(`Hook ${hook.name || "in-process"} returned blocking decision: ${decision.decision}`, {
                 event: relevantEvent,
                 decision: decision.decision,
               });
-              return decision;
+              return settle(decision);
             }
             if (decision.feedback || decision.hookSpecificOutput) {
               if (!accumulatedDecision) {
@@ -275,6 +295,10 @@ export class HookDispatcher {
             }
           }
         } catch (err: unknown) {
+          if (scriptResult) {
+            logger.error('Script result hook failed.', { event: relevantEvent });
+            continue;
+          }
           if (relevantEvent === 'UserPromptSubmit') {
             logger.error('Prompt input hook failed.');
             return {decision:'block', reason:'Prompt input hook result was refused.'};
@@ -288,7 +312,7 @@ export class HookDispatcher {
     for (const hook of commandHooks) {
       // Awaited process hooks and approvals may publish a replacement. An older
       // event cannot adopt that snapshot or execute the retired declarations.
-      if (trust !== this.trust || commandHooks !== this.commandHooks) break;
+      if (trust !== this.trust || commandHooks !== this.commandHooks || scriptResult && !scriptCurrent()) break;
       // What the hook last wrote to stderr, which the block contract reads.
       let lastStderr = "";
       const translated = relevantEvent === 'PreToolUse' && hook.writeGate !== undefined;
@@ -296,12 +320,18 @@ export class HookDispatcher {
       if (hook.event === relevantEvent && (translated || this.matches(hook.matcher, matchPayload))) {
         const sourceRevision = hook.fingerprint === undefined || trust?.bypassed ? undefined
           : trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)');
-        if (!(await this.declaredHookIsAllowed(hook, payload.workspaceRoot, sourceRevision))) continue;
+        const commandCurrent = () => scriptCurrent()
+          && (hook.sourceCurrent?.() ?? true)
+          && (sourceRevision === undefined || trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)') === sourceRevision);
+        if (scriptResult && !commandCurrent()) continue;
+        if (!(await this.declaredHookIsAllowed(hook, payload.workspaceRoot, sourceRevision, scriptResult ? commandCurrent : undefined))) continue;
+        if (scriptResult && !commandCurrent()) continue;
         if (trust !== this.trust || commandHooks !== this.commandHooks || trust?.admission?.()) continue;
         if (sourceRevision !== undefined && trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)') !== sourceRevision) continue;
         const timeoutMs = hook.timeoutMs ?? hookTimeoutMs(relevantEvent);
         const protocol = writeHookProtocol(hook.writeGate);
         let jsonPayloads: string[];
+        let preparedArtifact: { readonly command: string; readonly workerCommand: string; readonly bundledPath?: string } | undefined;
         if (translated) {
           const inputs = translateWriteInputs(payload as PreToolUsePayload, timeoutMs, protocol);
           if ('decision' in inputs) {
@@ -319,15 +349,25 @@ export class HookDispatcher {
             ? inputs.batch.matchNames.some(matchesInput) ? [inputs.batch.input] : []
             : inputs.inputs.filter(input => matchesInput(input.tool_name));
           if (matchedInputs.length === 0) continue;
-          const invalidArtifact = checkWriteHookArtifact(hook.writeGate, payload.workspaceRoot);
-          if (invalidArtifact) {
-            logger.warn('Write hook failed', invalidArtifact.hookVerdict);
-            return invalidArtifact;
+          const assertCurrent = () => {
+            if (trust !== this.trust || commandHooks !== this.commandHooks || trust?.admission?.()
+              || hook.sourceCurrent?.() === false
+              || sourceRevision !== undefined && trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)') !== sourceRevision) {
+              throw new Error('The hook declaration changed.');
+            }
+          };
+          const resolvedArtifact = await resolveWriteHookCommand(hook.writeGate, payload.workspaceRoot, assertCurrent);
+          try { assertCurrent(); }
+          catch { return hookUnknown('invalid_input'); }
+          if ('decision' in resolvedArtifact) {
+            logger.warn('Write hook failed', resolvedArtifact.hookVerdict);
+            return resolvedArtifact;
           }
+          preparedArtifact = resolvedArtifact;
           try { jsonPayloads = matchedInputs.map(input => JSON.stringify(input)); }
           catch { return hookUnknown('invalid_input'); }
         } else jsonPayloads = [JSON.stringify(payload)];
-        const command = translated ? writeHookCommand(hook.writeGate) : hook.command;
+        const command = preparedArtifact?.command ?? hook.command;
 
         // Run under the same isolation the bash tool uses. A hook is a shell
         // command, and leaving it unconfined while confining the commands the user
@@ -338,7 +378,8 @@ export class HookDispatcher {
         // so the sandbox wrapper's arguments are never re-parsed by a shell. A
         // hook command containing `$(...)` would otherwise be substituted by the
         // wrapper's own shell before it ever reached the sandbox.
-        const execRoots = translated ? [process.execPath] : [];
+        const execRoots = preparedArtifact
+          ? [process.execPath, ...(preparedArtifact.bundledPath ? [preparedArtifact.bundledPath] : [])] : [];
         const sandbox = planSandboxedCommand({
           shell: SHELL_BIN,
           shellArgs: ["-c", command],
@@ -350,19 +391,19 @@ export class HookDispatcher {
           // not read as a hook that ran and approved: the return value here is
           // what the caller consults, so the refusal carries through as a deny.
           const reason = sandbox.notice ?? "sandbox refused the hook command";
-          logger.warn(reason, { event: relevantEvent, command: hook.command });
+          logger.warn(reason, { event: relevantEvent, ...(scriptResult ? {} : { command: hook.command }) });
           return { decision: "block", reason };
         }
         if (sandbox.state === "unavailable" && sandbox.notice) {
-          logger.warn(sandbox.notice, { event: relevantEvent, command: hook.command });
+          logger.warn(sandbox.notice, { event: relevantEvent, ...(scriptResult ? {} : { command: hook.command }) });
         }
         const program = sandbox.command ?? SHELL_BIN;
         const programArgs = sandbox.args ?? ["-c", command];
 
         const batchDeadline = Date.now() + timeoutMs;
         const workerIdentity = translated ? writeWorkerIdentity(hook.writeGate) : undefined;
-        if (workerIdentity !== undefined && jsonPayloads.length === 1) {
-          const workerCommand = writeHookCommand(hook.writeGate, 'stdio');
+        if (workerIdentity !== undefined && preparedArtifact && jsonPayloads.length === 1) {
+          const workerCommand = preparedArtifact.workerCommand;
           const workerSandbox = planSandboxedCommand({
             shell: SHELL_BIN,
             shellArgs: ['-c', workerCommand],
@@ -376,7 +417,7 @@ export class HookDispatcher {
               key: JSON.stringify([payload.sessionId, payload.workspaceRoot, workerIdentity, sourceRevision, workerProgram, workerArgs]),
               program: workerProgram, args: workerArgs, cwd: payload.workspaceRoot,
             }, jsonPayloads[0]!, Math.max(1, batchDeadline - Date.now()));
-            if (trust !== this.trust || commandHooks !== this.commandHooks || trust?.admission?.() ||
+            if (trust !== this.trust || commandHooks !== this.commandHooks || trust?.admission?.() || hook.sourceCurrent?.() === false ||
                 (sourceRevision !== undefined && trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)') !== sourceRevision)) {
               return hookUnknown('invalid_input');
             }
@@ -393,6 +434,7 @@ export class HookDispatcher {
           }
         }
         for (const jsonPayload of jsonPayloads) {
+          if (translated && hook.sourceCurrent?.() === false) return hookUnknown('invalid_input');
           const remainingMs = Math.max(1, batchDeadline - Date.now());
           if (Date.now() > batchDeadline) return hookUnknown('timeout');
           try {
@@ -404,6 +446,7 @@ export class HookDispatcher {
                   cwd: payload.workspaceRoot,
                   timeout: remainingMs,
                   maxBuffer: 1024 * 1024,
+                  ...(scriptResult && stopOptions.signal ? { signal: stopOptions.signal } : {}),
                 },
                 (error, stdoutBuf, stderrBuf) => {
                   if (error) {
@@ -431,25 +474,31 @@ export class HookDispatcher {
               }
             });
 
+            if (scriptResult && !commandCurrent()) continue;
             if (translated) {
+              if (hook.sourceCurrent?.() === false) return hookUnknown('invalid_input');
               const result = applyWriteHookPolicy(translateWriteResult(stdout), protocol);
               logger.info('Write hook result', result.hookVerdict ?? { status: result.decision });
               if (result.decision === 'block' || result.decision === 'retry') return result;
               accumulatedDecision = mergeWriteHookResult(accumulatedDecision, result);
             } else if (stdout && stdout.trim()) {
-              let parsed: HookDecision;
+              let parsed: HookDecision | undefined;
               try {
-                parsed = JSON.parse(stdout.trim()) as HookDecision;
-                if (relevantEvent === 'PreToolUse') parsed = normalizeHookVeto(parsed) ?? parsed;
+                const value = JSON.parse(stdout.trim()) as HookDecision;
+                parsed = scriptResult ? captureScriptHookDecision(value)
+                  : relevantEvent === 'PreToolUse' ? normalizeHookVeto(value) ?? value : value;
               } catch {
+                if (scriptResult) throw new Error('Script result hook returned invalid output.');
                 logger.error(
                   `Command hook returned output that is not valid JSON for event ${relevantEvent}`,
                   { event: relevantEvent, command: hook.command },
                 );
                 throw new Error("hook returned invalid JSON output");
               }
+              if (!parsed) continue;
+              captureOutput(parsed, commandCurrent);
               if (parsed.decision === "block" || parsed.decision === "retry") {
-                return parsed;
+                return settle(parsed);
               }
               if (parsed.feedback || parsed.hookSpecificOutput) {
                 accumulatedDecision = mergeWriteHookResult(accumulatedDecision, parsed);
@@ -457,6 +506,12 @@ export class HookDispatcher {
             }
           } catch (err: unknown) {
             const failure = err instanceof CommandHookFailure ? err : undefined;
+            if (scriptResult) {
+              if (commandCurrent()) logger.error('Script result command hook failed.', {
+                event: relevantEvent, exitCode: failure?.exitCode, timedOut: failure?.timedOut,
+              });
+              continue;
+            }
             if (translated) {
               const parsed = translateWriteResult(failure?.stdout ?? '');
               const result = failure?.timedOut ? hookUnknown('timeout')
@@ -488,11 +543,10 @@ export class HookDispatcher {
 
       }
     }
-    const extensionDecision = !trust?.admission?.() && payload.workspaceRoot
-      ? await dispatchExtensionHooks(payload, accumulatedDecision, stopOptions.signal, stopOptions.extensionRunners)
+    const extensionDecision = (!scriptResult || scriptCurrent()) && !trust?.admission?.() && payload.workspaceRoot
+      ? await dispatchExtensionHooks(payload, accumulatedDecision, stopOptions.signal, stopOptions.extensionRunners, scriptResult)
       : null;
-    if (extensionDecision) return extensionDecision;
-    return accumulatedDecision ?? { decision: "allow" };
+    return settle(extensionDecision ?? accumulatedDecision ?? { decision: "allow" });
   }
 }
 
@@ -507,6 +561,7 @@ async function dispatchExtensionHooks(
   accumulated: HookDecision | null,
   signal?: AbortSignal,
   runners = getExtensionEventRunners(payload.workspaceRoot, payload.sessionId),
+  scriptResult = false,
 ): Promise<HookDecision | null> {
   const aliases = EXTENSION_EVENT_ALIASES[payload.eventName];
   let merged = accumulated;
@@ -517,6 +572,8 @@ async function dispatchExtensionHooks(
       const returned = payload.eventName === 'UserPromptSubmit'
         ? (await captureCallbackResult(() => runExtensionEvent(payload.eventName, payload, aliases, signal), captureInputHookDecision,
           {cancellation:callbackCancellation(signal), check:() => runExtensionEvent.admission?.()})).value
+        : scriptResult ? (await captureCallbackResult(() => runExtensionEvent(payload.eventName, payload, aliases, signal), captureScriptHookDecision,
+          { cancellation: callbackCancellation(signal), check: () => runExtensionEvent.admission?.() })).value
         : await runExtensionEvent(payload.eventName, payload, aliases, signal);
       if (signal?.aborted) return { decision: 'block', reason: 'Extension event cancelled.' };
       if (!returned || typeof returned !== 'object') continue;

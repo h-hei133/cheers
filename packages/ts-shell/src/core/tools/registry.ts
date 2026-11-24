@@ -4,6 +4,7 @@ import { resolveWorkspaceRoot } from '../workspace/roots.js'
 import { createTaskOutputToolDefinition, createTaskStopToolDefinition, createTaskWaitToolDefinition } from './shell/background.js';
 import { withFileLock } from '../../runtime/execution/fileLock.js'
 import { createUnifiedDiff } from '../../presentation/tui/transcript/diff.js'
+import { recordEditDiff } from '../../edit/result/diff.js'
 import {
   createDefaultExecutionService,
   type ExecutionAuthority,
@@ -142,12 +143,18 @@ export function createCoreToolRegistry(options?: {
             abortSignal: context.abortSignal,
             absolutePath: target,
             content,
+            ...(context.nested ? originalUnreadable ? { expectedAbsent: true } : { expectedContent: original } : {}),
             workspaceRoot: root,
             authority: TOOL_APPROVED_WRITE_AUTHORITY,
             caller: 'core-tool:write',
             reason: 'Write an approved workspace file target.',
             reportSafeTarget: containment.resolvedPath,
           })
+          if (context.nested) {
+            const metadata = written ? { ...written } : { status: 'unverified' };
+            if (written?.status === 'committed') recordEditDiff(metadata, createUnifiedDiff(relPath, original, content));
+            return approvedResult(`Wrote ${relPath}`, metadata);
+          }
           const diff = original && original !== content ? createUnifiedDiff(relPath, original, content) : ''
           const output = diff
             ? `Updated ${relPath}\n\n\`\`\`diff\n${diff}\n\`\`\``

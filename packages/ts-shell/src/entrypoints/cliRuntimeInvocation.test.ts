@@ -139,6 +139,27 @@ describe("CLI runtime invocation", () => {
     expect(step).toHaveBeenCalledOnce();
   });
 
+  it('offers configured image and classification tools on separate connections', async () => {
+    const { deps } = dependencies();
+    const imageConnection = { id: 'image-connection', provider: 'openai-compatible' as const, authType: 'api-key' as const,
+      apiKey: 'synthetic-image-key', baseUrl: 'https://openrouter.ai/api/v1', createdAt: 'now', updatedAt: 'now' };
+    const runtimeConfig = { ...getRuntimeConfig(workspaceRoot), providerConnections: [imageConnection] };
+    const step = vi.fn<NonNullable<CliRuntimeInvocationDependencies['createStep']>>((_request, tools) => {
+      expect(tools.get('generate_image')?.argsSchema.properties).toMatchObject({ model: { enum: ['fixture-image'] } });
+      expect(tools.get('classify')?.argsSchema.properties).toMatchObject({ model: { enum: ['fixture-classifier'] } });
+      return async () => ({ text: 'done', stopReason: 'stop', toolCalls: [] });
+    });
+    const result = await runCliRuntimeInvocation(baseInput({ runtimeConfig,
+      providerCatalog: [{ id: 'openrouter', label: 'Image fixture', runtime: 'openai-compatible', auth: 'api-key',
+        baseUrl: imageConnection.baseUrl, models: [{ id: 'fixture-image', modelType: 'image', input: ['text'], output: ['image'] }] },
+      { id: 'openai', label: 'Classification fixture', runtime: 'openai', auth: 'api-key',
+        baseUrl: 'https://api.openai.com/v1', models: [{ id: 'fixture-chat', input: ['text'], output: ['text'] },
+          { id: 'fixture-classifier', modelType: 'classifier', input: ['text'], compat: { endpoint: 'openai-decisions' } }] }],
+    }), { ...deps, createStep: step });
+    await collect(result.events);
+    expect(step).toHaveBeenCalledOnce();
+  });
+
   it("binds compaction measurements to the effective schema and system prompt", () => {
     const compaction = {
       policy: { contextWindow: 10_000 },
@@ -235,18 +256,22 @@ describe("CLI runtime invocation", () => {
     ]);
     let captured: Parameters<typeof turnSession.runTurn>[0] | undefined;
     let notifiedIdentity: PromptIdentitySnapshot | undefined;
+    let loadedNames: readonly string[] = [];
     const original = turnSession.runTurn;
     const spy = vi.spyOn(turnSession, 'runTurn').mockImplementation(options => {
       captured = options;
       return original(options);
     });
     try {
-      await runCliRuntimeInvocation(baseInput({
+      const request = baseInput({
         providerModeEnv: 'synthetic',
         runtimeConfig: { ...getRuntimeConfig(workspaceRoot), toolDiscovery: 'dynamic' },
         compaction,
         onPromptIdentity: identity => { notifiedIdentity = identity; },
-      }), { ...dependencies().deps, tools: () => tools });
+        onDiscoveryLoad: names => { loadedNames = names; },
+      });
+      const deps = { ...dependencies().deps, tools: () => tools };
+      const run = await runCliRuntimeInvocation(request, deps);
       const load = captured?.tools.get('tool_load');
       expect(load).toBeDefined();
       const before = captured?.compaction?.policy.promptIdentity;
@@ -259,6 +284,15 @@ describe("CLI runtime invocation", () => {
       expect(beforeTools).not.toContain('special');
       expect(afterTools).toContain('special');
       expect(notifiedIdentity).toEqual(after);
+      expect(loadedNames).toEqual(['special']);
+      await collect(run.events);
+      const continued = await runCliRuntimeInvocation({ ...request, retainedTools: loadedNames }, deps);
+      expect(captured?.tools.has('special')).toBe(true);
+      await collect(continued.events);
+      tools.delete('special');
+      const retired = await runCliRuntimeInvocation({ ...request, retainedTools: loadedNames }, deps);
+      expect(captured?.tools.has('special')).toBe(false);
+      await collect(retired.events);
     } finally {
       spy.mockRestore();
     }
@@ -429,7 +463,8 @@ describe("CLI runtime invocation", () => {
       expect(systems[0]).toContain("BUILD MODE ACTIVE");
       expect(systems[1]).toContain("PLAN MODE ACTIVE");
       expect(systems[1]).not.toContain("BUILD MODE ACTIVE");
-      expect(systems[1]).toContain("real tools (read)");
+      expect(systems[1]).toContain('Use the tools declared for the current request when they apply.');
+      expect(systems[1]).not.toContain('real tools (read)');
       expect(systems[2]).toBe(systems[0]);
     } finally {
       server.closeAllConnections();

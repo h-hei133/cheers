@@ -122,6 +122,8 @@ export function createApprovalResponse(input: {
   readonly promptId: string;
   readonly decision: ApprovalDecision;
   readonly userComment: string;
+  readonly denialFeedback?: string;
+  readonly denialSource?: EscalationResponse['denialSource'];
   readonly respondedAt?: number;
   readonly selected?: readonly string[];
   readonly selectionRevision?: string;
@@ -131,6 +133,8 @@ export function createApprovalResponse(input: {
     decision: input.decision,
     respondedAt: input.respondedAt ?? Date.now(),
     userComment: input.userComment,
+    ...(input.denialFeedback ? { denialFeedback: input.denialFeedback } : {}),
+    ...(input.denialSource ? { denialSource: input.denialSource } : {}),
     ...(input.selected ? { selected: input.selected } : {}),
     ...(input.selectionRevision ? { selectionRevision: input.selectionRevision } : {}),
   };

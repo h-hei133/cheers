@@ -1,7 +1,11 @@
 import { imagesOf, messageToText } from "../../model-adapters/multimodal.js";
 import { replayTodosFromMessages } from "../../core/commands/todoCommandRuntime.js";
 import { splitFencedDiff, textBlock, type Block } from "../../presentation/tui/transcript/blocks.js";
-import { summarize } from "./toolCards.js";
+import { displayReportText } from '../../core/commands/report/projection.js';
+import { scriptCode, summarize } from "./toolCards.js";
+import { redactExportText } from '../../core/security/redaction.js';
+import { neutraliseForDisplay } from '../../core/text/safety.js';
+import { truncateTextBytes } from '../../core/tools/truncation.js';
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import type { Session } from "../../session/schema/sessionRecord.js";
 import type { WorkspaceRootMode } from "../../session/SessionManager.js";
@@ -90,10 +94,12 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
             // Ignore malformed tool arguments
           }
           const detail = summarize(call.function.name, args);
+          const code = scriptCode(call.function.name, args);
           const toolBlock: Block = {
             kind: "tool",
             title: call.function.name,
             ...(detail ? { detail } : {}),
+            ...(code ? { code } : {}),
             text: "",
             status: "ok",
             collapsed: true,
@@ -117,10 +123,13 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
           const images = imagesOf(turn.content);
           if (images.length > 0) toolBlock.images = images;
           splitFencedDiff(toolBlock);
-          if (/^(\(Operation cancelled|Blocked\b|Tool execution error:|Tool '[^']+' is not available|Error\b)/i.test(body)) {
+          const scriptStatus = toolBlock.title === 'codemode' ? turn.metadata?.scriptStatus : undefined;
+          if (scriptStatus === 'failed' || (scriptStatus !== 'ok'
+            && /^(\(Operation cancelled|Blocked\b|Tool execution error:|Tool '[^']+' is not available|Error\b|Script failed\b)/i.test(body))) {
             toolBlock.status = "failed";
-            toolBlock.collapsed = false;
+            if (!toolBlock.code) toolBlock.collapsed = false;
           }
+          if (toolBlock.title === 'codemode') blocks.push(...scriptHistory(toolBlock, turn.metadata?.nestedCalls));
         }
       }
     }
@@ -144,6 +153,25 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
     }
   }
   return { blocks: blocks.slice(omitted), earlier: blocks.slice(0, omitted), omitted };
+}
+
+function scriptHistory(parent: Block, metadata: unknown): Block[] {
+  if (!metadata || typeof metadata !== 'object' || !('calls' in metadata) || !Array.isArray(metadata.calls)) return [];
+  const calls = metadata.calls.slice(0, 256);
+  parent.nestedCallCount = calls.length;
+  return calls.flatMap((call: unknown) => {
+    if (!call || typeof call !== 'object' || !('name' in call) || typeof call.name !== 'string' || !('status' in call)) return [];
+    const value = call as { name: string; status: unknown; arguments?: Record<string, unknown>; metadata?: Record<string, unknown>; error?: unknown; denial?: unknown };
+    const detail = summarize(value.name, value.arguments);
+    const diff = typeof value.metadata?.diff === 'string' ? truncateTextBytes(displayReportText(redactExportText(value.metadata.diff)), 1_600) : undefined;
+    const approval = value.denial ? 'denied' : value.metadata?.approval ? 'approved' : undefined;
+    return [{ kind: 'tool', title: neutraliseForDisplay(truncateTextBytes(value.name, 256)),
+      ...(detail ? { detail: neutraliseForDisplay(truncateTextBytes(redactExportText(detail), 500)) } : {}),
+      ...(diff ? { diff } : {}), ...(approval ? { approval } : {}),
+      status: value.status === 'ok' ? 'ok' : value.status === 'error' ? 'failed' : 'unknown',
+      text: typeof value.error === 'string' ? truncateTextBytes(redactExportText(value.error), 500) : '',
+      finalized: true, collapsed: true }];
+  });
 }
 export interface HistoryTarget {
   readonly transcript: Transcript;

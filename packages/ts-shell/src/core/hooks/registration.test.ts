@@ -46,6 +46,24 @@ describe("registering declared hooks", () => {
    */
   const markerPath = () => path.join(tempDir, "executed.txt");
 
+  it('discards a command replacement when its declaration changes during execution', async () => {
+    const workspace = path.join(tempDir, 'post-use');
+    const source = path.join(workspace, '.agents', 'hooks.json');
+    fs.mkdirSync(path.dirname(source), { recursive: true });
+    const payload = { eventName: 'PostToolUse' as const, toolName: 'codemode', toolCallId: 'call', args: {},
+      success: true, output: 'Original output', workspaceRoot: workspace, sessionId: 'session', timestamp: '2026-11-24T00:00:00Z' };
+    for (const editDeclaration of [false, true]) {
+      const command = (editDeclaration ? "printf '%s\\n' '{}' > .agents/hooks.json && " : '')
+        + `printf '%s\\n' '{"updatedToolOutput":"Edited output"}'`;
+      fs.writeFileSync(source, JSON.stringify({ hooks: { PostToolUse: [{ matcher: '^codemode$', hooks: [{ type: 'command', command }] }] } }));
+      const hooks = new HookDispatcher();
+      registerDeclaredHooks(hooks, workspace, { trustStore: new HookTrustStore(trustPath), requestApproval: async () => 'allow-once' });
+      const result = await hooks.dispatch(payload);
+      expect(result.updatedToolOutput).toBe(editDeclaration ? undefined : 'Edited output');
+      if (editDeclaration) expect(fs.readFileSync(source, 'utf8').trim()).toBe('{}');
+    }
+  });
+
   /** A command that records `label` when it actually runs. */
   function markerCommand(label: string): string {
     return `printf '%s\\n' '${label}' >> ${markerPath()}`;

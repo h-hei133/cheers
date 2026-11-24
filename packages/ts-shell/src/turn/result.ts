@@ -10,6 +10,21 @@ import { captureToolResult, reduceToolResult } from '../extensions/events/result
 import type { ExtensionToolResult, ExtensionToolResultEvent } from '../extensions/events/model.js';
 import { redactSecretsFromObject } from '../observability/structuredLogger.js';
 import type { ToolDefinition } from '../tools/types.js';
+import { scriptConsole } from '../core/tools/codemode/output.js';
+import { displayReportText } from '../core/commands/report/projection.js';
+import type { ScriptHookOutput } from '../core/hooks/types.js';
+
+export function scriptHookOutput({ call, args, result }: AfterToolCallContext): ScriptHookOutput | undefined {
+  if (call.name !== 'codemode' || typeof args.code !== 'string') return undefined;
+  const console = scriptConsole(result.metadata);
+  const calls = result.metadata?.nestedCalls as { readonly calls?: readonly { readonly name?: unknown }[] } | undefined;
+  const toolsUsed = Array.isArray(calls?.calls) ? calls.calls.slice(0, 256)
+    .map(entry => entry?.name).filter((name): name is string => typeof name === 'string' && name.length <= 256)
+    .map(name => redactExportText(displayReportText(name))) : [];
+  return Object.freeze({ code: truncateTextBytes(redactExportText(displayReportText(args.code)), 32 * 1024),
+    result: truncateTextBytes(redactExportText(displayReportText(result.output)), TOOL_OUTPUT_LIMIT),
+    stdout: console?.stdout ?? '', stderr: console?.stderr ?? '', toolsUsed: Object.freeze([...new Set(toolsUsed)]) });
+}
 
 /** Capture inert, bounded observations before exposing them to handlers. */
 function publicRecord(value: Record<string, unknown> | undefined): Readonly<Record<string, unknown>> {
@@ -88,9 +103,9 @@ export async function collectToolResult(input: {
 /** The model and history receive the same projection, with native notices still reserved. */
 export function projectToolResult(result: AfterToolCallContext['result'], patch: ExtensionToolResult | undefined,
   verification: string | undefined, refused: string | undefined, preUseFeedback?: string): string {
-  const originalNotice = typeof result.metadata?.outputNotice === 'string' ? result.metadata.outputNotice : '';
-  const replacement = patch?.output === undefined ? undefined : redactExportText(patch.output)
-    .replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, char => '\\x' + char.charCodeAt(0).toString(16).padStart(2, '0'));
+  const originalNotice = typeof result.metadata?.outputNotice === 'string'
+    ? redactExportText(displayReportText(result.metadata.outputNotice)) : '';
+  const replacement = patch?.output === undefined ? undefined : redactExportText(displayReportText(patch.output));
   const advice = patch?.feedback && truncateTextBytes(neutraliseForDisplay(redactExportText(patch.feedback)), 512);
   const verified = verification && truncateTextBytes(neutraliseForDisplay(redactExportText(verification)), 512);
   const writeAdvice = preUseFeedback && truncateTextBytes(neutraliseForDisplay(redactExportText(preUseFeedback)), WRITE_HOOK_CONTEXT_BYTES);

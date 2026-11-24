@@ -2,9 +2,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { evaluateToolPermissionScope, buildToolEscalationPrompt } from "./toolPolicy.js";
+import { evaluateToolPermissionScope, buildToolEscalationPrompt, planModeBlock, toolPlanMode } from "./toolPolicy.js";
 
 describe("toolPolicy", () => {
+  it('treats scripts as read-only compositions in plan mode while checking nested effects individually', () => {
+    expect(toolPlanMode('codemode')).toBe('read-only');
+    expect(planModeBlock('plan', 'codemode', { code: 'return await tools.read({});' })).toBeUndefined();
+    expect(planModeBlock('plan', 'codemode', { code: 'store("x", 1);', record: true })).toContain('not permitted');
+    expect(planModeBlock('plan', 'write', { path: 'x' })).toContain('not permitted');
+  });
   it("allows read-only tools without escalation across all modes", () => {
     for (const tool of ["read", "glob", "grep", "web_search", "web_fetch", "todo", "ask"]) {
       for (const scope of ["ask", "accept-edits", "allow-all"] as const) {
