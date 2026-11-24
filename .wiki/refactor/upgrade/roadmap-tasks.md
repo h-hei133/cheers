@@ -1,23 +1,23 @@
 # 2026-11 路线图执行记录
 
-**状态**：Batch 0–4 的可发布范围已通过定向验收并分批提交，v0.1.0 与包含五秒 job 晋升的 v0.1.1 均已发布。P0 的全量单测、启动模型路由、发布核心门禁已在 Linux 本地通过；2026-11-24 至 25 日 Casa、NOFX 和 BaiLu 原生 CLI 与单文件产物请求成功，B0.6 仍等待本地 WorkBuddy 服务。修复提交尚待推送后的 GitHub 双 CI；版本 v0.1.2 已准备并通过 Linux 产物检查。完整 JS worker 脱离父 tool 与额外 agent slot 经核实不适用。
+**状态**：Batch 0–4 的可发布范围已通过定向验收并分批提交，v0.1.0、v0.1.1、v0.1.2 均已发布。P0 的全量单测、启动模型路由、发布核心门禁已在 Linux 本地通过；2026-11-24 至 25 日 Casa、NOFX 和 BaiLu 原生 CLI 与单文件产物请求成功，B0.6 仍等待本地 WorkBuddy 服务。提交 `4c11147b` 通过 main CI `45432989402` 的两个必需 job，Release workflow `45442889705` 已发布三个平台资产；Linux 下载资产的 SHA-256、`--version` 和 `--help` 检查通过。完整 JS worker 脱离父 tool 与额外 agent slot 经核实不适用。
 **任务范围**：核实并执行 `.wiki/wiki/references/codex-and-frontier-gap-audit-2026-11.md` 与 `.wiki/wiki/references/cheers-next-phase-roadmap-2026-11.md` 中的后续批次。
 **基线**：2026-11-23，源码提交 `f65ba979`；续接工作基于本地提交 `4c83b5db`。
 
 这份记录只跟踪上述两份研究材料带来的后续工作。它与 `.wiki/refactor/upgrade/tasks.md` 中已有的 62 项会话／运行时计划分开计数，不重置或改写那份清单。目标仓库及 Linux 是本次可写、验证范围；参考树只读；真实模型只通过现有 Cheers 运行路径调用。测试和报告不读取或输出凭据。新产品文件、标识符、界面文案不引入其他项目的名称或标签，也不复制参考仓库实现。
 
-原 Batch 0–4 按当时计划本地提交、未推送。2026-11-24 后续 P0/P1 修复按用户当前指令分批提交并推送 main；外部平台、Windows、实际计费和无法由 Linux 本机证明的结果单独标为未验证。
+原 Batch 0–4 在当时的执行记录中为本地提交。T4 推送后，相关批次提交均已进入 `origin/main`，当前提交为 `4c11147b`。2026-11-24 后续 P0/P1 修复按用户当前指令分批提交并推送 main；外部平台、Windows、实际计费和无法由 Linux 本机证明的结果单独标为未验证。
 
 ## 核实后需要执行的任务
 
 | 批次 | 状态 | 当前证据与边界 |
 | --- | --- | --- |
-| Batch 0 | 实现完成，B0.6 部分验证 | Ready / Configured、模型 Registry、会话连接切换和事务重命名已有实现。最新 Linux 原生 CLI 请求中 Casa、NOFX、BaiLu 均成功，精确路由和会话连接均已确认。WorkBuddy 本地端口 `127.0.0.1:7863` 无监听，仍未验收。 |
-| Batch 0.5 | Linux 本地验收通过，已本地提交 | YAML/JSONC、用户配置解析、保注释局部写回、显式迁移和配置消费者通过 31 个聚焦套件 826/826，六个静态门、源码构建、单文件构建和隔离配置迁移入口通过。提交 `f7f9044c74e05eaa7d0d79dd5023a36fa475a294`，未推送。 |
-| Batch 1 | Linux 本地验收通过，已提交 | 请求前缀、工具发现、缓存 usage/状态、Responses 摘要前缀复用、Bedrock cachePoint 和 capability 反转均通过定向测试。提交 `ab7312f3` 与接线补充 `976847c3`。真实 BaiLu cache-read 为 0、384、640 tokens，但无输入 token 分母，未报告命中率百分比。 |
-| Batch 2 | Linux 本地验收通过，shell 长命令晋升补充已提交 | 嵌套调用 fail-closed、拒绝终止分类、逐调用审批、审批等待暂停、receipt/diff、代码折叠和 PostToolUse 脱敏通过定向测试。Code Mode shell tag 的长 bash 命令现复用同一 PID 的 session job 晋升。完整 JS worker 仍由父 tool 持有，不转入新生命周期。 |
-| Batch 3 | 五秒同进程晋升已实现并通过定向验收 | 命令面板、主题预览入口、并排 diff 换行、Tab/Alt+Up、首次连接引导、受控 LSP 候选、重复调用提醒、job 观察及 stream idle watchdog 原实现已验收。当前晋升改动通过 33 项聚焦测试与 Linux 编译/单文件 build；新 agent 并发槽由现有输入/任务 owner 反证为不适用。 |
-| Batch 4 | v0.1.0 与 v0.1.1 均已发布 | README、INSTALL、发布 workflow、审批式外部 workspace 架构初始化及 MIT LICENSE 已实现。根与 shell 包 SPDX 为 MIT，版权信息为 `Copyright (c) 2026 h-hei133`。固定包为 `ea5054127f4679a8939a747c6495e0df8534b70e`，pinned judge `proven`。原 Batch 4 实现提交 `099b661`；复现性修复 `fb567fb7`；许可证收尾 `e1719fdb`；版本标签 `v0.1.0` 和 `v0.1.1` 均完成发布验收。 |
+| Batch 0 | 实现完成，B0.6 部分验证，已推送 | Ready / Configured、模型 Registry、会话连接切换和事务重命名已有实现。最新 Linux 原生 CLI 请求中 Casa、NOFX、BaiLu 均成功，精确路由和会话连接均已确认。WorkBuddy 本地端口 `127.0.0.1:7863` 无监听，仍未验收。 |
+| Batch 0.5 | Linux 本地验收通过，提交已推送 | YAML/JSONC、用户配置解析、保注释局部写回、显式迁移和配置消费者通过 31 个聚焦套件 826/826，六个静态门、源码构建、单文件构建和隔离配置迁移入口通过。提交 `f7f9044c74e05eaa7d0d79dd5023a36fa475a294` 已进入当前 main。 |
+| Batch 1 | Linux 本地验收通过，提交已推送 | 请求前缀、工具发现、缓存 usage/状态、Responses 摘要前缀复用、Bedrock cachePoint 和 capability 反转均通过定向测试。提交 `ab7312f3` 与接线补充 `976847c3` 均已进入当前 main。真实 BaiLu cache-read 为 0、384、640 tokens，但无输入 token 分母，未报告命中率百分比。 |
+| Batch 2 | Linux 本地验收通过，提交已推送 | 嵌套调用 fail-closed、拒绝终止分类、逐调用审批、审批等待暂停、receipt/diff、代码折叠和 PostToolUse 脱敏通过定向测试。Code Mode shell tag 的长 bash 命令现复用同一 PID 的 session job 晋升。完整 JS worker 仍由父 tool 持有，不转入新生命周期。 |
+| Batch 3 | 五秒同进程晋升已实现并通过定向验收，已推送 | 命令面板、主题预览入口、并排 diff 换行、Tab/Alt+Up、首次连接引导、受控 LSP 候选、重复调用提醒、job 观察及 stream idle watchdog 原实现已验收。当前晋升改动通过 33 项聚焦测试与 Linux 编译/单文件 build；新 agent 并发槽由现有输入/任务 owner 反证为不适用。 |
+| Batch 4 | v0.1.0、v0.1.1、v0.1.2 均已发布 | README、INSTALL、发布 workflow、审批式外部 workspace 架构初始化及 MIT LICENSE 已实现。根与 shell 包 SPDX 为 MIT，版权信息为 `Copyright (c) 2026 h-hei133`。固定包为 `ea5054127f4679a8939a747c6495e0df8534b70e`，pinned judge `proven`。原 Batch 4 实现提交 `099b661`；复现性修复 `fb567fb7`；许可证收尾 `e1719fdb`；三个版本均完成发布验收。 |
 
 ## 批次 0 验收清单
 
@@ -27,7 +27,7 @@
 - [x] B0.4 重命名复用 session record transaction。RPC 忙时取消且不写入。回归覆盖事务重读与中断恢复。
 - [x] B0.5 `.tmp/` 当前为空，未发现活动进程，不需要删除历史内容。
 - [ ] B0.6 定向模型／连接／会话测试、反转回归及正常 Linux CLI 入口验证通过。2026-11-24 Linux Node 20.3 CLI 对 `apikey-casa/gpt-6.2-sol`、`nofx/gpt-6.1-terra`、`openai-compatible/bailu-2.8` 分别请求成功；会话所存模型和精确连接匹配，传输诊断与红action均验证。四个连接中 WorkBuddy 的本地端口无监听，等待服务可用后再关闭该项。之前记录的 Casa/NOFX 认证失败不再代表当前状态。
-- [x] B0.7 本地提交 `8d310529435445028890a165d67c11fb81b1a2c0`，未推送。
+- [x] B0.7 提交 `8d310529435445028890a165d67c11fb81b1a2c0` 已进入当前 `origin/main`。
 
 ## 后续批次验收条件
 
@@ -102,7 +102,7 @@
 - pinned archive 经包契约测试核对，commit 为 `ea5054127f4679a8939a747c6495e0df8534b70e`。用归档成员 `package/dist/adapters/cli/normproof.js` 在 Cheers source 上运行 judge，结果 `proven`、0 open obligations、0 failed obligations、0 proof gaps。
 - `/init architecture` 通过隔离外部 workspace snapshot 生成精确提案；`/init apply` 使用既有 patch approval，要求完整选择并逐文件读回。测试验证被拒、partial、stale、源修改和普通配置并发变更都不会提交未核实结果。runtime asset 和 hook bundle digest 经构建及资产测试校验。
 - Linux 真实模型探测三轮 BaiLu 返回 cache-read `0`、`384`、`640` tokens，cache-write 为 `0`。provider 未给出输入 token 分母，未推导命中率。Casa 与 NOFX 分别返回认证失败，Workbuddy 目标 `127.0.0.1:7863` 无监听。旧 Batch 0 记录中的“真实 endpoint 请求成功”修正为 BaiLu 成功，Casa/NOFX 为认证失败，均与产品路由测试分开记录。
-- Batch 1–4 无新增产品运行时依赖。提交 `ab7312f3`/`976847c3`、`d006c981`、`b06ec6d0`、`099b661`，均本地且未推送。实际工作量 L。B4.1 LICENSE 与公开 Release 保持未完成，因用户选择暂缓根项目许可证信息。
+- Batch 1–4 无新增产品运行时依赖。提交 `ab7312f3`/`976847c3`、`d006c981`、`b06ec6d0`、`099b661` 在当时的执行记录中为本地提交，现均已进入 `origin/main`。实际工作量 L。B4.1 LICENSE 与公开 Release 当时暂缓，后续已补齐许可证信息并完成三个版本发布。
 
 ## Batch 3.5 设计与修正
 
@@ -137,7 +137,7 @@
 - Linux `npm run build` 与 `npm run build:exe` 通过，单文件可执行产物为版本 0.1.0。
 - 从编译 CLI 的正常 `config migrate` 入口，在隔离 HOME/workspace 中迁移 5 个 JSON 文件。YAML 目标读回成功，`.json.bak` 与原字节一致，然后清理源普通文件。隔离 HOME、workspace 和 session 随后删除。
 - 未调用 provider。实现复用原 profile、snapshot、文档路径、字段合并和权限 owner。新增 1 个纯 JS YAML 依赖，无原生绑定。实际投入 L。
-- 本批本地提交 `f7f9044c74e05eaa7d0d79dd5023a36fa475a294`，未推送。
+- 本批提交 `f7f9044c74e05eaa7d0d79dd5023a36fa475a294` 在执行时尚未推送，现已进入当前 `origin/main`。
 
 ## Batch 0 执行证据（2026-11-24）
 
@@ -145,7 +145,7 @@
 - Linux 验证 420/420 定向 Vitest。`verify:import-cycles`、`check:config-consumers`、`check:declarations`、`check:node-floor`、`check:lint`、`verify:docs-drift:strict`、`npm run build` 和 `npm run build:exe` 全部通过。
 - 生产 `--list-models` 入口只展示配置的 9 个模型。BaiLu 真实请求成功；NOFX 与 APIKey Casa 请求分别返回认证失败，不能计为成功。Workbuddy 选择了正确连接，但 `127.0.0.1:7863` 没有监听服务，真实请求归类为 provider/network failure。
 - 测试副作用：第一次真实请求启动时复用了已有 Cheers session，将其模型选择改为 `bailu-2.8`。原选择没有执行前快照，不能安全推定并回写。本机 session ID 是 `sess_ce712b9e215964b0_1795310273004`。
-- 外部临时 workspace 和其中创建的测试 session 已删除。本批本地提交 `8d310529435445028890a165d67c11fb81b1a2c0`，未推送。
+- 外部临时 workspace 和其中创建的测试 session 已删除。本批提交 `8d310529435445028890a165d67c11fb81b1a2c0` 在执行时尚未推送，现已进入当前 `origin/main`。
 
 ## 构建可复现性收尾（2026-11-24）
 
@@ -190,10 +190,10 @@
 - T1：Linux Node 20.3.0 `npm run test:ts` 通过，1,281 个文件、17,657 项通过、2 项跳过。首次运行发现 20,000 节点与 30,000 条分支摘要组合超过 30 秒测试上限；两个负载边界用例单独重跑均通过，将仅该参数化用例的观测超时设为 60 秒，所有导航与字节完整性断言保留。模型目录和 YAML 旧 JSONC fixture 按现有格式与生产解析行为更新。相关包构建、四个最终覆盖套件 72 项及 Node floor 静态门通过。
 - T2：启动入口将目录模型别名解析到唯一 ready connection；`<runtime-provider>/<model>` 先拆出 provider，再保持完整 model ID。显式 `--provider` 仍优先，provider 前缀、嵌套模型路径、目录别名和显式 provider 分支由隔离回归覆盖。Linux Node 20.3.0 源码/编译 CLI 与 v0.1.2 单文件产物使用隔离 HOME 逐项请求 Casa `gpt-6.2-sol`、NOFX `gpt-6.1-terra`、BaiLu `bailu-2.8`，均返回 completed；会话选择分别保存精确连接，传输诊断命中 `apikey.casa`、`b872cff39391.nofx.one`、`bailucode.com`，输出脱敏核验通过。
 - T3：失效的旧测试路径改成现有权限记忆 codec/continuity 投影生产消费者测试。隔离 Home Gate 和 Git hook 边界显式设置。`verify:release:core` 在 Node 20.3.0、隔离 HOME/TestRoot、中间构建和最终 v0.1.2 构建中完整通过，包含 session/query、CLI、MCP、result contract、workspace safety、evidence artifact、long-session durability 及 strict docs gate。发布 workflow 增加精确 SHA 的 main `Build & Test` 与 `Validate NormProof Architecture` 前置成功条件。
-- T4：外部记录已更新。三条 provider 路由证据通过；`127.0.0.1:7863` 无监听，WorkBuddy 保持开放。根包、shell 包及 lockfile 已升至 v0.1.2；Linux TypeScript build、107 MB 单文件产物、`--version` 和 `--help` 检查通过。待分批提交推送并观察远端双 CI；仅在 CI 成功后推送 `v0.1.2` 标签。
+- T4：外部记录已更新。三条 provider 路由证据通过；`127.0.0.1:7863` 无监听，WorkBuddy 保持开放。根包、shell 包及 lockfile 已升至 v0.1.2；Linux TypeScript build、单文件产物、`--version` 和 `--help` 检查通过。标签 `v0.1.2` 已推送至提交 `4c11147b`，该提交的 main CI `45432989402` 两个必需 job 均成功。Release workflow `45442889705` 完成三个平台资产及 sidecar 校验和发布。下载的 Linux 资产为 112,670,848 字节，SHA-256、`--version` 和 `--help` 独立复验通过。
 - T5：CI 和 release workflow 的 checkout/setup-node 升至 v7，upload-artifact 升至 v7，download-artifact 升至 v8。Linux release gate 与 Node 20.3 已验收；Windows 未测试，macOS 交互真机未做，npm `private` 保持现状。
-- 本地门禁：六项静态检查通过，`npm run test:scripts` 229/229 通过，固定 `.normproof/normproof-0.1.0.tgz` 的 prose check/judge 通过，报告 `proven`、0 open obligations、0 failed obligations、0 proof gaps。strict docs drift 仍显示 35 条既有 unprefixed source-path advisory。
-- GitHub CI 尚未针对修复提交运行；修复提交及标签待发布。
+- 本地门禁：六项静态检查通过，`npm run test:scripts` 229/229 通过，固定 `.normproof/normproof-0.1.0.tgz` 的 prose check/judge 通过，报告 `proven`、0 open obligations、0 failed obligations、0 proof gaps。strict docs drift 的无前缀源码 advisory 已归档为历史状态，当前门禁结果为 0 dangling reference 和 0 source-dangling reference。
+- GitHub main CI `45432989402` 与发布 workflow `45442889705` 均成功。提交 `4c11147b` 和标签 `v0.1.2` 已推送，公开 Release 资产验收完成。
 
 ## 完成及提交规则
 

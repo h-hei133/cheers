@@ -24,8 +24,8 @@ It does not claim every historical note is perfectly classified.
 | `.normproof/EXPERIENCE.md` | historical | Early retrospective on formal structural proof vs runtime semantic review (2026-09). | `.wiki/wiki/topics/normproof-structural-governance.md` | Architecture / NormProof |
 | `.normproof/dispositions.md` | historical | Append-only dated decisions and source-bound audits. Paths describe the reviewed source generation; current findings require a fresh judge. |  | Architecture / NormProof |
 | `.wiki/refactor/plan.md` | historical | Completed 2026-09 module-boundary refactor plan and per-step record. | `AGENTS.md` | Architecture |
-| `.wiki/refactor/architecture-exploration-2026-09-18.md` | active | Where modules are still mis-placed, and whether tests need their own tree. |  | Architecture |
-| `.wiki/refactor/drift-exploration-2026-09-18.md` | active | Documentation and rule drift: what is stale, and what actually blocks deleting it. |  | Architecture |
+| `.wiki/refactor/architecture-exploration-2026-09-18.md` | historical | Dated module-placement exploration; its measurements describe the 2026-09 source tree. |  | Architecture |
+| `.wiki/refactor/drift-exploration-2026-09-18.md` | historical | Dated documentation-drift investigation; use the current drift gate and this status map for present path state. | `scripts/verify-docs-and-rules-drift.mjs` | Architecture |
 | `scripts/verify-docs-and-rules-drift.mjs` | active | Gate that reports documents whose path references no longer resolve. |  | Architecture |
 | `docs/DOC_STATUS.md` | active | Select route-relevant docs and avoid broad history loading. |  | Documentation / Capability Contract Architecture |
 | `docs/ACTIVE_CONTEXT.md` | historical | Legacy route context superseded by GOAL.md and .wiki/. | `GOAL.md` | Documentation |
@@ -80,11 +80,11 @@ It does not claim every historical note is perfectly classified.
 |---|---|---|---|---|
 | `docs/sprint/sprint-working-index.md` | active | Starting sprint capability planning or checking which sprint docs are current. |  | Sprint Knowledge Base |
 | `docs/sprint/current-capability-summary.md` | historical | Checking code-backed current capability status and missing areas before planning new capability batches.|  | Sprint Knowledge Base |
-| `docs/sprint/component-adoption-log.md` | active | Checking controlled component or behavior adoption decisions, boundaries, validation evidence, and rollback plans for sprint capability work. |  | Sprint Knowledge Base |
+| `docs/sprint/component-adoption-log.md` | historical | Dated sprint adoption decisions and validation records; referenced source paths describe their recorded tree. |  | Sprint Knowledge Base |
 | `docs/sprint/mature-agent-capability-map.md` | active | Checking the full mature capability target extracted from the local implementation and public docs named in the blueprint. |  | Sprint Knowledge Base |
 | `docs/sprint/task-capability-map.md` | active | Checking the target model for reliable task completion across coding, artifacts, collaboration, verification, recovery, host automation, and live execution. |  | Sprint Knowledge Base |
-| `docs/sprint/task-capability-gap-plan.md` | active | Selecting task-completion gaps, aggressive batches, adoption modes, completion gates, failure signals, and anti-goals. |  | Sprint Knowledge Base |
-| `docs/sprint/project-gap-and-priority-plan.md` | active | Selecting task-completion-driven priority batches while retaining completed trusted-runtime foundation context. |  | Sprint Knowledge Base |
+| `docs/sprint/task-capability-gap-plan.md` | historical | Dated capability plan whose evidence paths are explicitly marked stale; current upgrade work is tracked separately. | `.wiki/refactor/upgrade/MASTER.md` | Sprint Knowledge Base |
+| `docs/sprint/project-gap-and-priority-plan.md` | historical | Dated gap and priority plan with completed-batch evidence tied to earlier source trees. | `.wiki/refactor/upgrade/MASTER.md` | Sprint Knowledge Base |
 | `docs/sprint/development-capability-catalog.json` | active | Running the externalized live development challenge through the shared task runtime. |  | Sprint Knowledge Base / Runtime Evaluation |
 | `docs/sprint/autonomous-development-gap-map.md` | active | Checking SP034 owner-domain gap diagnosis, playbook and mature-source inputs, selected transplant targets, introduction decisions, and before/after diagnostic evidence. |  | Sprint Knowledge Base / Core Capability |
 | `docs/sprint/hard-mission-gauntlet.md` | historical | Checking the SP044 hard normal-runtime mission set, initial weaknesses, and same-mission rerun outcomes.|  | Sprint Knowledge Base / Core Capability |
