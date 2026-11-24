@@ -90,8 +90,9 @@ export function resolveExecutableOutput(root, requested, windows = false) {
 }
 
 /** Bun preserves a Windows executable suffix on --outfile instead of appending a second one. */
-export function compilerTemporaryPath(outfile, windowsTarget) {
-  return `${outfile}.${process.pid}.${randomUUID()}.tmp${windowsTarget ? ".exe" : ""}`;
+export function compilerTemporaryPath(root, outfile, windowsTarget) {
+  const executableName = path.basename(outfile).replace(/\.exe$/i, "");
+  return path.join(path.resolve(root), ".tmp", `${executableName}-build${windowsTarget ? ".exe" : ""}`);
 }
 
 function commandOnPath(command) {
@@ -156,14 +157,25 @@ async function buildExecutable({ version, name, outfile, target, bunTarget, wind
       return 2;
     }
 
+    const buildTemporary = compilerTemporaryPath(repoRoot, outfile, windowsTarget);
     try {
       fs.mkdirSync(path.dirname(outfile), { recursive: true });
       assertNoSymlinkPath(repoRoot, path.dirname(outfile));
+      fs.mkdirSync(path.dirname(buildTemporary), { recursive: true });
+      assertNoSymlinkPath(repoRoot, path.dirname(buildTemporary));
+      assertNoSymlinkPath(repoRoot, buildTemporary);
+      if (fs.existsSync(buildTemporary)) {
+        const previous = fs.lstatSync(buildTemporary);
+        if (previous.isSymbolicLink() || !previous.isFile()) {
+          throw new Error("The executable build staging path is not a regular file.");
+        }
+        fs.rmSync(buildTemporary);
+      }
     } catch (error) {
-      console.error(`The executable output path is unsafe: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(`The executable build path is unsafe: ${error instanceof Error ? error.message : String(error)}`);
       return 1;
     }
-    temporary = compilerTemporaryPath(outfile, windowsTarget);
+    temporary = buildTemporary;
     const compilerWithPath = captureBunProvenance();
     const { executable: bunExecutable, ...compiler } = compilerWithPath;
 

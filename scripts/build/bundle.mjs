@@ -1,5 +1,5 @@
 import { build } from "esbuild";
-import { copyFileSync, existsSync, lstatSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { assertNoSymlinkPath, REQUIRED_BUILD_ASSETS, safeRelativePath } from "../build-identity.mjs";
 import { bindingName, PUBLIC_ENTRY } from "./exports.mjs";
@@ -8,6 +8,7 @@ import { bindingName, PUBLIC_ENTRY } from "./exports.mjs";
 const REQUIRE_BANNER = 'import { createRequire as __cheersCreateRequire } from "node:module";\n'
   + 'const require = __cheersCreateRequire(import.meta.url);';
 const CLI_ENTRY = "entrypoints/cli.js";
+const DOMAIN_NAMESPACE = "domain-modules";
 
 function sourceEntry(root, entry) {
   const base = path.join(root, "packages/ts-shell/src", entry.slice(0, -3));
@@ -85,12 +86,15 @@ export async function bundleModules({ root, staging, version, name, entries, dom
   staging = path.resolve(staging);
   assertNoSymlinkPath(root, staging);
   const linkedDomains = new Map();
+  const domainRoots = new Map();
   for (const [specifier, entry] of domainEntries) {
     if (!/^@cheers\/[a-z0-9-]+$/.test(specifier)) throw new Error("Invalid domain build specifier.");
     const absolute = path.resolve(root, entry);
     assertNoSymlinkPath(staging, absolute);
     if (!lstatSync(absolute).isFile()) throw new Error(`Build entry for ${specifier} is not a regular file.`);
-    linkedDomains.set(specifier, { path: absolute });
+    const domainName = specifier.slice("@cheers/".length);
+    linkedDomains.set(specifier, `${domainName}/${path.basename(absolute)}`);
+    domainRoots.set(domainName, path.dirname(absolute));
   }
   if (typeof version !== "string" || !version.trim() || typeof name !== "string" || !name.trim()) {
     throw new Error("Bundle version and package name must be nonempty strings.");
@@ -116,8 +120,30 @@ export async function bundleModules({ root, staging, version, name, entries, dom
     target: "node20.3",
     keepNames: true,
     packages: "external",
-    ...(linkedDomains.size > 0 ? { plugins: [{ name: "domain-workspaces", setup(builder) {
-      builder.onResolve({ filter: /^@cheers\// }, ({ path: specifier }) => linkedDomains.get(specifier));
+    ...(linkedDomains.size > 0 ? { plugins: [{ name: DOMAIN_NAMESPACE, setup(builder) {
+      builder.onResolve({ filter: /^@cheers\// }, ({ path: specifier }) => {
+        const resolved = linkedDomains.get(specifier);
+        return resolved ? { path: resolved, namespace: DOMAIN_NAMESPACE } : undefined;
+      });
+      builder.onResolve({ filter: /^(?:\.{1,2})\//, namespace: DOMAIN_NAMESPACE }, args => {
+        const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(args.importer), args.path));
+        const owner = args.importer.split("/")[0];
+        const domainName = resolved.split("/")[0];
+        if (!safeRelativePath(resolved) || domainName !== owner || !domainRoots.has(domainName)) {
+          throw new Error(`A domain module import from ${owner} escapes its package output: ${args.path} -> ${resolved}.`);
+        }
+        return { path: resolved, namespace: DOMAIN_NAMESPACE };
+      });
+      builder.onLoad({ filter: /.*/, namespace: DOMAIN_NAMESPACE }, args => {
+        if (!safeRelativePath(args.path)) throw new Error("A domain module path is unsafe.");
+        const [domainName, ...segments] = args.path.split("/");
+        const domainRoot = domainRoots.get(domainName);
+        if (!domainRoot || segments.length === 0) throw new Error("A domain module path is unavailable.");
+        const absolute = path.resolve(domainRoot, ...segments);
+        assertNoSymlinkPath(root, absolute);
+        if (!lstatSync(absolute).isFile()) throw new Error("A domain module is not a regular file.");
+        return { contents: readFileSync(absolute), loader: "js", resolveDir: path.dirname(absolute) };
+      });
     } }] } : {}),
     chunkNames: "chunks/[name]-[hash]",
     assetNames: "assets/[name]-[hash]",

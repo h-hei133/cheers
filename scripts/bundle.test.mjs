@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import { bundleModules } from "./build/bundle.mjs";
 import { bindingName } from "./build/exports.mjs";
 import { bundleDomainTypes } from "./build/types.mjs";
-import { REQUIRED_BUILD_ASSETS } from "./build-identity.mjs";
+import { REQUIRED_BUILD_ASSETS, snapshotDirectory } from "./build-identity.mjs";
 
 function write(file, contents) {
   mkdirSync(path.dirname(file), { recursive: true });
@@ -182,6 +182,59 @@ export async function media() {
       assert.equal(await api.media(), 'unavailable');
     } finally { rmSync(missing.root, { recursive: true, force: true }); }
   } finally { rmSync(input.root, { recursive: true, force: true }); }
+});
+
+test("bundle output is stable across temporary domain directories", async () => {
+  const input = fixture();
+  const secondStaging = path.join(input.root, "packages/ts-shell/dist/staging-second");
+  const domainSource = "export const value = 'stable domain output';\n";
+  const writeDomainEntry = (staging) => {
+    const entry = path.join(staging, ".domains/media/index.js");
+    write(entry, domainSource);
+    return entry;
+  };
+
+  try {
+    write(path.join(input.source, "index.ts"), [
+      'export async function media() {',
+      '  return (await import("@cheers/media")).value;',
+      '}',
+    ].join("\n"));
+
+    await bundleModules({ ...input, domainEntries: new Map([
+      ["@cheers/media", writeDomainEntry(input.staging)],
+    ]) });
+    rmSync(path.join(input.staging, ".domains"), { recursive: true, force: true });
+    const first = snapshotDirectory(input.staging);
+
+    await bundleModules({ ...input, staging: secondStaging, domainEntries: new Map([
+      ["@cheers/media", writeDomainEntry(secondStaging)],
+    ]) });
+    rmSync(path.join(secondStaging, ".domains"), { recursive: true, force: true });
+    const second = snapshotDirectory(secondStaging);
+
+    assert.equal(second.digest, first.digest);
+  } finally {
+    rmSync(input.root, { recursive: true, force: true });
+  }
+});
+
+test("domain modules cannot reach another package through relative imports", async () => {
+  const input = fixture();
+  try {
+    write(path.join(input.source, "index.ts"), 'export async function media() { return import("@cheers/media"); }\n');
+    const mediaEntry = path.join(input.staging, ".domains/media/index.js");
+    const browserEntry = path.join(input.staging, ".domains/browser/index.js");
+    write(mediaEntry, 'export { value } from "../browser/index.js";\n');
+    write(browserEntry, 'export const value = "browser";\n');
+
+    await assert.rejects(bundleModules({ ...input, domainEntries: new Map([
+      ["@cheers/media", mediaEntry],
+      ["@cheers/browser", browserEntry],
+    ]) }), /escapes its package output/);
+  } finally {
+    rmSync(input.root, { recursive: true, force: true });
+  }
 });
 
 test("missing, ambiguous and unsafe public sources refuse bundling before staging changes", async () => {

@@ -145,9 +145,11 @@ test("restricts executable output to a file directly inside dist/bin", () => {
 });
 
 test("keeps the executable suffix Bun requires for a Windows compile target", () => {
-  const outfile = path.join(os.tmpdir(), "cheers.exe");
-  assert.match(compilerTemporaryPath(outfile, false), /\.tmp$/);
-  assert.match(compilerTemporaryPath(outfile, true), /\.tmp\.exe$/);
+  const root = mkdtempSync(path.join(os.tmpdir(), "cheers-output-"));
+  const outfile = path.join(root, "dist/bin/cheers");
+  assert.equal(compilerTemporaryPath(root, outfile, false), path.join(root, ".tmp/cheers-build"));
+  assert.equal(compilerTemporaryPath(root, outfile, true), path.join(root, ".tmp/cheers-build.exe"));
+  rmSync(root, { recursive: true, force: true });
 });
 
 test("recognizes both host target spellings and keeps other targets cross-target", () => {
