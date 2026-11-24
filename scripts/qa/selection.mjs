@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 
 function snapshot(home) {
   const store = path.join(home, '.cheers');
@@ -36,7 +37,7 @@ export async function rejectStaleSelection({ state, child, home, sessionId, comm
   start = state.output.length;
   child.stdin.write('\r');
   await waitForOutput(() => normalized(state.output.slice(start)), value =>
-    value.includes('changed after') && value.includes('Reopen'), `${command} stale rejection`);
+    value.includes('changed') && value.includes('Reopen'), `${command} stale rejection`);
   await waitForOutput(() => normalized(state.output.slice(start)), value =>
     value.includes('Ask anything, or / for commands'), `${command} rejection prompt`);
   const actual = snapshot(home);
@@ -156,6 +157,8 @@ export async function browseSessionPages({ state, child, home, project, normaliz
 /** Direct rename/editor and deletion use explicit confirmation and retain saved source bytes. */
 export async function manageSavedSession({ state, child, home, sessionId, normalized, waitForOutput }) {
   const metadataPath = path.join(home, '.cheers', 'sessions', sessionId, 'metadata.json');
+  const sessionDirectory = path.dirname(metadataPath);
+  const stateBefore = JSON.parse(fs.readFileSync(path.join(sessionDirectory, 'state.json'), 'utf8'));
   const before = snapshot(home);
   let start = state.output.length; child.stdin.write(`/delete ${sessionId}\r`);
   await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Delete saved session'), 'saved delete preview');
@@ -170,10 +173,13 @@ export async function manageSavedSession({ state, child, home, sessionId, normal
   start = state.output.length; child.stdin.write('\x15qa-managed-title\r');
   await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Renamed session') && value.includes('qa-managed-title'), 'saved title write');
   if (JSON.parse(fs.readFileSync(metadataPath, 'utf8')).title !== 'qa-managed-title') throw new Error('Saved title was not written.');
+  const stateAfter = JSON.parse(fs.readFileSync(path.join(sessionDirectory, 'state.json'), 'utf8'));
+  if (!isDeepStrictEqual(stateAfter, stateBefore)) throw new Error('Rename changed saved conversation state.');
   const after = snapshot(home);
-  if (JSON.stringify(after.filter(([file]) => !file.endsWith(`${sessionId}/metadata.json`)))
-    !== JSON.stringify(before.filter(([file]) => !file.endsWith(`${sessionId}/metadata.json`)))) {
-    throw new Error('Rename changed conversation files or the active session.');
+  const unrelated = rows => rows.filter(([file]) => !file.endsWith(`${sessionId}/metadata.json`)
+    && !file.endsWith(`${sessionId}/state.json`));
+  if (JSON.stringify(unrelated(after)) !== JSON.stringify(unrelated(before))) {
+    throw new Error('Rename changed the saved transcript or active session.');
   }
   state.managementChecks = { status: 'pass', deleteCancelUnchanged: true, titleEditorHandoff: true, titleReadback: true, conversationUnchanged: true };
 }

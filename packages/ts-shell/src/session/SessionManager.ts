@@ -199,18 +199,17 @@ export class SessionManager extends SessionReentrySurface {
     );
   }
 
-  renameSession(sessionId: string, title: string): Session {
+  renameSession(sessionId: string, title: string, beforeCommit?: (session: Session) => void,
+    admission?: () => void): Session {
     const normalized = title.trim();
     return commitSessionRecordTransaction(
       this.host.store.stateLayout(sessionId),
       sessionId,
-      (session, timestamp) => ({
-        session: {
-          ...session,
-          title: normalized.length > 0 ? normalized : undefined,
-          updatedAt: timestamp,
-        },
-      }),
+      (session, timestamp) => {
+        beforeCommit?.(session);
+        return { session: { ...session, title: normalized.length > 0 ? normalized : undefined, updatedAt: timestamp } };
+      },
+      admission,
     );
   }
 

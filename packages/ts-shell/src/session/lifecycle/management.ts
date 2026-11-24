@@ -8,6 +8,7 @@ import { readSessionManagementSnapshot, type SessionManagementTarget } from '../
 import { writeJsonFileAtomic } from '../store/sessionFileStore.js';
 import { readSessionFileVersion } from '../store/version.js';
 import { withSessionStateLock } from '../store/sessionStateStore.js';
+import { PromptPublicationError } from '../store/prompt/intent.js';
 
 type Manager = Pick<SessionManager, 'catalog' | 'getSessionDirPath' | 'renameSession' | 'deleteSession' | 'sessionExists'>;
 export type SessionManagementAction = 'rename' | 'delete' | 'pin';
@@ -65,6 +66,7 @@ export function applySessionManagement(manager: Manager, context: () => SessionS
   if (preview.action === 'rename' && invalidSessionTitle(title ?? '')) {
     return { status: 'unchanged', note: invalidSessionTitle(title ?? '')! };
   }
+  if (preview.action === 'rename') return applyRename(manager, context, preview, title!.trim());
   let started = false;
   let confirmedDeletion = false;
   try {
@@ -95,11 +97,7 @@ export function applySessionManagement(manager: Manager, context: () => SessionS
         return !confirmedDeletion ? { status: 'unknown', note: 'Deletion was attempted, but the saved session is still present. Check it before retrying.' }
           : { status: 'changed', note: `Deleted session ${id}.` };
       }
-      manager.renameSession(id, title!.trim());
-      const saved = readSessionManagementSnapshot(layout, id).session;
-      return saved.id === id && saved.createdAt === preview.session.createdAt && saved.title === title!.trim()
-        ? { status: 'changed', note: `Renamed session ${id} to ${saved.title}.` }
-        : { status: 'unknown', note: 'Rename was attempted, but the saved title could not be confirmed. Check it before retrying.' };
+      return { status: 'unchanged', note: 'The saved session action is unavailable. Reopen the action.' };
     }, { requireExisting: true });
   } catch (error) {
     // Removing the directory deliberately removes its lock too. The lock owner
@@ -111,6 +109,46 @@ export function applySessionManagement(manager: Manager, context: () => SessionS
     return { status: started ? 'unknown' : 'unchanged', note: started
       ? 'The session action was attempted, but its result could not be confirmed. Check the saved session before retrying.'
       : 'The saved session is unavailable or locked. No session action was started.' };
+  }
+}
+
+function applyRename(manager: Manager, context: () => SessionSelectionContext, preview: SessionManagementPreview,
+  title: string): SessionManagementResult {
+  const id = preview.session.id;
+  const { layout } = preview;
+  let refusal: string | undefined;
+  const refuse = (message: string): never => { refusal = message; throw new Error(message); };
+  try {
+    manager.renameSession(id, title, session => {
+      if (layoutFor(manager, id).sessionDir !== layout.sessionDir || readSessionFileVersion(layout) !== preview.version) {
+        refuse('The saved session changed after the preview. Reopen the action.');
+      }
+      const snapshot = readSessionManagementSnapshot(layout, id);
+      const blocked = block(preview.expected, context(), snapshot.session, id, 'rename',
+        snapshot.state.status === 'active' ? snapshot.state.runPhase : undefined);
+      if (blocked) refuse(blocked);
+      if (session.id !== id || session.createdAt !== preview.session.createdAt || session.title !== snapshot.session.title) {
+        refuse('The saved session changed after the preview. Reopen the action.');
+      }
+      const expired = managementAdmission(preview.admission);
+      if (expired) refuse(expired);
+    }, () => {
+      const expired = managementAdmission(preview.admission);
+      if (expired) refuse(expired);
+    });
+  } catch (error) {
+    if (error instanceof PromptPublicationError && error.persistence === 'unchanged') {
+      return { status: 'unchanged', note: refusal ?? 'The saved session changed after the preview. Reopen the action.' };
+    }
+    return { status: 'unknown', note: 'Rename was attempted, but the saved title could not be confirmed. Check it before retrying.' };
+  }
+  try {
+    const saved = withSessionStateLock(layout, () => readSessionManagementSnapshot(layout, id).session, { requireExisting: true });
+    return saved.id === id && saved.createdAt === preview.session.createdAt && saved.title === title
+      ? { status: 'changed', note: `Renamed session ${id} to ${saved.title}.` }
+      : { status: 'unknown', note: 'Rename was attempted, but the saved title could not be confirmed. Check it before retrying.' };
+  } catch {
+    return { status: 'unknown', note: 'Rename was attempted, but the saved title could not be confirmed. Check it before retrying.' };
   }
 }
 
