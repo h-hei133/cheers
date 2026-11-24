@@ -21,12 +21,13 @@ This file is the curated, compact index of reusable engineering pitfalls, enviro
 - **Rule**: Require an explicit terminal pass count (`tests N`, `pass N`) alongside exit 0 and validate launcher invocations at the Node `>=20.3.0` floor.
 
 ### Never Run Heavy Builds Or Tests Concurrently In WSL2
-- **Symptom**: Parallel `tsc`, `vitest`, `build`, or `normproof` runs terminate with exit 137 (`Killed`).
-- **Root Cause**: WSL2 bounded RAM triggers the Linux OOM-Killer under concurrent TypeScript/Vitest workers.
-- **Rule**: Chain heavy commands serially with `&&`, run Tier-1 sub-second static gates first, batch multiple Vitest targets into one invocation, and never invoke `build`/`vitest`/`normproof` inside delegated subagents.
+- **Symptom**: Concurrent heavy checks OOM WSL2 (137).
+- **Root Cause**: Parallel workers exceed memory.
+- **Rule**: Run builds, tests, and gates serially. Delegates do not run them.
 
-### Keep Byte Budget Fixtures Small On Node 20.3.0
-Long wrapped Unicode lines can spend over 30 seconds in terminal layout on Node 20.3.0. Cross the byte ceiling with fewer multibyte graphemes for truncation checks. Use short rows for cumulative ANSI and newline accounting.
+### Keep Unicode Budget Fixtures Small On Node 20.3.0
+- **Symptom**: Wrapped Unicode lines exceed 30s in terminal layout.
+- **Rule**: Use few multibyte graphemes at byte limits and short rows for ANSI/newline accounting.
 
 ---
 
@@ -51,6 +52,11 @@ Long wrapped Unicode lines can spend over 30 seconds in terminal layout on Node 
 
 ## 3. Process Lifecycle, Sandbox & PTY
 
+### Synthetic CLI Git Boundary
+- **Symptom**: An isolated `.tmp/` project loads repository hooks.
+- **Root Cause**: Git discovery binds the ancestor repository.
+- **Rule**: Set child `GIT_CEILING_DIRECTORIES` to the test root or use a separate Git root. Keep hooks enabled.
+
 ### PID Existence Does Not Prove A Terminated Target Is Running
 - **Symptom**: A PTY wrapper closes its streams, yet `kill(pid, 0)` still succeeds and fails teardown tests.
 - **Root Cause**: Linux retains an exited zombie PID until reaped, and PIDs can be reused.
@@ -67,10 +73,9 @@ Long wrapped Unicode lines can spend over 30 seconds in terminal layout on Node 
 - **Rule**: Bind `process.execPath` read-only when planning sandboxed hooks. A packaged hook also needs an explicit read-only bind for its verified profile artifact file. Report persistent write-gate stdio fallback to one-shot execution.
 
 ### Startup Metrics Must Follow Real Surface Readiness
-- **Symptom**: Benchmarks misreport first-frame latency or PTY probes send input before a view finishes returning.
-- **Root Cause**: Prepaint, runtime adoption, and stream flush are separate lifecycle events.
-- **Rule**: Synchronize terminal assertions on concrete rendered chrome/focus markers and wait for child process exit and stream close before tearing down fixtures.
-- **PTY command handoff**: A save/result notice can render before its picker fully closes. Wait for the ordinary input prompt before sending the next command.
+- **Symptom**: First-frame metrics are wrong or PTY input arrives before the view is ready.
+- **Root Cause**: Prepaint, runtime adoption, and stream flush are separate.
+- **Rule**: Sync on rendered chrome/focus, then await child exit and stream close. After result notices, wait for the normal prompt before another command.
 
 ---
 

@@ -13,7 +13,49 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify-ci:
+    name: Require successful main CI
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Wait for CI on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 40); do
+            runs="$(gh run list --workflow .github/workflows/ci.yml --branch main --commit "$GITHUB_SHA" \
+              --json databaseId,headSha,status,conclusion,event --limit 100)"
+            run_id="$(jq -r --arg sha "$GITHUB_SHA" '[.[] | select(.headSha == $sha and .event == "push")] | sort_by(.databaseId) | last | .databaseId // empty' <<< "$runs")"
+            if [[ -n "$run_id" ]]; then
+              run="$(jq -c --argjson id "$run_id" '.[] | select(.databaseId == $id)' <<< "$runs")"
+              status="$(jq -r '.status' <<< "$run")"
+              conclusion="$(jq -r '.conclusion // empty' <<< "$run")"
+              if [[ "$status" == "completed" ]]; then
+                if [[ "$conclusion" != "success" ]]; then
+                  echo "The main CI run for this release commit concluded $conclusion."
+                  exit 1
+                fi
+                jobs="$(gh run view "$run_id" --json jobs --jq '[.jobs[] | select(.name == "Build & Test" or .name == "Validate NormProof Architecture") | select(.conclusion == "success") | .name] | sort | join(",")')"
+                if [[ "$jobs" != "Build & Test,Validate NormProof Architecture" ]]; then
+                  echo "The main CI run for this release commit did not pass both required jobs."
+                  exit 1
+                fi
+                echo "Both required main CI jobs passed for $GITHUB_SHA."
+                exit 0
+              fi
+            fi
+            echo "Waiting for the main CI run on $GITHUB_SHA (${attempt}/40)."
+            sleep 15
+          done
+          echo "No successful main CI run completed for $GITHUB_SHA within 10 minutes."
+          exit 1
+
   build:
+    needs: verify-ci
     name: Build ${{ matrix.asset }}
     strategy:
       fail-fast: false
@@ -32,11 +74,11 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20.3.0'
           cache: npm
@@ -74,7 +116,7 @@ jobs:
           "$DIST" --help >/dev/null
           (cd dist/bin && shasum -a 256 "$ASSET" > "$ASSET.sha256")
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.asset }}
           path: |
@@ -85,12 +127,12 @@ jobs:
 
   publish:
     name: Publish release assets
-    needs: build
+    needs: [verify-ci, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist/release
           pattern: cheers-*

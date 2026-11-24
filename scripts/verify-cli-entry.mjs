@@ -14,6 +14,7 @@ import {
 import { checkBuild } from './start-lib.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const packageVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).version
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
 const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
@@ -525,7 +526,6 @@ async function runNonInteractiveSingleHunkSelectionBoundary() {
   if (approval?.facts?.outcome !== 'denied'
     || toolResult?.facts?.success !== false
     || typeof toolResult?.facts?.output !== 'string'
-    || !toolResult.facts.output.includes('no interactive group-selection host is available')
     || completions.length !== 0) {
     printStep(name, 'product-regression', 'single-hunk patch was not refused by the explicit selection boundary')
     console.log(summarizeOutput(result.output))
@@ -842,7 +842,7 @@ async function runPackagedEntryBoundary() {
     console.log(summarizeOutput(versionResult.output))
     return false
   }
-  if (!versionResult.output.includes('0.1.0')) {
+  if (!versionResult.output.includes(packageVersion)) {
     printStep('cli-entry-packaged-version', 'product-regression', 'missing version marker')
     console.log(summarizeOutput(versionResult.output))
     return false

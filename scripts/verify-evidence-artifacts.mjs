@@ -188,6 +188,7 @@ async function runSuccessEvidenceCheck() {
       HOME: syntheticHome,
       USERPROFILE: syntheticHome,
       CHEERS_PROVIDER_MODE: 'synthetic',
+      CHEERS_SYNTHETIC_TOOLS: '1',
     },
     timeoutMs: 240000,
   })
@@ -201,13 +202,18 @@ async function runSuccessEvidenceCheck() {
   const stdoutOk = assertContains(result.output, [
     'Result',
     'Outcome: success',
-    'Action result',
-    'Task: write-file',
-    'Changed: 1 file(s)',
+    'Execution summary',
+    'Actions: write (1 run)',
+    'Approvals: 1/1 approved',
   ], 'success-path-result-markers')
 
   if (!fs.existsSync(successTargetPath)) {
     printStep('success-path-changed-file', 'product-regression', `${successTargetPath} missing`)
+    return false
+  }
+  const content = fs.readFileSync(successTargetPath, 'utf8')
+  if (content !== "```python\nprint('evidence artifact success')\n```") {
+    printStep('success-path-changed-file', 'product-regression', 'file content did not match the requested fixture')
     return false
   }
   printStep('success-path-changed-file', 'pass', successTargetPath)
@@ -216,32 +222,21 @@ async function runSuccessEvidenceCheck() {
   if (!artifacts) return false
   const queryEvents = flattenQueryEvents(artifacts.transcript)
   const queryCompleted = findLast(queryEvents, (event) => event.type === 'query.completed')
-  const coderTurn = queryEvents
-    .filter((event) => event.type === 'turn.completed')
-    .map((event) => event.output)
-    .reverse()
-    .find((output) => output?.codingResult?.taskKind === 'write-file')
   const toolResult = findLast(queryEvents, (event) => event.type === 'tool.result' && event.toolName === 'write')
   const approvalResolved = findLast(queryEvents, (event) => event.type === 'approval.resolved' && event.toolName === 'write')
 
-  const codingResult = queryCompleted?.result?.codingResult ?? coderTurn?.codingResult
-  const evidence = codingResult?.evidence ?? []
-  const changeSet = codingResult?.changeSet
   const transcriptOk =
     queryCompleted?.result?.status === 'completed' &&
     queryCompleted?.result?.terminalClassification === 'success' &&
     toolResult?.success === true &&
     approvalResolved?.outcome === 'approved' &&
-    codingResult?.changedFiles?.includes(successRelativePath) &&
-    changeSet?.changedFiles?.includes(successRelativePath) &&
-    evidence.some((item) => item.includes('current-permission-request-tool:write')) &&
-    evidence.some((item) => item.includes(`edit/write applied on ${successRelativePath}`))
+    toolResult.output?.includes(`Wrote ${successRelativePath}`)
 
   if (!transcriptOk) {
-    printStep('success-path-transcript-evidence', 'product-regression', 'stdout markers did not map to transcript codingResult/changeSet/evidence')
+    printStep('success-path-transcript-evidence', 'product-regression', 'terminal, approval, or write-result facts did not match')
     return false
   }
-  printStep('success-path-transcript-evidence', 'pass', 'changedFiles/changeSet/evidence matched')
+  printStep('success-path-transcript-evidence', 'pass', 'terminal, approval, write-result, and disk content matched')
   return stdoutOk
 }
 
@@ -263,6 +258,7 @@ async function runDeniedEvidenceCheck() {
       HOME: syntheticHome,
       USERPROFILE: syntheticHome,
       CHEERS_PROVIDER_MODE: 'synthetic',
+      CHEERS_SYNTHETIC_TOOLS: '1',
     },
     timeoutMs: 240000,
   })
@@ -274,47 +270,40 @@ async function runDeniedEvidenceCheck() {
   }
 
   const stdoutOk = assertContains(result.output, [
-    'approval-audit:event=decision',
-    'approval-audit:decision=deny',
     'approval-audit:persistent=false',
+    'approval-audit:cache-effect=none',
+    'Approval decision: deny',
     'Result',
     'Outcome: stopped',
-    'Verification: blocked',
+    'BlockerKind: approval-denied',
+    'Approvals: 0/1 approved',
   ], 'denied-path-result-markers')
 
   const artifacts = assertSessionArtifacts(targetProject, startedAtMs, 'denied-path-session-artifacts')
   if (!artifacts) return false
   const queryEvents = flattenQueryEvents(artifacts.transcript)
   const queryCompleted = findLast(queryEvents, (event) => event.type === 'query.completed')
-  const coderTurn = queryEvents
-    .filter((event) => event.type === 'turn.completed')
-    .map((event) => event.output)
-    .reverse()
-    .find((output) => output?.codingResult?.taskKind === 'run-command')
   const approvalResolved = findLast(queryEvents, (event) => event.type === 'approval.resolved' && event.toolName === 'bash')
   const toolResult = findLast(queryEvents, (event) => event.type === 'tool.result' && event.toolName === 'bash')
-  const codingResult = queryCompleted?.result?.codingResult ?? coderTurn?.codingResult
   const stateAudit = artifacts.state?.workingMemory?.approvalAudit
   const continuity = artifacts.state?.workingMemory?.continuity
-  const evidence = codingResult?.evidence ?? []
 
   const deniedOk =
+    queryCompleted?.result?.status === 'stopped_error' &&
     queryCompleted?.result?.terminalClassification === 'stopped' &&
-    codingResult?.verification?.status === 'blocked' &&
-    codingResult?.verification?.blockerKind === 'approval-denied' &&
+    queryCompleted?.result?.stopReason?.includes('User denied permission') &&
     approvalResolved?.outcome === 'denied' &&
     toolResult?.success === false &&
     stateAudit?.decision === 'deny' &&
     stateAudit?.persistent === false &&
     continuity?.lastApprovalDecision === 'deny' &&
-    evidence.some((item) => item.includes('verify-blocker-kind:approval-denied')) &&
-    evidence.some((item) => item.includes('current-permission-request-tool:bash'))
+    continuity?.lastApprovalCacheEffect === 'none'
 
   if (!deniedOk) {
-    printStep('denied-path-audit-evidence', 'product-regression', 'stdout approval marker did not map to transcript/state evidence')
+    printStep('denied-path-audit-evidence', 'product-regression', 'terminal, tool, or approval-audit facts did not match')
     return false
   }
-  printStep('denied-path-audit-evidence', 'pass', 'approval audit, transcript event, and blocked result matched')
+  printStep('denied-path-audit-evidence', 'pass', 'terminal, tool, transcript, and approval-audit facts matched')
   return stdoutOk
 }
 

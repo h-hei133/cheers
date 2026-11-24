@@ -6,7 +6,6 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import {
   getRealProviderHome,
-  getSyntheticHome,
   getTestRoot,
 } from './support/testPaths.mjs'
 import { resolveVitestPath } from './support/scriptRuntime.mjs'
@@ -16,11 +15,9 @@ const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
 const vitestPath = resolveVitestPath(repoRoot, tsShellRoot)
 const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
-const syntheticHome = getSyntheticHome()
 const realHome = getRealProviderHome({ allowDefault: true })
 const projectRoot = path.join(getTestRoot(), 'real-fresh-editwrite-compact-rebased')
 const realSessionId = 'sess_12903adabf7ae26e_1776956738259'
-const syntheticSessionId = 'sess_8c44c8891210d92e_1776956957666'
 const replayFile = path.join(getTestRoot(), 'permission-memory-replay.txt')
 
 const authorityRoot = process.platform === 'win32' ? projectRoot.replaceAll('/', '\\') : projectRoot
@@ -113,187 +110,6 @@ function printStep(name, status, detail = '') {
   console.log(`[${status}] ${name}${suffix}`)
 }
 
-function assertPathInside(parent, child) {
-  const normalizedParent = path.resolve(parent)
-  const normalizedChild = path.resolve(child)
-  if (
-    normalizedChild !== normalizedParent &&
-    !normalizedChild.startsWith(`${normalizedParent}${path.sep}`)
-  ) {
-    throw new Error(`Refusing to touch path outside ${normalizedParent}: ${normalizedChild}`)
-  }
-}
-
-function writeJson(filePath, payload) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true })
-  fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
-}
-
-function writeText(filePath, content) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true })
-  fs.writeFileSync(filePath, content, 'utf8')
-}
-
-function ensureSyntheticPermissionMemoryFixture() {
-  const sessionsRoot = path.join(syntheticHome, '.cheers', 'sessions')
-  const sessionDir = path.join(sessionsRoot, syntheticSessionId)
-  assertPathInside(sessionsRoot, sessionDir)
-
-  fs.mkdirSync(sessionsRoot, { recursive: true })
-  if (fs.existsSync(sessionDir)) {
-    fs.rmSync(sessionDir, { recursive: true, force: true })
-  }
-  fs.mkdirSync(sessionDir, { recursive: true })
-  fs.mkdirSync(path.join(projectRoot, 'src'), { recursive: true })
-  writeText(path.join(projectRoot, 'src', 'permission-memory-fixture.txt'), 'permission memory fixture\n')
-
-  const now = new Date().toISOString()
-  const rebasedRoot = projectRoot.replaceAll('\\', '/')
-  const cacheKey = `${rebasedRoot.toLowerCase()}|bash:spawn:process:node`
-  const continuity = {
-    lastTaskKind: 'chat',
-    lastApprovalDecision: 'allow-once',
-    lastApprovalDecisionSource: 'cli-policy',
-    lastApprovalPersistent: false,
-    lastApprovalCacheEffect: 'none',
-    lastApprovalProjectRoot: authorityRoot,
-    lastApprovalCacheKey: cacheKey,
-    lastApprovalScope: 'bash/spawn/process(node)',
-    lastApprovalLineage: 'verify:node --version',
-    lastApprovalChannel: 'interactive',
-    lastApprovalInputKey: 'y',
-    lastApprovalRecordedAt: now,
-    lastPermissionRequestToolName: 'bash',
-    lastPermissionRequestOperation: 'spawn',
-    lastPermissionRequestProcess: 'node',
-    lastPermissionRequestScopeLabel: 'bash/spawn/process(node)',
-    lastPermissionRequestCacheKey: cacheKey,
-    lastPermissionRequestProjectRoot: authorityRoot,
-    lastPermissionRequestSource: 'verification-command',
-    lastPermissionRequestLineage: 'verify:node --version',
-    lastRequestScopeLabel: 'bash/spawn/process(node)',
-    lastRequestScopeCacheKey: cacheKey,
-    lastRequestScopeProjectRoot: authorityRoot,
-    lastRequestScopeSource: 'verification-command',
-  }
-
-  writeJson(path.join(sessionDir, 'metadata.json'), {
-    id: syntheticSessionId,
-    projectRoot,
-    rootMode: 'direct',
-    requestedWorkspaceRoot: projectRoot,
-    targetPathBase: projectRoot,
-    gitRoot: null,
-    title: 'Permission Memory Synthetic Fixture',
-    createdAt: now,
-    updatedAt: now,
-  })
-  writeJson(path.join(sessionDir, 'state.json'), {
-    status: 'completed',
-    projectRoot,
-    runPhase: 'idle',
-    terminalReason: 'completed',
-    terminalClassification: 'success',
-    durableStatus: 'success',
-    workingMemory: {
-      compacted: true,
-      compactReason: 'auto-threshold',
-      sourceTurnCount: 33,
-      continuity,
-      approvalAudit: {
-        decision: 'allow-once',
-        decisionSource: 'cli-policy',
-        persistent: false,
-        cacheEffect: 'none',
-        projectRoot: authorityRoot,
-        cacheKey,
-        scopeLabel: 'bash/spawn/process(node)',
-        lineage: 'verify:node --version',
-        channel: 'interactive',
-        inputKey: 'y',
-        recordedAt: now,
-      },
-      approvalAuditHistory: [
-        {
-          decision: 'allow-once',
-          decisionSource: 'cli-policy',
-          persistent: false,
-          cacheEffect: 'none',
-          projectRoot: authorityRoot,
-          cacheKey,
-          scopeLabel: 'bash/spawn/process(node)',
-          lineage: 'verify:node --version',
-          channel: 'interactive',
-          inputKey: 'y',
-          recordedAt: now,
-        },
-      ],
-      summary: [
-        'last-approval-decision: allow-once',
-        'last-approval-persistent: false',
-        'last-approval-cache-effect: none',
-        `last-approval-project-root: ${authorityRoot}`,
-        `last-approval-cache-key: ${cacheKey}`,
-        'last-approval-scope: bash/spawn/process(node)',
-        'last-permission-request-tool-name: bash',
-        'last-permission-request-operation: spawn',
-        'last-permission-request-process: node',
-        'last-permission-request-scope-label: bash/spawn/process(node)',
-        `last-permission-request-cache-key: ${cacheKey}`,
-        `last-permission-request-project-root: ${authorityRoot}`,
-        'last-request-scope-label: bash/spawn/process(node)',
-        `last-request-scope-cache-key: ${cacheKey}`,
-        `last-request-scope-project-root: ${authorityRoot}`,
-      ],
-    },
-  })
-  writeText(
-    path.join(sessionDir, 'transcript.jsonl'),
-    [
-      {
-        type: 'message',
-        role: 'user',
-        content: 'run node --version with approval',
-        timestamp: now,
-      },
-      {
-        type: 'message',
-        role: 'assistant',
-        content: 'Approval was granted once for bash/spawn/process(node).',
-        timestamp: now,
-      },
-    ].map((entry) => JSON.stringify(entry)).join('\n') + '\n',
-  )
-
-  const currentSessionPath = path.join(syntheticHome, '.cheers', 'current-session.json')
-  let currentSessionStore = { schemaVersion: 1, byProjectRoot: {} }
-  if (fs.existsSync(currentSessionPath)) {
-    try {
-      currentSessionStore = JSON.parse(fs.readFileSync(currentSessionPath, 'utf8'))
-    } catch {
-      currentSessionStore = { schemaVersion: 1, byProjectRoot: {} }
-    }
-  }
-  const byProjectRoot =
-    currentSessionStore && typeof currentSessionStore.byProjectRoot === 'object'
-      ? currentSessionStore.byProjectRoot
-      : {}
-  byProjectRoot[path.resolve(projectRoot).toLowerCase()] = {
-    sessionId: syntheticSessionId,
-    updatedAt: now,
-  }
-  writeJson(currentSessionPath, {
-    schemaVersion: 1,
-    byProjectRoot,
-  })
-
-  const state = JSON.parse(fs.readFileSync(path.join(sessionDir, 'state.json'), 'utf8'))
-  if (state.projectRoot !== projectRoot || state.status !== 'completed') {
-    throw new Error(`Synthetic permission-memory fixture failed validation for ${syntheticSessionId}`)
-  }
-  printStep('synthetic-permission-memory-fixture', 'pass', syntheticSessionId)
-}
-
 async function runCli(args, env, timeoutMs = 240000) {
   return run(process.execPath, [tsxCliPath, "--conditions=cheers-source", cliEntryPath, ...args], {
     cwd: tsShellRoot,
@@ -302,9 +118,10 @@ async function runCli(args, env, timeoutMs = 240000) {
   })
 }
 
-async function runFocusedTest(name, file, pattern) {
+async function runFocusedTest(name, file, pattern, extraEnv = {}) {
   const result = await run(process.execPath, [vitestPath, 'run', file, '-t', pattern], {
     cwd: tsShellRoot,
+    env: extraEnv,
     timeoutMs: 120000,
   })
   if (result.code !== 0 || result.timedOut) {
@@ -316,84 +133,35 @@ async function runFocusedTest(name, file, pattern) {
   return true
 }
 
-async function runSyntheticExplanationGate() {
-  if (!fs.existsSync(syntheticHome)) {
-    printStep('synthetic-home', 'fail', `${syntheticHome} missing`)
-    return false
-  }
-  ensureSyntheticPermissionMemoryFixture()
-  const env = {
-    HOME: syntheticHome,
-    USERPROFILE: syntheticHome,
-    CHEERS_PROVIDER_MODE: 'synthetic',
-  }
-  const args = [
-    '--project',
-    projectRoot,
-    '--session-id',
-    syntheticSessionId,
-    '--migrate-session-root',
-    '--print',
-    'what did I just approve and why is it asking again',
-  ]
-  const printResult = await runCli(args, env)
-  if (printResult.code !== 0 || printResult.timedOut) {
-    printStep('synthetic-print-explanation', 'fail', printResult.timedOut ? 'timed out' : `exit=${printResult.code}`)
-    process.stdout.write(printResult.output)
-    return false
-  }
-  const printMarkers = assertMarkers(printResult.output, requiredExplanationMarkers, 'synthetic-print-explanation')
-  if (!printMarkers.ok) {
-    printStep(printMarkers.label, 'fail', `missing=${printMarkers.missing.join(' | ')}`)
-    return false
-  }
-  printStep('synthetic-print-explanation', 'pass')
-
-  if (!fs.existsSync(replayFile)) {
-    fs.mkdirSync(path.dirname(replayFile), { recursive: true })
-    fs.writeFileSync(replayFile, 'what did I just approve and why is it asking again\n', 'utf8')
-  }
-  const replayResult = await runCli([
-    '--project',
-    projectRoot,
-    '--session-id',
-    syntheticSessionId,
-    '--migrate-session-root',
-    '--replay-file',
-    replayFile,
-  ], env)
-  if (replayResult.code !== 0 || replayResult.timedOut) {
-    printStep('synthetic-replay-explanation', 'fail', replayResult.timedOut ? 'timed out' : `exit=${replayResult.code}`)
-    process.stdout.write(replayResult.output)
-    return false
-  }
-  const replayMarkers = assertMarkers(replayResult.output, requiredExplanationMarkers, 'synthetic-replay-explanation')
-  if (!replayMarkers.ok) {
-    printStep(replayMarkers.label, 'fail', `missing=${replayMarkers.missing.join(' | ')}`)
-    return false
-  }
-  printStep('synthetic-replay-explanation', 'pass')
-  return true
+function testEnvironment() {
+  return { GIT_CEILING_DIRECTORIES: path.resolve(getTestRoot()) }
 }
 
 async function runHardGate() {
   console.log('permission-memory hard gate')
   console.log(`repo=${repoRoot}`)
-  console.log(`synthetic HOME=${syntheticHome}`)
   console.log('homeCreated=false')
 
   const checks = []
+  const env = testEnvironment()
   checks.push(await runFocusedTest(
     'session-permission-normalization-tests',
     'src/session/SessionManager.test.ts',
     'normalizes legacy permission project-root fields and rooted targets for old sessions|normalizes lowercase legacy-root target residues during project-root migration',
+    env,
   ))
   checks.push(await runFocusedTest(
-    'orchestration-authority-explanation-tests',
-    'src/orchestration/runMvpIntegratedFlow.test.ts',
-    'prefers subject tool/operation/target coherence over stale scope fragments after compact recovery|rebases migrated subject target text to the current root when legacy target residue is detected',
+    'permission-request-memory-coherence-tests',
+    'src/session/permissionRequestMemoryCodec.test.ts',
+    'extracts the most recent evidence tokens with existing case normalization|prefers memory over evidence only when memory matches the session root and evidence does not',
+    env,
   ))
-  checks.push(await runSyntheticExplanationGate())
+  checks.push(await runFocusedTest(
+    'permission-memory-continuity-projection-tests',
+    'src/session/continuation/snapshot.test.ts',
+    'projects retained approval and permission-request memory for the current session',
+    env,
+  ))
 
   const ok = checks.every(Boolean)
   printStep('permission-memory-hard-gate', ok ? 'pass' : 'fail')

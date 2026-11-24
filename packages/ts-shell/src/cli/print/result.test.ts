@@ -22,6 +22,7 @@ function childEnvironment(home: string, tmp: string): NodeJS.ProcessEnv {
   }
   return { ...env, HOME: home, USERPROFILE: home, TMPDIR: tmp, TMP: tmp, TEMP: tmp,
     CHEERS_TEST_ROOT: tmp, CHEERS_SYNTHETIC_HOME: home, CHEERS_REAL_HOME: "",
+    GIT_CEILING_DIRECTORIES: path.dirname(tmp),
     // Use the HTTP transport against the loopback fixture, with no inherited credentials.
     CHEERS_PROVIDER_MODE: "real", NO_COLOR: "1" };
 }

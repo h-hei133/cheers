@@ -58,6 +58,48 @@ function codingResult(failed = false): CodingResultSummary {
 }
 
 describe("session continuity snapshot sources", () => {
+  it("projects retained approval and permission-request memory for the current session", () => {
+    const snapshot = buildSessionContinuitySnapshot(fixture(undefined, {
+      continuity: {
+        lastApprovalDecision: "allow-once",
+        lastApprovalDecisionSource: "cli-policy",
+        lastApprovalPersistent: false,
+        lastApprovalCacheEffect: "none",
+        lastApprovalProjectRoot: "/workspace",
+        lastApprovalCacheKey: "/workspace|bash:spawn:process:node",
+        lastApprovalScope: "bash/spawn/process(node)",
+        lastApprovalLineage: "verify:node --version",
+        lastApprovalRecordedAt: timestamp,
+        lastPermissionRequestToolName: "bash",
+        lastPermissionRequestOperation: "spawn",
+        lastPermissionRequestProcess: "node",
+        lastPermissionRequestScopeLabel: "bash/spawn/process(node)",
+        lastPermissionRequestCacheKey: "/workspace|bash:spawn:process:node",
+        lastPermissionRequestProjectRoot: "/workspace",
+        lastPermissionRequestSource: "verification-command",
+        lastPermissionRequestLineage: "verify:node --version",
+        lastRequestScopeLabel: "bash/spawn/process(node)",
+        lastRequestScopeCacheKey: "/workspace|bash:spawn:process:node",
+        lastRequestScopeProjectRoot: "/workspace",
+        lastRequestScopeSource: "verification-command",
+      },
+    }));
+
+    expect(snapshot).toMatchObject({
+      lastApprovalDecision: "allow-once",
+      lastApprovalDecisionSource: "cli-policy",
+      lastApprovalPersistent: false,
+      lastApprovalCacheEffect: "none",
+      lastApprovalProjectRoot: "/workspace",
+      lastApprovalScope: "bash/spawn/process(node)",
+      lastPermissionRequestToolName: "bash",
+      lastPermissionRequestOperation: "spawn",
+      lastPermissionRequestProcess: "node",
+      lastPermissionRequestProjectRoot: "/workspace",
+      lastRequestScopeProjectRoot: "/workspace",
+    });
+  });
+
   it("excludes uncertain history whose source is not on the selected path", () => {
     const input = fixture({ ...codingResult(true), lastActionResultSeed: { actionKind: "edit-file", target: "discarded.ts",
       changedFiles: [], verifiedFiles: [], writerStarted: true, writeEffect: "unknown" } }, {});
