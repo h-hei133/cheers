@@ -37,3 +37,7 @@ npm run check:lint
 npm run verify:docs-drift:strict
 npm run test:ts
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE).

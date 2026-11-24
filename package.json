@@ -1,6 +1,7 @@
 {
   "name": "cheers",
   "version": "0.1.0",
+  "license": "MIT",
   "description": "Maintainable TypeScript coding agent: shell, session, orchestration and execution",
   "private": true,
   "type": "module",

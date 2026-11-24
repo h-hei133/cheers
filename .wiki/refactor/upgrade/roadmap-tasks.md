@@ -1,6 +1,6 @@
 # 2026-11 路线图执行记录
 
-**状态**：Batch 0–4 的可执行范围已通过 Linux 本地验收并本地提交。Batch 0 真实模型路由仍部分未证实；Batch 4 LICENSE 与公开 Release 按用户要求或发布边界暂缓。
+**状态**：Batch 0–4 的本地实现已通过 Linux 定向验收并分批提交。Batch 0 真实模型路由仍部分未证实；Batch 4 的 MIT LICENSE 已按权利人信息补齐，版本标签的公开 Release workflow 尚未触发。
 **任务范围**：核实并执行 `.wiki/wiki/references/codex-and-frontier-gap-audit-2026-11.md` 与 `.wiki/wiki/references/cheers-next-phase-roadmap-2026-11.md` 中的后续批次。
 **基线**：2026-11-23，源码提交 `f65ba979`。
 
@@ -17,7 +17,7 @@
 | Batch 1 | Linux 本地验收通过，已提交 | 请求前缀、工具发现、缓存 usage/状态、Responses 摘要前缀复用、Bedrock cachePoint 和 capability 反转均通过定向测试。提交 `ab7312f3` 与接线补充 `976847c3`。真实 BaiLu cache-read 为 0、384、640 tokens，但无输入 token 分母，未报告命中率百分比。 |
 | Batch 2 | Linux 本地验收通过，已提交 | 嵌套调用 fail-closed、拒绝终止分类、逐调用审批、审批等待暂停、receipt/diff、代码折叠和 PostToolUse 脱敏通过定向测试。字面 shell 模板复用现有 gated bash。提交 `d006c981`。重复调用观察器与共享工具执行 owner 同批集成。长脚本后台晋升按现有生命周期反证暂缓，详见 `script-jobs.md`。 |
 | Batch 3 | 四模式 Linux CLI 验收通过，已提交 | 命令面板、主题预览入口、并排 diff 换行、Tab/Alt+Up、首次连接引导、受控 LSP 候选、重复调用提醒、job 观察及 stream idle watchdog 通过定向测试及四模式 smoke。提交 `b06ec6d0`。五秒后台晋升暂缓。 |
-| Batch 4 | 除 LICENSE 和公开 Release 外的本地范围验收通过，已提交 | README、INSTALL、发布 workflow 和审批式外部 workspace 架构初始化已实现。固定包为 `ea5054127f4679a8939a747c6495e0df8534b70e`，pinned judge `proven`。提交 `099b661`。用户暂缓根项目 SPDX 与版权主体，因此未创建 LICENSE；未创建 tag 或公开 Release。 |
+| Batch 4 | LICENSE 与本地发布资格已验收；公开 Release workflow 待触发 | README、INSTALL、发布 workflow 和审批式外部 workspace 架构初始化已实现。根与 shell 包 SPDX 为 MIT，版权信息为 `Copyright (c) 2026 h-hei133`。固定包为 `ea5054127f4679a8939a747c6495e0df8534b70e`，pinned judge `proven`。原 Batch 4 实现提交 `099b661`；许可证与发布收尾另行提交。 |
 
 ## 批次 0 验收清单
 
@@ -45,7 +45,7 @@
 - Batch 3 Codex 命令弹窗按运行能力筛选并保持注册顺序，未按使用频率排序。菜单排序作为本地 UX 选择实施，不记录成参考项目的既有行为。
 - Batch 3 主题预览能力已有，修复点是 `/theme` 入口复用现有预览 lease；Tab 是补全键，排队仍用原命令。
 - Batch 3 LSP 自动探测会越过已建立的显式服务器路径权限。只有展示候选并在用户选择后启动才符合现有合同。
-- Batch 4 许可证主体与标识未确定。不得由依赖或参考仓库推导根项目 LICENSE。
+- Batch 4 初始许可证主体与标识未确定，曾按用户要求暂缓。2026-11-24 用户确认 SPDX `MIT`、版权主体 `h-hei133`、年份 `2026`，后续按该信息补齐许可证和包元数据。
 
 ## 逐项执行账本
 
@@ -80,7 +80,7 @@
 | B3.4 repeat-tool reminder 与 stream idle watchdog | 缺口成立 | 已验收 | 有界有序参数摘要、阈值 3/5/8；观察器不 veto 且跳过调用不计数。stream watchdog 与 native deadline/取消分类分离。 |
 | B3.5 jobs/diff 汇总过滤与注意力并发 | 部分成立 | 已验收／有界 | 精确 run settlement waiter、审批等待观察和 jobs 差值投影完成；五秒后台晋升和新优先槽维持暂缓。 |
 | B3.6 文件拆分/死代码清理 | 无职责候选支撑宽泛拆分 | 已核实 | 删除无生产引用的 `DoomLoopDetector` 与孤立测试；未进行没有具体 owner/反例依据的大模块改写。 |
-| B4.1 README/安装/许可证/发布工作流 | 文档和发布配置缺口成立 | 部分验收 | README、INSTALL 与 workflow 通过本地构建/静态脚本验证。用户暂缓 SPDX 与版权主体，因此 LICENSE 未创建；公开 Release 未执行。 |
+| B4.1 README/安装/许可证/发布工作流 | 文档和发布配置缺口成立 | 本地验收通过，公开发布待触发 | README、INSTALL、Linux/macOS 标签 workflow、MIT LICENSE 及根/shell 包元数据通过本地验证。`v0.1.0` workflow 待版本标签推送后构建三平台产物并发布。 |
 | B4.2 固定门控包刷新 | 版本缺口成立，实际相差五提交 | 已验收 | pinned archive、全部清单哈希与全哈希 commit `ea5054127f4679a8939a747c6495e0df8534b70e` 一致，脚本契约通过。 |
 | B4.3 外部工作区门控资产携带 | 缺口成立 | 已验收 | initializer 与 hook assets 带 digest、Node/runtime 限制和 profile 隔离；实际构建产物包含资源。 |
 | B4.4 外部工作区一键初始化 | 原建议绕过 writer 不成立 | 已验收／有界 | `/init architecture` 只生成隔离快照提案；`/init apply` 复用普通 patch 审批、完整分组校验和逐文件读回。 |
@@ -91,7 +91,7 @@
 - Batch 1 需请求捕获与 prefix 测试、缓存成本/usage/状态呈现、endpoint 适配测试及针对 capability 的反转；真实模型缓存命中只记录服务实际返回，不设伪造收益阈值。
 - Batch 2 需 worker 与真实 `runTurn` 的拒绝反例、hook/权限/回执消费者测试、审批 UI 停止路径、并行调用结算、静态门和源码构建。不得为验证拒绝而对用户工作区写文件。
 - Batch 3 每项按对应 TUI owner 用短 PTY/终端尺寸和键序列验证；只在 Linux 侧执行。无真实外部服务器或账号证据时按 `not_configured` 报告。
-- Batch 4 需 pinned 包哈希与外部隔离工作区回读、Linux 可执行文件标签/摘要/安装目录验收、发布 workflow 静态审计。没有许可证持有人选择时 LICENSE 与公开 Release 仍为阻断项。
+- Batch 4 需 pinned 包哈希与外部隔离工作区回读、Linux 可执行文件标签/摘要/安装目录验收及发布 workflow 静态审计。公开 Release 由版本标签触发，需记录 workflow 与资产摘要结果。
 
 ## Batch 1–4 执行证据（2026-11-24）
 
@@ -154,7 +154,16 @@
 - 代码复用现有 build identity、publication lock、包入口验证及单文件验收逻辑。新增运行时依赖 0，非计划依赖 0；S.U.P.E.R 检查 10/10，实际投入 M。
 - Linux `npm run test:scripts` 为 227/227；其中构建脚本测试 47/47，打包测试 7/7。六项静态门禁通过，严格文档门仍报告 35 条既有历史源码路径 advisory。
 - 连续两次 `npm run build:ts` 均产生 build ID `35d4adf87af8` 和 artifact digest `d6e54b51256adfc06c5db9e4d8910d710f807f3a811d8ad947b5b58326aab896`。连续两次 `npm run build:exe` 均生成 SHA-256 `99d1ef521b429b73935cf53d6ac3795af817834b02fccd79a382b3f9fafe0402`、112,670,848 字节；Linux 可执行文件 `--version` 返回 `0.1.0`，最终 `checkBuild` 为 `fresh`。
-- 验证只在 Linux 侧进行。B0.6 仍因 Casa/NOFX 认证失败和 Workbuddy 本地服务未监听而部分验证；LICENSE 信息由用户暂缓，因此没有创建 LICENSE 或发布公开 Release。本批本地提交后不推送。
+- 验证只在 Linux 侧进行。B0.6 仍因 Casa/NOFX 认证失败和 Workbuddy 本地服务未监听而部分验证。记录这批构建证据时，许可证信息尚未收到，因此当时没有创建 LICENSE 或发布公开 Release；后续授权与处理见下方许可证记录。
+
+## MIT 许可证与发布资格（2026-11-24）
+
+- 用户确认 SPDX `MIT`、版权主体 `h-hei133`、版权年份 `2026`。根目录 `LICENSE`、README 许可证说明、根与 shell 包 `license` 字段及 lockfile 元数据一致。
+- 本地 YAML 解析校验确认 release workflow 监听 `v*` 标签，根与 shell 包版本均为 `0.1.0`，产物矩阵仅包含 Linux x64 和 macOS arm64/x64；发布 job 校验三个可执行文件及 SHA-256 sidecar 后调用 GitHub Release 创建流程。
+- `npm install --package-lock-only --ignore-scripts --offline` 成功。六项静态门禁通过，严格文档门报告 35 条既有历史源码路径 advisory。
+- Linux `npm run build:ts`、`npm run build:exe`、编译产物 `--version` 与 `--help` 通过；当前 manifest 为 `fresh`，build ID `3cf42ea7d9803af3df25b793e89bebace01905f0fc48aa959869fb6ebf7ded06`，artifact digest `d6e54b51256adfc06c5db9e4d8910d710f807f3a811d8ad947b5b58326aab896`，可执行文件为 112,670,848 字节，SHA-256 `99d1ef521b429b73935cf53d6ac3795af817834b02fccd79a382b3f9fafe0402`。
+- `npm run verify:release:core` 的首轮退出为配置错误，合成 HOME 缺失。改用隔离 `.tmp/release-home` 与 `.tmp/release-test` 后，环境门通过，但权限/记忆门因缺失测试路径 `src/orchestration/runMvpIntegratedFlow.test.ts` 且隔离打印流程受 Stop hook 默认拒绝而失败；这是该本地门禁当前未通过的证据，不能计为发布核心门通过。GitHub release workflow 本身不调用该门禁。
+- 本地 release workflow 静态和 Linux 产物校验通过。远端版本标签与三平台 workflow 尚未执行，公开 Release 状态待补记。
 
 ## 完成及提交规则
 
