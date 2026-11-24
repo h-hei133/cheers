@@ -1351,13 +1351,13 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
       terminal.input('\t\x1b[B\r');
       terminal.input('blocked-model'); await vi.waitFor(() => expect(frame()).toContain('▸ blocked-model'));
       terminal.input('\x1b[13;5u'); await vi.waitFor(() => expect(frame()).toContain('Choose effort'));
-      terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('▸ auto'));
+      terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('▸ high'));
       if (ending === 'post-workspace' || ending === 'post-ready') {
         const hook = vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
           if (event.eventName === 'PostModelSwitch' && ending === 'post-workspace') context.workspaceIssue = 'Workspace is unavailable.';
           return undefined;
         });
-        switchHook = hook; terminal.input('\x1b[B\x1b[B\r');
+        switchHook = hook; terminal.input('\x1b[A\r');
         await vi.waitFor(() => expect(hook).toHaveBeenCalledWith(expect.objectContaining({ eventName: 'PostModelSwitch' })));
         await vi.waitFor(() => expect(host.view.transcript.all().map(block => block.text).join('\n')).toContain('Model switched to blocked-model.'));
         if (ending === 'post-workspace') expect(host.overlay.active).toBe(false);
@@ -1380,7 +1380,7 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
           }
           return undefined;
         });
-        switchHook = hook; terminal.input('\x1b[B\x1b[B\r');
+        switchHook = hook; terminal.input('\x1b[A\r');
         await vi.waitFor(() => expect(hook).toHaveBeenCalledWith(expect.objectContaining({ eventName: 'PreModelSwitch' })));
         await vi.waitFor(() => expect(host.busy).toBe(false));
         expect(JSON.stringify(modelState.readSessionModelEdit(session.id))).toBe(JSON.stringify(selection));
@@ -1398,8 +1398,8 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
       expect(modelState.readSessionModelEdit(session.id)).toEqual(selection); expect(context.configuration.current).toBe(accepted);
       expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(changed); expect(context.runtimeConfig.topP).toBe(0.7);
       terminal.input('\x1b[13;5u'); await vi.waitFor(() => expect(frame()).toContain('Choose effort'));
-      terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('▸ auto'));
-      terminal.input('\x1b[B\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('Model switched to blocked-model'));
+      terminal.input('\t\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('▸ high'));
+      terminal.input('\x1b[A\r'); await vi.waitFor(() => expect(frame()).toContain('Model switched to blocked-model'));
       expect(readSessionModel(session.id)).toEqual({ ...target, connectionId: 'relay', model: 'blocked-model', thinkingEffort: 'medium' });
       if (entry === 'settings') expect(frame()).toContain('▸ Models and roles');
       else expect(frame()).toContain('▸ blocked-model');

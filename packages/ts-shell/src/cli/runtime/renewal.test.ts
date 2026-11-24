@@ -36,8 +36,12 @@ vi.mock('./cliRuntimeInvocationBridge.js', () => ({ streamCliRuntimePrompt: (inp
   input.prepareProviderResources?.(input.providerCredentialResolution); return { events: [] };
 } }));
 vi.mock('../../core/shell/compaction.js', () => ({ compactSessionHistory: async (input: {
+  policy: { prepare?: (messages: [], signal?: AbortSignal) => Promise<unknown> };
   summarize: (request: { messages: []; signal: AbortSignal }) => Promise<string | undefined>; signal: AbortSignal;
-}) => ({ status: 'compacted', summary: await input.summarize({ messages: [], signal: input.signal }) }) }));
+}) => {
+  await input.policy.prepare?.([], input.signal);
+  return { status: 'compacted', summary: await input.summarize({ messages: [], signal: input.signal }) };
+} }));
 
 let sessionManager: SessionManager;
 let home: string;

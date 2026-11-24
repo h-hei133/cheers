@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { importCatalog } from "../../config/profiles/import/catalog.js";
+import { parseConfigFileText } from "../../config/syntax.js";
 import { mergeProviders, type CatalogModel, type CatalogProvider } from "./catalog.js";
 import {
   DEFAULT_IMAGE_RESIZE,
@@ -81,7 +82,7 @@ describe("model catalog multimodal support", () => {
       inputLimits: { maxRequestBytes: 9_000_000, images: { maxPerMessage: 5, resize: { maxWidth: 1000 } } },
     });
 
-    const imported = JSON.parse(
+    const imported = parseConfigFileText("models.yaml",
       importCatalog(
         JSON.stringify({
           providers: {
@@ -102,7 +103,7 @@ describe("model catalog multimodal support", () => {
           },
         }),
       ),
-    );
+    ) as { providers: { acme: { models: Record<string, unknown>[] } } };
     expect(imported.providers.acme.models[0]).toMatchObject({
       modelType: "image",
       input: ["text", "image"],

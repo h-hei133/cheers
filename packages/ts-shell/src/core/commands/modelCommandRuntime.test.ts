@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultHookDispatcher } from '../hooks/hookDispatcher.js';
 import { getUserRuntimeConfigPath, getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
+import { parseConfigFileText } from "../../config/syntax.js";
 import { runConnectCommand } from "./connectCommandRuntime.js";
 import { runModelCommand } from "./modelCommandRuntime.js";
 import { credentialIdentityFor } from '../auth/account/pool.js';
@@ -58,7 +59,7 @@ describe("model command runtime", () => {
     fs.writeFileSync(userCatalogPath(), '{PRIVATE_CATALOG_VALUE');
     const before = fs.readFileSync(getUserRuntimeConfigPath());
     const result = await runModelCommand(args, { cwd: workspaceRoot });
-    expect(result.output).toContain('models.json could not be parsed');
+    expect(result.output).toContain(`${path.basename(userCatalogPath())} could not be parsed`);
     expect(result.output).not.toContain('PRIVATE_CATALOG_VALUE');
     expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
     expect(fs.readFileSync(userCatalogPath(), 'utf8')).toBe('{PRIVATE_CATALOG_VALUE');
@@ -70,8 +71,8 @@ describe("model command runtime", () => {
     fs.writeFileSync(userCatalogPath(), '{}');
     const result = await runModelCommand(['list'], { cwd: workspaceRoot,
       readConfiguration: () => ({ config, catalog: snapshot.providers, catalogDiagnostics: snapshot.diagnostics }) });
-    expect(result.output).toContain('models.json could not be parsed');
-    expect(result.output).toContain('settings: config.json; connections: auth.json');
+    expect(result.output).toContain(`${path.basename(userCatalogPath())} could not be parsed`);
+    expect(result.output).toContain(`Catalogue: models.yaml, models.yml or models.json (user profile only); settings: config.yaml, config.yml or config.json; connections: auth.json.`);
     const help = await runModelCommand(['config'], { cwd: workspaceRoot });
     expect(help.output).toContain('user profile only');
     expect(help.output).toContain('inside the existing providers object');
@@ -263,8 +264,8 @@ describe("model command runtime", () => {
     writeUserRuntimeConfigFile({ theme: 'dark' }, readRuntimeConfigEditAt(file));
     vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
       if (event.eventName === 'PreModelSwitch') {
-        const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
-        fs.writeFileSync(file, JSON.stringify({ ...raw, theme: 'light' }));
+        const external = readRuntimeConfigEditAt(file);
+        writeUserRuntimeConfigFile({ ...external.values, theme: 'light' }, external);
       }
       return undefined;
     });
@@ -272,12 +273,16 @@ describe("model command runtime", () => {
     expect(result.output).toContain('Global default stored at');
     // The setting stays in the settings document; the connection it selected is
     // the credential document's, and both are confirmed separately.
-    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const saved = parseConfigFileText(file, fs.readFileSync(file, 'utf8')) as {
+      theme?: string;
+      providerConnections?: unknown;
+      modelPreferences?: { connections?: Array<{ model?: string }> };
+    };
     expect(saved.theme).toBe('light');
     expect(saved.providerConnections).toBeUndefined();
     const credential = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
     expect(credential.providerConnections[0].model).toBeUndefined();
-    expect(saved.modelPreferences.connections[0].model).toBe('new-model');
+    expect(saved.modelPreferences?.connections?.[0]?.model).toBe('new-model');
   });
 
   it('reports conflict when an awaited hook changes the active connection', async () => {
@@ -441,7 +446,8 @@ describe("model command runtime", () => {
     writeUserRuntimeConfigFile({ ...edit.values, theme: 'dark', temperature: 0.2, topP: 0.8,
       providerCredentials: { openai: independent }, providerConnections: [selected, sibling] }, edit);
     const before = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
-    const settings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
+    const settingsPath = getUserRuntimeConfigPath();
+    const settings = parseConfigFileText(settingsPath, fs.readFileSync(settingsPath, 'utf8'));
     const result = await runModelCommand(['use', 'gpt-5.4', '--effort', 'high', '--global'], { cwd: workspaceRoot });
     expect(result.output).toContain('Model switched to gpt-5.4');
     const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
@@ -450,10 +456,16 @@ describe("model command runtime", () => {
       .toEqual(before.providerConnections?.find(connection => connection.id === sibling.id));
     const active = stored.providerConnections?.find(connection => connection.id === selected.id);
     expect(active).toEqual({ ...before.providerConnections![0], model: 'gpt-5.4', thinkingEffort: 'high', updatedAt: expect.any(String) });
-    const savedSettings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
-    expect(savedSettings).toEqual({ ...settings, modelPreferences: { ...settings.modelPreferences,
-      connections: settings.modelPreferences.connections.map((item: { id: string }) => item.id === selected.id ? { ...item, model: 'gpt-5.4', thinkingEffort: 'high' } : item),
-    } });
+    const savedSettings = parseConfigFileText(settingsPath, fs.readFileSync(settingsPath, 'utf8'));
+    const preferences = settings.modelPreferences as { connections?: Array<{ id: string; provider: string; model?: string; thinkingEffort?: string | null }> } | undefined;
+    let selectedPreferenceFound = false;
+    const connections = (preferences?.connections ?? []).map(item => {
+      if (item.id !== selected.id) return item;
+      selectedPreferenceFound = true;
+      return { ...item, model: 'gpt-5.4', thinkingEffort: 'high' };
+    });
+    if (!selectedPreferenceFound) connections.push({ id: selected.id, provider: selected.provider, model: 'gpt-5.4', thinkingEffort: 'high' });
+    expect(savedSettings).toEqual({ ...settings, modelPreferences: { ...preferences, connections } });
     expect(JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8')).providerConnections.find((item: { id: string }) => item.id === selected.id).model).toBeUndefined();
     const resolution = resolveProviderCredential({ runtimeConfig: getRuntimeConfig(workspaceRoot), env: {} });
     expect(resolution).toMatchObject({ model: 'gpt-5.4', thinkingEffort: 'high',
@@ -466,7 +478,8 @@ describe("model command runtime", () => {
     writeUserRuntimeConfigFile({ theme: 'dark', provider: 'openai', activeProviderConnectionId: undefined, providerConnections: [],
       providerCredentials: { openai: credential, google: { apiKey: 'SYNTHETIC_SIBLING_SLOT', model: 'sibling-model' } } }, edit);
     const before = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
-    const settings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
+    const settingsPath = getUserRuntimeConfigPath();
+    const settings = parseConfigFileText(settingsPath, fs.readFileSync(settingsPath, 'utf8'));
     const result = await runModelCommand(['use', 'gpt-5.4', '--effort', 'high', '--global'], { cwd: workspaceRoot });
     expect(result.output).toContain('Model switched to gpt-5.4');
     const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
@@ -474,8 +487,10 @@ describe("model command runtime", () => {
     expect(stored.activeProviderConnectionId).toBeUndefined();
     expect(stored.providerCredentials?.openai).toEqual({ ...credential, model: 'gpt-5.4', thinkingEffort: 'high' });
     expect(stored.providerCredentials?.google).toEqual(before.providerCredentials?.google);
-    expect(JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'))).toEqual({ ...settings,
-      modelPreferences: { ...settings.modelPreferences, providers: { ...settings.modelPreferences.providers,
+    const savedSettings = parseConfigFileText(settingsPath, fs.readFileSync(settingsPath, 'utf8'));
+    const preferences = settings.modelPreferences as { providers?: Record<string, { model?: string; thinkingEffort?: string | null }> } | undefined;
+    expect(savedSettings).toEqual({ ...settings,
+      modelPreferences: { ...preferences, providers: { ...preferences?.providers,
         openai: { model: 'gpt-5.4', thinkingEffort: 'high' },
       } },
     });

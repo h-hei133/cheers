@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it } from 'vitest';
-import { getRuntimeConfig, getUserAuthPath, type RuntimeConfigFile } from '../../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, type RuntimeConfigFile } from '../../../config/runtimeConfig.js';
 import { accountToken } from '../../../test-utils/oauth.js';
 import { createProfileContext, withProfile, type ProfileContext } from '../../paths/profile/context.js';
 import { resolveProviderCredential } from '../../shell/providerCredentials.js';
@@ -95,11 +95,12 @@ it.each(['accessToken', 'refreshToken', 'expiresAt', 'loginId', 'accountId', 'sl
 it('fences copied profile config and ledger, and a replaced profile directory', async () => {
   await withProfile(profile, login);
   const other = createProfileContext({ name: 'b', homeDir: fixture, env: {} });
-  for (const name of ['config.json', 'auth.json', 'refresh-leases.json']) fs.copyFileSync(path.join(profile.root, name), path.join(other.root, name));
+  const documents = withProfile(profile, () => [getUserRuntimeConfigPath(), getUserAuthPath(), refreshLeasesPath()].map(file => path.basename(file)));
+  for (const name of documents) fs.copyFileSync(path.join(profile.root, name), path.join(other.root, name));
   await withProfile(other, () => { expect(owner()).toBeUndefined(); });
   await withProfile(profile, () => {
     const captured = resolve(); fs.renameSync(profile.root, `${profile.root}.old`); fs.mkdirSync(profile.root);
-    for (const name of ['config.json', 'auth.json', 'refresh-leases.json']) fs.copyFileSync(path.join(`${profile.root}.old`, name), path.join(profile.root, name));
+    for (const name of documents) fs.copyFileSync(path.join(`${profile.root}.old`, name), path.join(profile.root, name));
     expect(accountReplayOwner(workspace, captured)).toBeUndefined();
   });
 });

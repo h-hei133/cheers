@@ -5,6 +5,7 @@ import { loadCatalog, writeCatalogCache } from '../../../../core/models/catalogS
 import { SessionManager } from '../../../../session/SessionManager.js';
 import { readSessionModelEdit } from '../../../../session/model/state.js';
 import { modelPicker } from '../model.js';
+import { CatalogNavigation } from '../navigation.js';
 import { OverlayHost } from '../../overlay.js';
 import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../../presentation/tui/text/ansi.js';
@@ -36,7 +37,7 @@ it.each([
 ])('moves removed $focused to its surviving neighbour $next in $category without writing', async ({ category, focused, remaining, next }) => {
   vi.useFakeTimers();
   let publication = { config: getRuntimeConfig(root), catalog: catalogue(), revision: 1 };
-  const picker = modelPicker({ cwd: root, projectRoot: root, sessionId, readConfiguration: () => publication }, id(focused));
+  const picker = modelPicker({ cwd: root, projectRoot: root, sessionId, readConfiguration: () => publication }, id(focused), new CatalogNavigation('all'));
   const before = fs.readFileSync(getUserRuntimeConfigPath()); const session = readSessionModelEdit(sessionId);
   const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
   const host = new OverlayHost(() => {}); host.open(picker); await vi.advanceTimersByTimeAsync(0);
@@ -72,7 +73,7 @@ it('returns from details to the next surviving neighbour when the focused model 
   const config = { ...configured, activeProviderConnectionId: undefined,
     providerConnections: configured.providerConnections.map(({ apiKey: _apiKey, ...connection }) => ({ ...connection, status: 'connected' as const })) };
   let publication = { config, catalog: catalogue(), revision: 1 };
-  const picker = modelPicker({ cwd: root, projectRoot: root, sessionId, readConfiguration: () => publication }, id('beta'));
+  const picker = modelPicker({ cwd: root, projectRoot: root, sessionId, readConfiguration: () => publication }, id('beta'), new CatalogNavigation('all'));
   const before = fs.readFileSync(getUserRuntimeConfigPath()); const session = readSessionModelEdit(sessionId);
   const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
   const host = new OverlayHost(() => {}); host.open(picker); await vi.advanceTimersByTimeAsync(0);
@@ -174,14 +175,18 @@ it('uses the visible cross-provider search result as the deleted detail origin',
       models: removeCandidates ? [{ id: 'shared-e' }] : [{ id: 'shared-b' }, { id: 'shared-c' }, { id: 'shared-e' }] },
   ];
   const target = `model:${JSON.stringify([null, 'second', 'shared-b'])}`;
+  const replacement = `model:${JSON.stringify([null, 'second', 'shared-e'])}`;
   let publication = { config, catalog: twoProviders(), revision: 1 };
-  const picker = modelPicker({ cwd: root, projectRoot: root, sessionId, readConfiguration: () => publication });
+  const picker = modelPicker({ cwd: root, projectRoot: root, sessionId, readConfiguration: () => publication }, undefined, new CatalogNavigation('all'));
+  let activePicker = picker;
   const host = new OverlayHost(() => {}); host.open(picker); await vi.advanceTimersByTimeAsync(0);
   const frame = () => host.render(120, 32).map(stripAnsi).join('\n');
   const press = async (raw: string) => {
     let pending: Promise<unknown> | undefined;
     host.handleKey(parseKeyEvent(raw), (selected, ids) => {
-      pending = selected.apply(ids, host.acceptanceFor(selected)).then(outcome => { if (outcome?.next) host.open(outcome.next); });
+      pending = selected.apply(ids, host.acceptanceFor(selected)).then(outcome => {
+        if (outcome?.next) { activePicker = outcome.next; host.open(outcome.next); }
+      });
     });
     await pending; await vi.advanceTimersByTimeAsync(0);
   };
@@ -190,7 +195,12 @@ it('uses the visible cross-provider search result as the deleted detail origin',
     host.handleKey(parseKeyEvent('\x1b[C'), vi.fn());
     host.handlePaste('shared');
     expect(frame()).toContain('▸ shared-a');
-    await press('\x1b[B'); // Alphabetical cross-provider results place b immediately after a.
+    const visible = host.model.visible;
+    expect(visible.some(row => row.id === target)).toBe(true);
+    for (let step = 0; step < visible.length && host.model.current()?.id !== target; step++) {
+      host.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+    }
+    expect(host.model.current()?.id).toBe(target);
     expect(frame()).toContain('▸ shared-b');
     await press('\r');
     expect(frame()).toContain('Configure connection');
@@ -198,8 +208,13 @@ it('uses the visible cross-provider search result as the deleted detail origin',
     await vi.advanceTimersByTimeAsync(500);
     expect(target).not.toBe(picker.navigation!.preferred);
     await press('\r');
-    expect(frame()).toContain('▸ shared-d');
-    expect(picker.navigation!.active).toBe('first');
+    expect(host.model.current()?.id).toBe(replacement);
+    expect(activePicker.initialSelection).toBe(replacement);
+    expect(activePicker.navigation!.active).toBe('second');
+    expect(frame()).toContain('▸ shared-e');
+    await press('\r');
+    expect(frame()).toContain('Configure connection');
+    expect(frame()).toContain('shared-e');
   } finally { host.close(); }
 });
 
@@ -215,7 +230,7 @@ it('preserves the visible detail origin through a nested key-form return', async
   let publication = { config, catalog, revision: 1 };
   const signIn = vi.fn(async () => ({ context: { cwd: root, projectRoot: root, sessionId }, note: '' }));
   const picker = modelPicker({ cwd: root, projectRoot: root, sessionId, readConfiguration: () => publication },
-    undefined, undefined, undefined, undefined, signIn);
+    undefined, new CatalogNavigation('all'), undefined, undefined, signIn);
   const host = new OverlayHost(() => {}); host.open(picker); await vi.advanceTimersByTimeAsync(0);
   const frame = () => host.render(120, 32).map(stripAnsi).join('\n');
   const press = async (raw: string) => {
@@ -255,7 +270,7 @@ it('preserves the visible detail origin when nested key setup succeeds without a
       context: { cwd: root, projectRoot: root, sessionId, readConfiguration: () => publication } };
   });
   const picker = modelPicker({ cwd: root, projectRoot: root, sessionId, readConfiguration: () => publication },
-    undefined, undefined, undefined, undefined, signIn);
+    undefined, new CatalogNavigation('all'), undefined, undefined, signIn);
   const host = new OverlayHost(() => {}); host.open(picker); await vi.advanceTimersByTimeAsync(0);
   const frame = () => host.render(120, 32).map(stripAnsi).join('\n');
   const press = async (raw: string) => {

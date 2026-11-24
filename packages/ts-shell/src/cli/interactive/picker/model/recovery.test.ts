@@ -70,6 +70,8 @@ it('selects the exact relay and compatible effort in one session transaction, re
   expect(effort.initialSelection).toBe('high');
   expect((await effort.load()).find(row => row.id === 'high')).toMatchObject({ disabled: true, focusable: true, note: expect.stringContaining('unsupported') });
   expect(readSessionModel(runtime.session.id)).toEqual(original);
+  expect(await effort.apply(['high'])).toBeUndefined();
+  expect(readSessionModel(runtime.session.id)).toEqual(original);
   const result = await effort.apply(['medium']); expect(result?.note).toContain('shared');
   const { contextWindow: previousWindow, ...sessionControls } = original;
   expect(previousWindow).toBe(100000);

@@ -83,7 +83,7 @@ import { preparePromptRequest } from '../../core/prompts/request.js';
 import {prepareExtensionInput, captureQueuedExtensionInput} from './extensions/input.js';
 import {prepareSessionHooks} from '../../core/hooks/prepare.js';
 import { providerStepRequest, providerToolsAvailable } from '../provider/step.js';
-import { manualCompactionPolicy, manualCompactionWiring } from './compaction/context.js';
+import { manualCompactionWiring } from './compaction/context.js';
 import { directCompactionTarget } from './compaction/direct.js';
 import { summaryTransport } from './compaction/target.js';
 import type { StepTarget } from '../../turn/context/contract.js';
@@ -201,9 +201,9 @@ export function createCliSessionRuntime(input: {
           ...(input.runtimeContext.sdkSkills ? { sdkSkills: input.runtimeContext.sdkSkills } : {}),
         });
         const mainRequest = providerStepRequest(host, preparedPrompt.tools, preparedPrompt.promptContext, preparedPrompt.discovery);
-        const bound = virtualModel ? manualCompactionWiring(wiring, mainRequest, convertToLlm, admission)
-          : { ...wiring, policy: manualCompactionPolicy(wiring.policy,
-            { ...mainRequest, provider: { ...mainRequest.provider, ...provider, provider: provider!.providerId } }, convertToLlm, admission) };
+        const compactionRequest = virtualModel ? mainRequest : { ...mainRequest,
+          provider: { ...mainRequest.provider, ...provider, provider: provider!.providerId } };
+        const bound = manualCompactionWiring(wiring, compactionRequest, convertToLlm, admission);
         return compactSessionHistory({
           store: input.sessionManager,
           sessionId,

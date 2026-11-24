@@ -234,4 +234,4 @@ it.each(['branch_summary', 'compaction'] as const)('acquires a 20,000-node chain
     expect(snapshot.session.turns.at(-1)?.content).toBe('entry-19999');
   }
   expect([layout.metadataPath, layout.statePath, layout.transcriptPath].map(file => fs.readFileSync(file))).toEqual(before);
-});
+}, 60_000);

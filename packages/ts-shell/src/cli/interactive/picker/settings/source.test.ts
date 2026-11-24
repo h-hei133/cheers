@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { readConfigSnapshot, serializeConfigDocument } from '../../../../config/document.js';
 import { getRuntimeConfig, getUserRuntimeConfigPath, getProjectConfigPath, readUserRuntimeConfigFile, readRuntimeConfigEditAt } from '../../../../config/runtimeConfig.js';
 import { createConfigInputs } from '../../../../config/inputs/selection.js';
 import { createShellRuntimeContext, refreshShellRuntimeConfig } from '../../../../core/shell/runtimeContext.js';
@@ -23,8 +24,8 @@ beforeEach(() => {
   user = getUserRuntimeConfigPath(); project = getProjectConfigPath(root);
   input = path.join(root, 'explicit-' + 'x'.repeat(130), 'overlay.json');
   for (const file of [user, project, input]) fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(user, '{/* retain */"maxTurns":11,"offline":true}');
-  fs.writeFileSync(project, '{"maxTurns":9}'); fs.writeFileSync(input, '{"maxTurns":31}');
+  fs.writeFileSync(user, `# retain\n${serializeConfigDocument({ maxTurns: 11, offline: true }, 'yaml')}`);
+  fs.writeFileSync(project, serializeConfigDocument({ maxTurns: 9 }, 'yaml')); fs.writeFileSync(input, '{"maxTurns":31}');
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 
@@ -97,10 +98,10 @@ it('changes scope through actual keys, saves only the primary project field, exp
   expect(saved?.note).toContain('Saved to your project configuration'); expect(saved?.note).toContain('input 1');
   expect(saved!.note.indexOf('differs from')).toBeLessThan(saved!.note.indexOf(input));
   expect(h.context.runtimeConfig.maxTurns).toBe(31);
-  expect(JSON.parse(fs.readFileSync(project, 'utf8')).maxTurns).toBe(22);
+  expect(readConfigSnapshot(project)?.values.maxTurns).toBe(22);
   expect(fs.readFileSync(user)).toEqual(userBytes); expect(fs.readFileSync(input)).toEqual(inputBytes);
   await h.key('\r'); expect(h.render()).toContain('Stored: 22');
-  fs.writeFileSync(input, '{}'); fs.writeFileSync(user, '{"offline":true}');
+  fs.writeFileSync(input, '{}'); fs.writeFileSync(user, serializeConfigDocument({ offline: true }, 'yaml'));
   expect(refreshShellRuntimeConfig(h.context).status).toBe('applied'); expect(h.context.runtimeConfig.maxTurns).toBe(22);
   h.overlay.close();
 });
@@ -121,7 +122,7 @@ it('retains the launch override after a user Apply and shows accepted versus sto
   const h = panel(false, true); await h.open('attentionOnIdle'); await h.choose('Choose true');
   expect((await h.key('\r'))?.note).toContain('keeps its launch override');
   expect(h.context.runtimeConfig.attentionOnIdle).toBe(false); expect(readUserRuntimeConfigFile().attentionOnIdle).toBe(true);
-  expect(fs.readFileSync(user, 'utf8')).toContain('/* retain */');
+  expect(fs.readFileSync(user, 'utf8')).toContain('# retain');
   await h.key('\r'); await h.choose('Values and sources');
   const shown = h.render(); expect(shown).toContain('Effective: false'); expect(shown).toContain('Accepted: false');
   expect(shown).toContain('Source: override'); expect(shown).toContain('Stored: true'); h.overlay.close();
@@ -129,7 +130,7 @@ it('retains the launch override after a user Apply and shows accepted versus sto
 
 it('reads a large effective/accepted/stored value to the end with real settings owners, retaining pending edits and all file bytes', async () => {
   const entries = Array.from({ length: 160 }, (_, i) => `fixture-${i}-` + 'x'.repeat(500));
-  fs.writeFileSync(user, JSON.stringify({ offline: true, disabledTools: entries }));
+  fs.writeFileSync(user, serializeConfigDocument({ offline: true, disabledTools: entries }, 'yaml'));
   const h = panel(false), bytes = [user, project, input].map(file => fs.readFileSync(file));
   await h.open('disabledTools'); await h.choose('Remove stored value'); await h.choose('Values and sources');
   expect(h.render().replace(/\n/g, '')).toContain('Effective: ['); expect(h.render()).not.toContain('Value is too large');
@@ -189,7 +190,7 @@ it.each((['user', 'project'] as const).flatMap(scope => [
     expect((await h.choose('Apply'))?.note).toContain(`Saved to your ${scope} configuration`);
     expect(readRuntimeConfigEditAt(target).values[field]).toEqual(value);
     expect(h.context.runtimeConfig[field as 'disabledTools' | 'modelTokenBudgets']).toEqual(value);
-    expect(fs.readFileSync(user, 'utf8')).toContain('/* retain */');
+    expect(fs.readFileSync(user, 'utf8')).toContain('# retain');
     expect(fs.readFileSync(scope === 'user' ? project : user)).toEqual(bytes[scope === 'user' ? 1 : 0]);
     expect(fs.readFileSync(input)).toEqual(bytes[2]);
     await h.open(field, scope); await h.choose('Edit value');

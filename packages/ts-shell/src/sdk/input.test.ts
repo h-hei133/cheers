@@ -347,7 +347,7 @@ it('uses the original metadata snapshot after an asynchronous input callback', a
   const metadata = {caller:{request:'original'}}, pending = session.prompt('Original', {promptMetadata:metadata});
   await reached.promise; metadata.caller.request = 'replacement'; wait.release(); await pending;
   expect(session.getState().turns.find(message => message.role === 'user')?.metadata)
-    .toEqual({caller:{request:'original'}});
+    .toMatchObject({caller:{request:'original'}, requestEnvironment: expect.stringContaining(`cwd=${root}`)});
   expect(metadata.caller.request).toBe('replacement');
 });
 

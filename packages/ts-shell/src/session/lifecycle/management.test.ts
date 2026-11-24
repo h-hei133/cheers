@@ -109,7 +109,6 @@ it('routes bare pin through the real saved metadata owner and rejects an offered
   fs.appendFileSync(transcriptPath, JSON.stringify({ type: 'message', id: 'pin-question', role: 'user',
     content: 'Saved pin target', timestamp: h.target.createdAt }) + '\n');
   const transcript = fs.readFileSync(transcriptPath);
-  const state = fs.readFileSync(path.join(directory, 'state.json'));
   const resume = vi.fn(async () => undefined);
   const actions = sessionPickerHost({ runtimeContext: h.runtimeContext, sessionManager: h.manager,
     busy: () => h.context.busy, resume });
@@ -127,12 +126,13 @@ it('routes bare pin through the real saved metadata owner and rejects an offered
   overlay.open(unpinned);
   await vi.waitFor(() => expect(overlay.render(100, 30).join('\n')).toContain('Saved work'));
   h.manager.renameSession(h.target.id, 'External update');
+  const renamedState = fs.readFileSync(path.join(directory, 'state.json'));
   const refused = await unpinned.apply([h.target.id]);
   expect(refused?.note).toContain('changed after the preview');
   expect(refused?.next).toBeUndefined();
   expect(new SessionManager().getSession(h.target.id)?.pinned).toBeUndefined();
   expect(fs.readFileSync(transcriptPath)).toEqual(transcript);
-  expect(fs.readFileSync(path.join(directory, 'state.json'))).toEqual(state);
+  expect(fs.readFileSync(path.join(directory, 'state.json'))).toEqual(renamedState);
   expect(h.runtimeContext.session.id).toBe(h.current.id);
   expect(resume).not.toHaveBeenCalled();
   overlay.close();

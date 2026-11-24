@@ -1306,7 +1306,7 @@ describe('bound extension management views', () => {
     hooks.registerInProcessHook({ name: 'observe-cancel', event: 'PermissionRequest', handler: () => { entered(); return { decision: 'allow' }; } });
     const applying = plan.apply(); await requested;
     commands.current!.controller.abort(); release();
-    expect(await applying).toContain('refused');
+    expect(await applying).toBe('Extension operation was blocked or its result could not be confirmed.');
     expect(fs.readFileSync(service.store.file)).toEqual(before);
     expect(await plan.apply()).toContain('consumed');
   });

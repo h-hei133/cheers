@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../../../../session/SessionManager.js';
 import { getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
+import { readConfigSnapshot, serializeConfigDocument } from '../../../../config/document.js';
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../../session/model/state.js';
 import { modelPicker } from '../model.js';
@@ -108,9 +109,11 @@ it.each(['deleted', 'provider-changed', 'ambiguous', 'overridden', 'pool'] as co
       auth.providerConnections = auth.providerConnections.map((row: { id: string }) => row.id === 'broken' ? { ...row, provider: 'anthropic' } : row);
       fs.writeFileSync(authPath, JSON.stringify(auth), { mode: 0o600 });
       const settingsPath = getUserRuntimeConfigPath();
-      const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-      settings.modelPreferences.connections = settings.modelPreferences.connections.map((row: { id: string }) => row.id === 'broken' ? { ...row, provider: 'anthropic' } : row);
-      fs.writeFileSync(settingsPath, JSON.stringify(settings));
+      const settings = readConfigSnapshot(settingsPath);
+      if (!settings) throw new Error('Expected the user settings document to exist.');
+      fs.writeFileSync(settingsPath, serializeConfigDocument({ ...settings.values, modelPreferences: {
+        connections: [{ id: 'broken', provider: 'anthropic', model: 'shared' }],
+      } }, settings.format));
     }
   }
   await picker.load(); const report = (await picker.inspect!('model:current'))!.next!;

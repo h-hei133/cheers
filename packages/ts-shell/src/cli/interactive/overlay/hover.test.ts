@@ -147,7 +147,8 @@ it('moves the hover between sidebar and content, clears it over details and pres
   const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
   const catalog = [{ id: 'fixture', label: 'Fixture provider', runtime: 'openai' as const, auth: 'api-key' as const,
     baseUrl: 'https://fixture.invalid/v1', models: [{ id: 'missing-a' }, { id: 'missing-b' }] }];
-  const overlay = new OverlayHost(() => {}), picker = modelPicker({ cwd: '/tmp/cheers-test', readConfiguration: () => ({ config, catalog }) });
+  const overlay = new OverlayHost(() => {}), picker = modelPicker({ cwd: '/tmp/cheers-test', readConfiguration: () => ({ config, catalog }) },
+    undefined, new CatalogNavigation('all'));
   overlay.open(picker); await settle();
   let rows = overlay.render(120, 30); const category = point(rows, 'Fixture provider', 'sidebar');
   move(overlay, category.row, category.column); rows = overlay.render(120, 30); hovered(rows, category.row);

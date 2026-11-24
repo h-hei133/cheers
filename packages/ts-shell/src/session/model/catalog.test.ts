@@ -7,6 +7,7 @@ import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntim
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from './state.js';
 import { projectSessionModel } from './projection.js';
 import { modelPicker } from '../../cli/interactive/picker/model.js';
+import { CatalogNavigation } from '../../cli/interactive/picker/navigation.js';
 import { thinkingPicker } from '../../cli/interactive/picker/thinking.js';
 import { readModelCatalog, runModelCommand } from '../../core/commands/modelCommandRuntime.js';
 import { runBtwCommand } from '../../core/commands/btwCommandRuntime.js';
@@ -398,13 +399,15 @@ it.each((['data', 'text'] as const).flatMap(route => (['account', 'api-key'] as 
 
 it('shows and sends exact relay metadata through both generic and relay-specific catalogue rows', async () => {
   const global = fs.readFileSync(getUserRuntimeConfigPath());
-  const picker = modelPicker(context());
+  const picker = modelPicker(context(), undefined, new CatalogNavigation('all'));
   const rows = await picker.load();
   for (const owner of ['openai', 'relay-a']) {
     expect(rows.find(item => item.id === row('a', owner))?.disabled).not.toBe(true);
     expect(picker.detail?.(row('a', owner))).toContain('Context: 16000 tokens');
   }
-  expect(rows.find(item => item.id === row('b'))?.disabled).toBe(true);
+  const genericRelayRow = rows.find(item => item.id === row('b'));
+  expect(genericRelayRow).toMatchObject({ note: 'effort will use auto' });
+  expect(genericRelayRow?.disabled).toBeUndefined();
   expect(picker.detail?.(row('b'))).toContain('Context: 32000 tokens');
   expect(requests).toHaveLength(0);
   expect((await readModelCatalog(false, sessionId, getRuntimeConfig(home))).models).toEqual(['shared']);

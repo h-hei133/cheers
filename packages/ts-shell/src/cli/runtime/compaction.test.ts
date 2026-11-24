@@ -74,14 +74,21 @@ vi.mock("./cliRuntimeInvocationBridge.js", () => ({ streamCliRuntimePrompt: (inp
   return { events: [] };
 } }));
 vi.mock("../../core/shell/compaction.js", () => ({ compactSessionHistory: async (input: {
+  policy: { prepare?: (messages: [], signal?: AbortSignal) => Promise<unknown> };
   summarize: (request: { messages: []; signal: AbortSignal }) => Promise<string | undefined>;
   summarizeTurnPrefix: (messages: [], signal: AbortSignal) => Promise<string | undefined>;
   signal: AbortSignal;
 }) => {
+  await input.policy.prepare?.([], input.signal);
   await input.summarize({ messages: [], signal: input.signal });
+  await input.policy.prepare?.([], input.signal);
   await input.summarizeTurnPrefix([], input.signal);
   return { status: "compacted" };
 } }));
+vi.mock("../../session/compaction.js", async importOriginal => {
+  const actual = await importOriginal<typeof import('../../session/compaction.js')>();
+  return { ...actual, condenseContext: vi.fn(async () => ({ status: 'declined', reason: 'below-threshold' })) };
+});
 
 let server: http.Server;
 let baseUrl: string;
@@ -237,12 +244,13 @@ it.each(['manual', 'automatic', 'branch'] as const)('converts the captured %s su
     await fixture.compaction!.summarizeTurnPrefix!([]);
   } else await deps.summarizeAbandonedTurns!([{ role: 'custom', customType: 'application',
     content: 'RAW_PRIVATE_CONTEXT', data: { value: 'RAW_PRIVATE_DATA' }, display: false }]);
-  expect(conversions).toBe(mode === 'branch' ? 1 : 2);
-  expect(received).toHaveLength(conversions);
+  expect(conversions).toBe(mode === 'manual' ? 4 : mode === 'branch' ? 1 : 2);
+  expect(received).toHaveLength(mode === 'branch' ? 1 : 2);
   received.forEach((request, index) => {
     const body = JSON.stringify(request.body);
     expect(body).toContain('APPLICATION_SYSTEM');
-    expect(body).toContain(`APPLICATION_HISTORY_${index + 1}`);
+    const conversion = mode === 'manual' ? (index === 0 ? 2 : 4) : index + 1;
+    expect(body).toContain(`APPLICATION_HISTORY_${conversion}`);
     expect(body).not.toContain('RAW_PRIVATE');
   });
 });

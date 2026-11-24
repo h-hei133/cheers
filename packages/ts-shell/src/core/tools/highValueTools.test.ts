@@ -104,7 +104,9 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
       const properties = (tool.argsSchema as { properties: Record<string, unknown> }).properties;
       expect(Object.keys(properties)).toEqual(expect.arrayContaining(['backend', 'server', 'line', 'character']));
       expect(tool.description).toContain('backend: scanner');
-      expect(tool.description).toContain('server.command');
+      expect(tool.description).toContain('operation: discover');
+      expect(tool.description).toContain('never starts them');
+      expect(tool.description).toContain('absolute executable');
     });
 
     it("answers a hover from the symbol name alone", async () => {

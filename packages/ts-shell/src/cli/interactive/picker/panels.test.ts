@@ -64,7 +64,8 @@ describe('phase 20 panel consumers', () => {
       session,
       context: { session },
       jobs: { scope: () => scope },
-      agents: { journal: { get: () => ({ ...liveJob, scope }), list: () => [{ ...liveJob, scope }] }, hasLive: (id: string) => id === liveJob.id },
+      agents: { journal: { get: () => ({ ...liveJob, scope }), list: () => [{ ...liveJob, scope }] },
+        hasLive: (id: string) => id === liveJob.id, waitsForPerson: () => false },
     } as unknown as JobsComposition;
     expect(jobsPicker(jobs).title).toBe('Jobs');
     const agents = agentsPicker(() => [{
@@ -112,7 +113,7 @@ describe('phase 20 panel consumers', () => {
       transcript: new Transcript(),
       sessionManager: {} as SessionManager,
       jobs: { session, context: { session }, jobs: { scope: () => scope },
-        agents: { journal: { list: () => [liveJob] }, hasLive: () => true } } as unknown as JobsComposition,
+        agents: { journal: { list: () => [liveJob] }, hasLive: () => true, waitsForPerson: () => false } } as unknown as JobsComposition,
       agentDefinitions: () => [{ name: 'review', source: 'user', status: 'enabled', description: 'Review.' }],
       agentDiscovery: () => ({ definitions: [{ name: 'review', source: 'user', status: 'enabled', description: 'Review.' }], diagnostics: [] }),
     } as unknown as PickerHost;
@@ -130,7 +131,7 @@ describe('phase 20 panel consumers', () => {
       text: 'x'.repeat(16384) + 'Authorization: Bearer SYNTHETIC_SIDE_SECRET', truncated: false, output: 'pending', note: 'stored owner' };
     const jobs = {
       session, context: { session }, jobs: { scope: () => scope },
-      agents: { journal: { list: () => [stale], get: () => stale }, hasLive: () => false },
+      agents: { journal: { list: () => [stale], get: () => stale }, hasLive: () => false, waitsForPerson: () => false },
     } as unknown as JobsComposition;
     const picker = agentsPicker(undefined, context(), undefined, jobs);
     const rows = await picker.load();
@@ -156,7 +157,7 @@ describe('phase 20 panel consumers', () => {
       text: '', truncated: false, output: 'complete', note: 'other scope' };
     const jobs = {
       session, context: { session }, jobs: { scope: () => scope },
-      agents: { journal: { list: () => [job] }, hasLive: () => false },
+      agents: { journal: { list: () => [job] }, hasLive: () => false, waitsForPerson: () => false },
     } as unknown as JobsComposition;
     const picker = agentsPicker(undefined, context(), undefined, jobs);
     const rows = await picker.load();
@@ -174,7 +175,7 @@ describe('phase 20 panel consumers', () => {
       text: '', truncated: false, output: 'pending', note: 'live' };
     const jobs = {
       session, context: { session }, jobs: { scope: () => scope },
-      agents: { journal: { list: () => [job] }, hasLive: () => true },
+      agents: { journal: { list: () => [job] }, hasLive: () => true, waitsForPerson: () => false },
     } as unknown as JobsComposition;
     const picker = agentsPicker(undefined, context(), undefined, jobs);
     await picker.load();

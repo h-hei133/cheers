@@ -83,10 +83,10 @@ it.each(['{PRIVATE_CATALOG_VALUE', '{"providers":{},"providers":{}}'])(
     fs.writeFileSync(userCatalogPath(), text);
     const before = fs.readFileSync(getUserRuntimeConfigPath());
     const picker = modelPicker(context()); await picker.load();
-    expect(picker.status?.([], '')).toMatch(/models.json (could not be parsed|repeats the top-level providers key)/);
+    expect(picker.status?.([], '')).toMatch(/models\.yaml (could not be parsed|repeats the top-level providers key)/);
     expect(picker.status?.([], '')).not.toContain('PRIVATE_CATALOG_VALUE');
-    expect(picker.detail!(id()).join('\n')).toContain('Catalogue: models.json (user profile only)');
-    expect(picker.detail!(id()).join('\n')).toContain('settings: config.json; connections: auth.json.');
+    expect(picker.detail!(id()).join('\n')).toContain('Catalogue: models.yaml, models.yml or models.json (user profile only)');
+    expect(picker.detail!(id()).join('\n')).toContain('settings: config.yaml, config.yml or config.json; connections: auth.json.');
     expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
     expect(fs.readFileSync(userCatalogPath(), 'utf8')).toBe(text);
   },
@@ -100,7 +100,7 @@ it('refreshes a corrected catalogue notice even when its provider entries did no
   const command = { ...context(), readConfiguration: () => shell.configuration.current,
     refreshRuntimeConfig: (scope?: 'catalog') => refreshShellRuntimeConfig(shell, scope) };
   const picker = modelPicker(command); await picker.load();
-  expect(picker.status?.([], '')).toContain('models.json could not be parsed');
+  expect(picker.status?.([], '')).toContain('models.yaml could not be parsed');
   const accepted = shell.configuration.current;
   fs.writeFileSync(userCatalogPath(), '{}');
   expect(shell.configuration.current.catalogDiagnostics).toBe(accepted.catalogDiagnostics);

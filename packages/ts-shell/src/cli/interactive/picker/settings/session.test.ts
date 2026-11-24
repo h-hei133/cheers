@@ -143,7 +143,20 @@ it.each((['user', 'project'] as const).flatMap(scope =>
       });
     };
     try {
-      if (surface === 'assignment') overlay.handlePaste('other');
+      if (surface === 'assignment') {
+        overlay.handleKey(parseKeyEvent('\t'), apply);
+        overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
+        overlay.handleKey(parseKeyEvent('\x1b[C'), apply);
+        expect(child.navigation?.active).toBe('all');
+        overlay.handlePaste('other');
+        const target = `model:${JSON.stringify(['fixture', 'openai', 'other'])}`;
+        const visible = overlay.model.visible;
+        expect(visible.some(row => row.id === target)).toBe(true);
+        for (let step = 0; step < visible.length && overlay.model.current()?.id !== target; step++) {
+          overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
+        }
+        expect(overlay.model.current()?.id).toBe(target);
+      }
       else for (let count = 0; count < (surface === 'role' ? 1 : 2); count++) overlay.handleKey(parseKeyEvent(surface === 'role' ? '\x1b[B' : '\x1b[A'), apply);
       overlay.handleKey(parseKeyEvent('\r'), apply); await pending; await settle();
       const failure = state === 'unchanged' ? 'this attempt did not write' : 'unverified';

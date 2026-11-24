@@ -113,7 +113,7 @@ it('reports selected logical identity in command status and the native model lab
 it('clears virtual selection when explicitly selecting a physical model', async () => {
   const { session, physical, context } = fixture();
   seedVirtual(session.id, physical);
-  const output = await runModelCommand(['use', 'openai/physical'], context);
+  const output = await runModelCommand(['use', 'physical'], context);
   expect(output.output).toContain('Model switched to physical.');
   expect(readSessionModel(session.id)).not.toHaveProperty('virtualModel');
   expect(readSessionModel(session.id)?.thinkingEffort).toBeNull();

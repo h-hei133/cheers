@@ -34,6 +34,15 @@ function host(theme?: string) {
   return { ...source, configuration: initialConfiguration(source) };
 }
 
+function revokeTrustAfterRead(filePath: string): void {
+  const stat = fs.statSync;
+  vi.spyOn(fs, 'statSync').mockImplementation(((...args: Parameters<typeof fs.statSync>) => {
+    const result = stat(...args);
+    if (args[1] !== undefined && String(args[0]) === filePath) projectTrust.setProjectTrust(root, 'untrusted');
+    return result;
+  }) as typeof fs.statSync);
+}
+
 it.each(['undecided', 'untrusted', 'unavailable'])('excludes automatic project assets and diagnostics under %s', decision => {
   const directory = projectDirectory(); write(directory); write(directory, 'PRIVATE_THEME');
   fs.writeFileSync(path.join(directory, 'broken.json'), '{PRIVATE_CONTENT');
@@ -91,12 +100,7 @@ it('uses the canonical resource path after the lexical theme directory changes d
 
 it('discards project results when trust is revoked during file reading', () => {
   const file = write(projectDirectory()); projectTrust.setProjectTrust(root, 'trusted');
-  const read = fs.readFileSync;
-  vi.spyOn(fs, 'readFileSync').mockImplementation((...args: Parameters<typeof fs.readFileSync>) => {
-    const result = read(...args);
-    if (String(args[0]) === file) projectTrust.setProjectTrust(root, 'untrusted');
-    return result;
-  });
+  revokeTrustAfterRead(file);
   expect(loadTheme('dark', root)).toEqual(getDefaultTheme());
 });
 
@@ -114,24 +118,14 @@ it('rechecks individual file identity after directory enumeration', () => {
 it('discards earlier project results if a later directory read changes trust', () => {
   const child = path.join(root, 'child'); fs.mkdirSync(child);
   write(projectDirectory(child)); const outer = write(projectDirectory(), 'outer');
-  projectTrust.setProjectTrust(root, 'trusted'); const read = fs.readFileSync;
-  vi.spyOn(fs, 'readFileSync').mockImplementation((...args: Parameters<typeof fs.readFileSync>) => {
-    const result = read(...args);
-    if (String(args[0]) === outer) projectTrust.setProjectTrust(root, 'untrusted');
-    return result;
-  });
+  projectTrust.setProjectTrust(root, 'trusted'); revokeTrustAfterRead(outer);
   expect(loadTheme('dark', child)).toEqual(getDefaultTheme());
 });
 
 it('checks automatic results after explicit paths while retaining personal and explicit authority', () => {
   write(projectDirectory()); const user = write(path.join(home, '.cheers', 'themes'), 'dark', '#abcdef');
   const explicit = write(path.join(home, 'named'), 'named'); projectTrust.setProjectTrust(root, 'trusted');
-  const read = fs.readFileSync;
-  vi.spyOn(fs, 'readFileSync').mockImplementation((...args: Parameters<typeof fs.readFileSync>) => {
-    const result = read(...args);
-    if (String(args[0]) === explicit) projectTrust.setProjectTrust(root, 'untrusted');
-    return result;
-  });
+  revokeTrustAfterRead(explicit);
   expect(loadTheme('dark', root, [explicit])?.colors.accent).toBe('#abcdef');
   expect(themeSourcePath('dark', root, [explicit])).toBe(user);
   expect(loadTheme('named', root, [explicit])?.colors.accent).toBe('#123456');

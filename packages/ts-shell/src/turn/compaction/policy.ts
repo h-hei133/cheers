@@ -10,6 +10,7 @@ export function capturedCompactionPolicy(policy: CompactionPolicy, prepared: Pre
   readonly admission?: () => string | undefined;
   readonly onPrepared: (prepared: PreparedTurnContext) => void;
   readonly force?: boolean;
+  readonly allowContextOverflow?: boolean;
 }): CompactionPolicy {
   const matches = (messages: readonly AgentMessage[], toolsAllowed?: boolean): boolean =>
     sameContext(messages, prepared.sourceMessages) && (toolsAllowed === undefined || toolsAllowed === prepared.allowTools);
@@ -41,7 +42,10 @@ export function capturedCompactionPolicy(policy: CompactionPolicy, prepared: Pre
       const candidate = await prepared.prepare(messages, signal);
       signal?.throwIfAborted();
       input.onPrepared(candidate);
-      if (candidate.refusal || !candidate.budget.ok && candidate.budget.reason !== 'unknown') {
+      const overBudget = !candidate.budget.ok && candidate.budget.reason !== 'unknown';
+      const allowedWindowOverflow = input.allowContextOverflow && !candidate.budget.ok
+        && candidate.budget.reason === 'window' && candidate.refusal?.inputLimit !== true;
+      if ((candidate.refusal || overBudget) && !allowedWindowOverflow) {
         throw new Error('Compaction candidate cannot satisfy the complete request limits.');
       }
       return capturedCompactionPolicy(policy, candidate, input);

@@ -27,6 +27,17 @@ it('rejects manual growth after complete conversion before durable publication',
   expect(result.status).toBe('nothing'); expect(commit).not.toHaveBeenCalled();
 });
 
+it('publishes a smaller manual result when the foreground request remains over budget', async () => {
+  const commit = vi.fn(() => ({ status: 'committed' as const }));
+  const source = { sessionId: request.sessionId, identity: 'source', history };
+  const policy = manualCompactionPolicy({ ...base, contextWindow: 800 },
+    { ...request, contextWindow: 800, systemPrompt: 's'.repeat(5000) }, messages => [{ role: 'user', content:
+      messages.some(message => String(message.content).includes('[Context Checkpoint]')) ? 'z'.repeat(2000) : 'Long history '.repeat(400) }]);
+  const result = await compactSessionHistory({ sessionId: source.sessionId, policy, summarize: async () => 'summary',
+    authority: { capture: () => source, commit }, store: {} as never });
+  expect(result.status).toBe('compacted'); expect(commit).toHaveBeenCalledOnce();
+});
+
 it('uses current request overhead and reuses caller capture through candidate preparation', async () => {
   let instruction = 'First system.';
   const converted = vi.fn((messages: readonly AgentMessage[]) => [{ role: 'user' as const, content:

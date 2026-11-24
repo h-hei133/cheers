@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../config/runtimeConfig.js';
+import { parseConfigFileText } from '../../../config/syntax.js';
 import { createConfigInputs } from '../../../config/inputs/selection.js';
 import { projectTrust } from '../../security/trust/store.js';
 import { runModelCommand } from '../modelCommandRuntime.js';
@@ -33,7 +34,9 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { recursive: true, force: true }); fs.rmSync(workspace, { recursive: true, force: true }); });
 
 function documents() {
-  return [getUserRuntimeConfigPath(), getUserAuthPath()].map(file => JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>);
+  const settingsPath = getUserRuntimeConfigPath();
+  return [parseConfigFileText(settingsPath, fs.readFileSync(settingsPath, 'utf8')),
+    JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8')) as Record<string, unknown>];
 }
 
 it('saves a provider-level default while a connection exists, without touching that connection', async () => {

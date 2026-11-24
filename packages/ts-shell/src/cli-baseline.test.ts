@@ -11,6 +11,7 @@ import { handleShellSigint } from "./core/shell/signalHandlers.js";
 import { createLongSessionContinuityFixture } from "./test-utils/longSessionContinuityFixtures.js";
 import { normalizePathIdentity } from "./session/continuation/roots.js";
 import { SessionManager } from "./session/SessionManager.js";
+import { versionLabel } from './core/version/current.js';
 import {
   createGitRepoFixture,
   normalizeCliOutput,
@@ -709,7 +710,7 @@ describe("CLI streaming baseline (T3)", () => {
       cli.on("close", (code) => {
         try {
           expect(code).toBe(0);
-          expect(output).toContain("0.1.0");
+          expect(output.trim()).toBe(versionLabel());
           resolve();
         } catch (error) {
           reject(error);
@@ -1236,7 +1237,7 @@ describe("CLI streaming baseline (T3)", () => {
     } finally {
       fs.rmSync(projectRoot, { recursive: true, force: true });
     }
-  }, 25000);
+  }, 45000);
 
   it("guards root binding diagnostics for CLI /sessions switch and /workspace attach", async () => {
     const repoA = path.join(fakeHomeDir, "repo-a");

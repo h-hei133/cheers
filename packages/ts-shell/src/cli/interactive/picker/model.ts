@@ -221,7 +221,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             if (!reason && captured) {
               const resolution = targetResolutionIdentity(selectedTargetContext, config, selectedTarget);
               detailActions.push({ id: 'effort', label: 'Choose effort', run: (returnTo, inspect) => ({ next: modelEffortPicker({
-                target: selectedTarget, current: assigning ? assignedEffort : selectedEffort, catalog, baseUrl: modelAddress, lines, admission: admitInspection,
+                target: selectedTarget, current: assigning ? assignedEffort : thinkingEffort, catalog, baseUrl: modelAddress, lines, admission: admitInspection,
                 back: note => note === undefined ? inspect() : returnTo(note), canReturn: () => modelBrowserOwned(context),
                 save: async (effort, stillOwned = () => true) => assigning && connection
                   ? (modelActionAdmission(admitInspection, stillOwned) ?? assigning.assign({ connectionId: connection.connectionId,

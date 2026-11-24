@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CONFIG_SETTINGS, formatSetting, settingValue, type SettingsScope } from '../../../../config/settings.js';
+import { serializeConfigDocument } from '../../../../config/document.js';
 import { getProjectConfigPath, getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt } from '../../../../config/runtimeConfig.js';
 import { applyShellSubstrateTransition, createShellRuntimeContext } from '../../../../core/shell/runtimeContext.js';
 import { projectTrust } from '../../../../core/security/trust/store.js';
@@ -40,6 +41,12 @@ let scratch: string;
 let root: string;
 let userFile: string;
 let projectFile: string;
+
+function writeYaml(file: string, value: Record<string, unknown>, comment?: string): void {
+  const text = serializeConfigDocument(value, 'yaml');
+  fs.writeFileSync(file, comment ? `# ${comment}\n${text}` : text);
+}
+
 beforeEach(() => {
   fs.mkdirSync('/tmp/cheers-test', { recursive: true });
   scratch = fs.mkdtempSync('/tmp/cheers-test/settings-fields-'); root = path.join(scratch, 'project');
@@ -50,8 +57,8 @@ beforeEach(() => {
   for (const name of ['CHEERS_MAX_TURNS', 'CHEERS_OFFLINE']) { vi.stubEnv(name, ''); delete process.env[name]; }
   userFile = getUserRuntimeConfigPath(); projectFile = getProjectConfigPath(root);
   fs.mkdirSync(path.dirname(userFile), { recursive: true });
-  fs.writeFileSync(userFile, '// user preferences\n{"schemaVersion":1}');
-  fs.writeFileSync(projectFile, '// project preferences\n{"schemaVersion":1}');
+  writeYaml(userFile, { schemaVersion: 1 }, 'user preferences');
+  writeYaml(projectFile, { schemaVersion: 1 }, 'project preferences');
   writeCatalogCache([{ id: 'openai', models: [{ id: 'fixture', contextWindow: 128000, maxTokens: 8192 }] }]);
   projectTrust.setProjectTrust(root, 'session-only'); selectTheme('dark', root);
 });
@@ -109,7 +116,7 @@ it('requires an explicit valid exercise for every real setting and every editabl
 it.each(['session', 'workspace', 'workspace-return'] as const)('does not carry a failed staged project setting into another %s binding on retry', async change => {
   const view = surface('project'); const before = fs.readFileSync(projectFile);
   const nextRoot = path.join(scratch, 'next-project'); fs.mkdirSync(path.join(nextRoot, '.cheers'), { recursive: true });
-  const nextFile = getProjectConfigPath(nextRoot); fs.writeFileSync(nextFile, '{"maxTurns":7}');
+  const nextFile = getProjectConfigPath(nextRoot); writeYaml(nextFile, { maxTurns: 7 });
   const nextBefore = fs.readFileSync(nextFile);
   try {
     await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
@@ -130,13 +137,13 @@ it.each(['user', 'project'] as const)('allows an explicit second Apply after a s
   const other = scope === 'user' ? projectFile : userFile; const otherBefore = fs.readFileSync(other);
   try {
     await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
-    const conflicting = '// changed externally\n{"schemaVersion":1,"maxTurns":17,"topP":0.6}';
+    const conflicting = `# changed externally\n${serializeConfigDocument({ schemaVersion: 1, maxTurns: 17, topP: 0.6 }, 'yaml')}`;
     fs.writeFileSync(target, conflicting);
     expect((await view.press('\r'))?.note).toContain('conflict');
     expect(fs.readFileSync(target, 'utf8')).toBe(conflicting); expect(view.frame()).toContain('Pending: 42');
     expect((await view.press('\r'))?.note).toContain(`Saved to your ${scope}`);
     expect(readRuntimeConfigEditAt(target).values).toMatchObject({ maxTurns: 42, topP: 0.6 });
-    expect(fs.readFileSync(target, 'utf8')).toContain('// changed externally'); expect(fs.readFileSync(other)).toEqual(otherBefore);
+    expect(fs.readFileSync(target, 'utf8')).toContain('# changed externally'); expect(fs.readFileSync(other)).toEqual(otherBefore);
     await view.press('\r'); expect(view.frame()).toContain('Stored: 42');
   } finally { view.overlay.close(); }
 });
@@ -156,7 +163,7 @@ it.each((['user', 'project'] as const).flatMap(scope => ([
     try {
       await view.open(key); await view.press('\r'); await view.press('\x15');
       view.overlay.handlePaste(JSON.stringify(value)); await view.press('\r');
-      const changed = `// changed externally\n${JSON.stringify({ schemaVersion: 1, [key]: external, topP: 0.6 })}`;
+      const changed = `# changed externally\n${serializeConfigDocument({ schemaVersion: 1, [key]: external, topP: 0.6 }, 'yaml')}`;
       fs.writeFileSync(target, changed);
       expect((await view.press('\r'))?.note).toContain('conflict');
       expect(fs.readFileSync(target, 'utf8')).toBe(changed); expect(view.frame()).toContain('Apply not confirmed');
@@ -168,7 +175,7 @@ it.each((['user', 'project'] as const).flatMap(scope => ([
       expect(result?.note).toContain(`Saved to your ${scope} configuration.`);
       expect(retainedFailure).toBe(true);
       expect(readRuntimeConfigEditAt(target).values).toMatchObject({ [key]: returning === 'confirm' ? amended : value, topP: 0.6 });
-      expect(fs.readFileSync(target, 'utf8')).toContain('// changed externally'); expect(fs.readFileSync(other)).toEqual(untouched);
+      expect(fs.readFileSync(target, 'utf8')).toContain('# changed externally'); expect(fs.readFileSync(other)).toEqual(untouched);
       await view.open(key); expect(view.frame()).toContain('Stored:'); expect(view.frame()).not.toContain('Apply not confirmed');
     } finally { view.overlay.close(); }
   });
@@ -178,7 +185,7 @@ it.each(['user', 'project'] as const)('retains a failed %s Apply when cancelling
   const other = scope === 'user' ? projectFile : userFile, untouched = fs.readFileSync(other);
   try {
     await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
-    const external = '// concurrent source\n{"schemaVersion":1,"maxTurns":17,"topP":0.6}';
+    const external = `# concurrent source\n${serializeConfigDocument({ schemaVersion: 1, maxTurns: 17, topP: 0.6 }, 'yaml')}`;
     fs.writeFileSync(target, external);
     expect((await view.press('\r'))?.note).toContain('conflict');
     await view.choose('Change save scope'); await view.press('\x1b');
@@ -188,7 +195,7 @@ it.each(['user', 'project'] as const)('retains a failed %s Apply when cancelling
     expect((await view.press('\r'))?.note).toContain(`Saved to your ${scope} configuration.`);
     expect(retainedFailure).toBe(true);
     expect(readRuntimeConfigEditAt(target).values).toMatchObject({ maxTurns: 42, topP: 0.6 });
-    expect(fs.readFileSync(target, 'utf8')).toContain('// concurrent source'); expect(fs.readFileSync(other)).toEqual(untouched);
+    expect(fs.readFileSync(target, 'utf8')).toContain('# concurrent source'); expect(fs.readFileSync(other)).toEqual(untouched);
     await view.press('\r'); expect(view.frame()).toContain('Stored: 42'); expect(view.frame()).not.toContain('Apply not confirmed');
   } finally { view.overlay.close(); }
 });
@@ -227,10 +234,10 @@ it('keeps the original pending value and scope when a chosen scope document beco
   const view = surface('user'); const before = fs.readFileSync(userFile);
   try {
     await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
-    await view.choose('Change save scope'); fs.writeFileSync(projectFile, '{broken');
+    await view.choose('Change save scope'); fs.writeFileSync(projectFile, 'schemaVersion: [broken');
     await view.choose('Project configuration');
     expect(view.frame()).toContain('save to user'); expect(view.frame()).toContain('Pending: 42'); expect(view.frame()).toContain('Apply not confirmed');
-    expect(fs.readFileSync(userFile)).toEqual(before); expect(fs.readFileSync(projectFile, 'utf8')).toBe('{broken');
+    expect(fs.readFileSync(userFile)).toEqual(before); expect(fs.readFileSync(projectFile, 'utf8')).toBe('schemaVersion: [broken');
   } finally { view.overlay.close(); }
 });
 
@@ -239,9 +246,9 @@ it('does not retry a pending project value into a preferred source that replaced
   const view = surface('project');
   try {
     await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
-    fs.writeFileSync(projectFile, '{"maxTurns":21}');
+    writeYaml(projectFile, { maxTurns: 21 });
     expect((await view.press('\r'))?.note).toContain('source changed'); await view.press('\r');
-    expect(fs.readFileSync(legacy, 'utf8')).toBe('{"maxTurns":19}'); expect(fs.readFileSync(projectFile, 'utf8')).toBe('{"maxTurns":21}');
+    expect(fs.readFileSync(legacy, 'utf8')).toBe('{"maxTurns":19}'); expect(readRuntimeConfigEditAt(projectFile).values.maxTurns).toBe(21);
     expect(view.frame()).toContain('Pending: 42'); expect(view.frame()).toContain('Apply not confirmed');
   } finally { view.overlay.close(); }
 });
@@ -252,9 +259,9 @@ it('does not write a captured legacy user source after a preferred user document
   const view = surface('user');
   try {
     await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
-    fs.writeFileSync(preferred, '{"maxTurns":21}');
+    writeYaml(preferred, { maxTurns: 21 });
     await view.press('\r'); await view.press('\r');
-    expect(fs.readFileSync(legacy, 'utf8')).toBe('{"maxTurns":19}'); expect(fs.readFileSync(preferred, 'utf8')).toBe('{"maxTurns":21}');
+    expect(fs.readFileSync(legacy, 'utf8')).toBe('{"maxTurns":19}'); expect(readRuntimeConfigEditAt(preferred).values.maxTurns).toBe(21);
     expect(view.frame()).toContain('Pending: 42'); expect(view.frame()).toContain('Apply not confirmed');
   } finally { view.overlay.close(); }
 });
@@ -290,10 +297,10 @@ it('rechecks a legacy user selector inside the real configuration write lock', a
   try {
     await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
     vi.spyOn(sessionFiles, 'withFileLock').mockImplementation((file, action, options) => lock(file, () => {
-      fs.writeFileSync(preferred, '{"maxTurns":21}'); return action();
+      writeYaml(preferred, { maxTurns: 21 }); return action();
     }, options));
     expect((await view.press('\r'))?.note).toContain('conflict');
-    expect(fs.readFileSync(legacy, 'utf8')).toBe('{"maxTurns":19}'); expect(fs.readFileSync(preferred, 'utf8')).toBe('{"maxTurns":21}');
+    expect(fs.readFileSync(legacy, 'utf8')).toBe('{"maxTurns":19}'); expect(readRuntimeConfigEditAt(preferred).values.maxTurns).toBe(21);
     expect(view.frame()).toContain('Pending: 42');
   } finally { view.overlay.close(); }
 });
@@ -349,7 +356,7 @@ it.each((['user', 'project'] as const).flatMap(scope => [
 ].map(test => ({ ...test, scope }))))(
   'preserves $name in $key through untouched editor Enter and Apply in $scope scope', async ({ key, value, scope, name }) => {
     const target = scope === 'user' ? userFile : projectFile, other = scope === 'user' ? projectFile : userFile;
-    fs.writeFileSync(target, `// preserved list\n${JSON.stringify({ schemaVersion: 1, [key]: value, topP: 0.7 })}`);
+    writeYaml(target, { schemaVersion: 1, [key]: value, topP: 0.7 }, 'preserved list');
     const bytes = fs.readFileSync(target), otherBytes = fs.readFileSync(other), view = surface(scope);
     const before = view.host.openSettings(scope).values[key];
     const tools = ['read', 'write', 'first', 'last', 'mcp__fixture__read'];
@@ -363,7 +370,7 @@ it.each((['user', 'project'] as const).flatMap(scope => [
       await view.press('\r');
       expect(settingValue(readRuntimeConfigEditAt(target).values, setting)).toEqual(value);
       expect(readRuntimeConfigEditAt(target).values.topP).toBe(0.7);
-      expect(fs.readFileSync(target, 'utf8')).toContain('// preserved list'); expect(fs.readFileSync(other)).toEqual(otherBytes);
+      expect(fs.readFileSync(target, 'utf8')).toContain('# preserved list'); expect(fs.readFileSync(other)).toEqual(otherBytes);
       expect(view.host.openSettings(scope).values[key]).toEqual(before);
       expect(filterVisibleToolNames(tools, view.runtime.runtimeConfig)).toEqual(visible);
       await view.open(key); await view.press('\r'); await view.press('\r'); await view.press('\r');
@@ -416,7 +423,7 @@ it.each(cases)('navigates, cancels, saves, reopens and removes $key in $scope th
     expect(saved.requestedSource).toBe(scope); expect(fs.readFileSync(other)).toEqual(otherBefore);
     const [rootKey, leaf] = setting.path;
     expect(readRuntimeConfigEditAt(target).values).toEqual({ schemaVersion: 1, [rootKey]: leaf ? { [leaf]: value } : value });
-    expect(fs.readFileSync(target, 'utf8')).toContain(`// ${scope} preferences`);
+    expect(fs.readFileSync(target, 'utf8')).toContain(`# ${scope} preferences`);
     await view.open(key);
     expect(view.frame()).toContain(`Stored: ${formatSetting(value).slice(0, 20)}`);
     await view.choose('Remove stored value'); await view.press('\r');
@@ -450,8 +457,8 @@ it.each([
   const setting = CONFIG_SETTINGS.find(item => item.key === test.key)!;
   const [rootKey, leaf] = setting.path;
   const config = (value: unknown) => ({ schemaVersion: 1, [rootKey]: leaf ? { [leaf]: value, diagrams: 'streaming' } : value });
-  fs.writeFileSync(userFile, JSON.stringify(config(test.user)));
-  fs.writeFileSync(projectFile, JSON.stringify(config(test.project)));
+  writeYaml(userFile, config(test.user));
+  writeYaml(projectFile, config(test.project));
   const projectBefore = fs.readFileSync(projectFile); const view = surface('user');
   try {
     expect(view.host.openSettings('user').values[test.key].stored).toEqual(test.user);

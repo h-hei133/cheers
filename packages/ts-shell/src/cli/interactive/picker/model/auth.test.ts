@@ -179,7 +179,7 @@ it('cancels model sign-in through real Escape and the default cancel action with
   const overlay = new OverlayHost(() => {}); overlay.open(modelSignInPicker(context(), 'openai', signIn, current => modelPicker(current)));
   await new Promise(resolve => setTimeout(resolve, 0)); overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
   await new Promise(resolve => setTimeout(resolve, 0));
-  expect(stripAnsi(overlay.render(110, 30).join('\n'))).toContain('All models'); overlay.close();
+  expect(stripAnsi(overlay.render(110, 30).join('\n'))).toContain('Ready / Configured'); overlay.close();
   expect(signIn).not.toHaveBeenCalled(); expect(configBytes()).toEqual(original);
 });
 

@@ -7,6 +7,7 @@ import { configurationAdmission } from '../../../../core/shell/configuration.js'
 import { SessionManager } from '../../../../session/SessionManager.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../../session/model/state.js';
 import { modelPicker } from '../model.js';
+import { CatalogNavigation } from '../navigation.js';
 import { OverlayHost } from '../../overlay.js';
 import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../../presentation/tui/text/ansi.js';
@@ -204,7 +205,7 @@ it.each(['revision', 'load'] as const)('makes cached models read-only after a %s
   const picker = modelPicker({ ...commands, readConfiguration: () => {
     if (!readable) throw new Error('publication unavailable');
     return publication;
-  } });
+  } }, undefined, new CatalogNavigation('all'));
   const overlay = new OverlayHost(() => {});
   overlay.open(picker);
   const frame = () => overlay.render(140, 32).map(stripAnsi).join('\n');

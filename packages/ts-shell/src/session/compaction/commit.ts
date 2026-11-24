@@ -71,23 +71,27 @@ export function captureSessionCompaction(store: SessionStoreAccess, sessionId: s
 export function commitSessionCompaction(store: SessionStoreAccess, input: CompactionCommitInput): CompactionCommit {
   let attempted = false;
   try {
+    const refused = input.signal?.aborted ? 'Compaction was cancelled.' : input.admission?.();
+    if (refused) return { status: 'refused', reason: refused };
+
+    const current = capture(store, input.source.sessionId);
+    if (current.identity !== input.source.identity) {
+      return { status: 'refused', reason: 'The session source changed while its summary was generated.' };
+    }
+    const transcript = store.transcriptPath(input.source.sessionId);
+    const before = captureTranscriptAppend(transcript);
+    const event: TranscriptEvent = { type: 'compaction', id: createTranscriptEntryId('comp'),
+      publication: 'prepared',
+      sourceActivePath: current.sourceActivePath,
+      summary: input.summary, keptMessages: input.keptMessages, tokensBefore: input.tokensBefore,
+      timestamp: new Date().toISOString() };
+    const blocked = input.signal?.aborted ? 'Compaction was cancelled.' : input.admission?.();
+    if (blocked) return { status: 'refused', reason: blocked };
+
+    // Admission can invoke native session owners synchronously. Keep it outside
+    // the non-reentrant state lock, then revalidate the source while locked.
     return store.withSessionStateLock(input.source.sessionId, () => {
-      const refused = input.signal?.aborted ? 'Compaction was cancelled.' : input.admission?.();
-      if (refused) return { status: 'refused', reason: refused };
-      const current = capture(store, input.source.sessionId);
-      if (current.identity !== input.source.identity) return { status: 'refused', reason: 'The session source changed while its summary was generated.' };
-      const transcript = store.transcriptPath(input.source.sessionId);
-      const before = captureTranscriptAppend(transcript);
-      const event: TranscriptEvent = { type: 'compaction', id: createTranscriptEntryId('comp'),
-        publication: 'prepared',
-        sourceActivePath: current.sourceActivePath,
-        summary: input.summary, keptMessages: input.keptMessages, tokensBefore: input.tokensBefore,
-        timestamp: new Date().toISOString() };
-      // Recheck after preparation, immediately before the append effect.
       input.signal?.throwIfAborted();
-      const blocked = input.admission?.();
-      if (blocked) return { status: 'refused', reason: blocked };
-      // Admission may invoke a native owner synchronously. Check its resulting source before the effect.
       if (capture(store, input.source.sessionId).identity !== input.source.identity) {
         return { status: 'refused', reason: 'The session source changed while its summary was generated.' };
       }

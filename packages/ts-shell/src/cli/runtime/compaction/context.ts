@@ -29,7 +29,9 @@ export function manualCompactionPolicy(policy: CompactionPolicy, request: StepRe
     const prepared = await prepareRequest(captured, signal);
     if (!sameContext(messages, captured)) throw new Error('Manual compaction history changed during preparation.');
     prepared.acceptRoute?.();
-    return capturedCompactionPolicy(bind?.(prepared) ?? policy, prepared, { admission, onPrepared: () => {} });
+    // A manual reduction remains useful when fixed foreground overhead alone exceeds the model window.
+    return capturedCompactionPolicy(bind?.(prepared) ?? policy, prepared,
+      { admission, onPrepared: () => {}, allowContextOverflow: true });
   } };
 }
 

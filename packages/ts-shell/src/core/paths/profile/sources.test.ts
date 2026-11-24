@@ -135,7 +135,7 @@ it('refuses a retained config edit even when the replacement root has identical 
     expect(error).toBeInstanceOf(ConfigWriteError); expect((error as ConfigWriteError).state).toBe('unchanged');
   }
   expect(fs.readFileSync(edit.path, 'utf8')).toBe(before);
-  expect(fs.readdirSync(a.root)).toEqual(['config.json']);
+  expect(fs.readdirSync(a.root)).toEqual(['config.yaml']);
 });
 
 it('keeps the installed crash callback from writing a replacement root', () => {

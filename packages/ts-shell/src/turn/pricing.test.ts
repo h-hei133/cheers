@@ -208,7 +208,7 @@ it('preserves usable models when the optional catalogue supplies invalid prices'
   await send(pricedStep(cost, 'openai-compatible', { catalog: snapshot.providers }));
   expect(requests).toHaveLength(1);
   expect(costModel(getSessionUsage(sessionId), []).estimate).toMatchObject({ usd: null, coverage: 'partial' });
-  expect(snapshot.diagnostics).toEqual(['models.json contains invalid prices; affected model prices are unavailable.']);
+  expect(snapshot.diagnostics).toEqual([`${path.basename(file)} contains invalid prices; affected model prices are unavailable.`]);
   expect(fs.readFileSync(file, 'utf8')).toBe(original);
 });
 
