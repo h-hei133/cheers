@@ -12,6 +12,7 @@ export const rulesSyntax: CommandSyntax = {
 export const initSyntax: CommandSyntax = {
   name: 'init', defaultAction: 'preview', actions: [
     { name: 'preview', summary: 'inspect bounded authorized project metadata', flags: [] },
+    { name: 'architecture', summary: 'preview architecture checks for the current workspace', flags: [] },
     { name: 'apply', summary: 'approve the exact retained initialization proposal', parameters: [{ name: 'proposal-id', kind: 'text', required: true }], flags: [] },
   ],
 };

@@ -9,9 +9,16 @@ function strings(value: unknown): boolean {
   return Array.isArray(value) && value.every(item => typeof item === 'string');
 }
 
+function architectureCheck(value: unknown): boolean {
+  return isRecord(value) && typeof value.sessionId === 'string' && value.sessionId.length > 0 && value.sessionId.length <= 512
+    && typeof value.workspaceIdentity === 'string' && /^[0-9]+:[0-9]+:[0-9]+(?:\.[0-9]+)?$/.test(value.workspaceIdentity)
+    && ['proven', 'partial'].includes(String(value.verdict));
+}
+
 function check(value: unknown): boolean {
   return isRecord(value) && typeof value.command === 'string' && HASH.test(value.command)
     && typeof value.reasonCode === 'string' && VERDICTS.has(value.proofVerdict) && strings(value.evidenceIdentity)
+    && (value.architecture === undefined || architectureCheck(value.architecture))
     && (value.stopRepair === undefined || parseStopRepair(value.stopRepair) !== undefined);
 }
 

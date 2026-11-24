@@ -35,6 +35,8 @@ const requiredMembers = [
   'package/dist/engine/proof/expression/evidence-readers.js'
 ];
 
+const LICENSE_MEMBER = 'package/LICENSE';
+
 const sha256 = /^[a-f0-9]{64}$/;
 const isPackageMember = value => /^package(?:\/[a-zA-Z0-9@._-]+)+\/?$/.test(value)
   && !value.split('/').some(segment => segment === '.' || segment === '..');
@@ -75,6 +77,10 @@ export function extractUpstream(bytes, metadata, destination, expectedArchiveSha
   if (pkg.name !== metadata.package || pkg.version !== metadata.packageVersion
     || pkg.engines?.node !== contract.packageNodeEngine || pkg.dependencies?.typescript !== contract.parserVersion) {
     throw new Error('invalid_contract: package identity, runtime or parser dependency');
+  }
+  if (pkg.license === 'MIT' && (!unique.has(LICENSE_MEMBER)
+    || !fs.readFileSync(path.join(destination, LICENSE_MEMBER), 'utf8').startsWith('MIT License\n'))) {
+    throw new Error('invalid_archive: declared MIT license is missing');
   }
   return { archiveSha256: metadata.archiveSha256, sourceCommit: metadata.baseCommit, members: metadata.members,
     parserVersion: contract.parserVersion, packageNodeEngine: pkg.engines.node, node: process.version };

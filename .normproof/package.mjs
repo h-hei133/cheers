@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { brotliCompressSync, constants as zlibConstants } from 'node:zlib';
 import { contract, digest, extractUpstream, readBundleMetadata, repository, requireDigest, requireRuntime } from './adapter/artifact.mjs';
 
 const metadataPath = '.normproof/bundle.json';
@@ -47,6 +48,7 @@ export function prepareRefresh(directory, commit, extracted, current) {
   extractUpstream(archiveBytes, JSON.parse(metadata), extracted, archive.sha256);
   const hooks = structuredClone(current.hooks);
   const replacements = new Map([[current.metadata.sourceArchive, archiveBytes], [metadataPath, metadata]]);
+  const bundledGates = {};
   for (const [name, spec] of Object.entries(gates)) {
     const gate = record[name];
     const entry = `src/adapters/${spec.directory}/hook.ts`;
@@ -67,6 +69,11 @@ export function prepareRefresh(directory, commit, extracted, current) {
     }
     const bytes = read(gate.file);
     requireDigest(bytes, gate.sha256, `${name} CLI`);
+    bundledGates[name === 'write' ? 'write' : 'stop'] = {
+      sha256: gate.sha256,
+      bytes: bytes.length,
+      data: brotliCompressSync(bytes, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 } }).toString('base64'),
+    };
     descriptor.sha256 = gate.sha256;
     replacements.set(file, bytes);
     const inputs = Object.fromEntries(Object.entries(gate.inputs).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
@@ -77,6 +84,11 @@ export function prepareRefresh(directory, commit, extracted, current) {
   replacements.set(contractPath, json({ ...contract, bundleMetadataSha256: digest(metadata), archiveSha256: archive.sha256,
     writeArtifactSha256: record.write.sha256, completionArtifactSha256: record.stop.sha256 }));
   replacements.set(hooksPath, json(hooks));
+  replacements.set('packages/ts-shell/src/core/hooks/assets.json', json({
+    version: 1,
+    sourceCommit: commit,
+    gates: bundledGates,
+  }));
   return replacements;
 }
 

@@ -45,7 +45,12 @@ export function installRuleControlRuntime(input: { readonly runtimeContext: Shel
     if (commandContext.sessionId !== context.session.id || commandContext.cwd !== context.cwd || commandContext.admission?.()) {
       return { kind: 'local', output: 'Command session or workspace changed.', state: { status: 'blocked' } };
     }
-    return name === 'context' ? contextAttachments(args, input) : rules(name, args);
+    if (name === 'context') return contextAttachments(args, input);
+    if (name === 'init' && args[0] === 'architecture' && commandContext.runCancellable) {
+      return commandContext.runCancellable(signal => rules(name, args,
+        commandContext.signal ? AbortSignal.any([commandContext.signal, signal]) : signal));
+    }
+    return rules(name, args, commandContext.signal);
   };
 }
 

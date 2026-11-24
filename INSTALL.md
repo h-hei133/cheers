@@ -1,83 +1,40 @@
-# Install and Start
+# Install and start Cheers
+
+## Install a release binary
+
+Download the executable and its matching `.sha256` file from the [releases page](https://github.com/h-hei133/cheers/releases). Choose `cheers-linux-x64`, `cheers-darwin-arm64`, or `cheers-darwin-x64` for your system.
+
+Run these commands from the download directory with your selected filename in place of `cheers-linux-x64`.
+
+```sh
+shasum -a 256 -c cheers-linux-x64.sha256
+mkdir -p "$HOME/.local/bin"
+install -m 755 cheers-linux-x64 "$HOME/.local/bin/cheers"
+"$HOME/.local/bin/cheers" --version
+```
 
 ## Requirements
 
-- Node.js >= 20
-- Rust toolchain (`cargo`, optional `rustup`)
-- Python 3.10+
+- Node.js 20.3 or newer
+- Bun when building a single-file executable
 
-## First-time setup
+## Run from a checkout
 
-```bash
-npm install
+```sh
+npm ci
 npm run setup
-```
-
-## Health check
-
-```bash
-npm run doctor
-```
-
-## Optional local config
-
-You can bootstrap credentials either by editing the user config file or by using `/connect` inside the CLI.
-
-```bash
 npm start
 ```
 
-Supported keys:
+Configure a model connection with `/connect`. Settings and model catalogues can use YAML. Legacy JSON configuration remains available until you explicitly run `cheers config migrate`, which backs up each selected source before verifying its YAML replacement.
 
-- `provider`
-- `maxTurns`
-- `providerCredentials`
+## Build a single-file executable
 
-Supported provider profiles:
-
-- `openai`
-- `anthropic`
-- `openai-compatible` (for SiliconFlow-style OpenAI-compatible endpoints)
-
-For `openai-compatible`, store all three fields:
-
-- `apiKey`
-- `baseUrl`
-- `model`
-
-Recommended CLI onboarding flow:
-
-```bash
-/connect set openai-compatible <api-key> https://api.siliconflow.cn/v1 deepseek-ai/DeepSeek-V3
-/connect status
-```
-
-## Daily-use commands
-
-```bash
+```sh
+npm ci
 npm run build
-npm test
-npm start
+npm run build:exe
+dist/bin/cheers --version
 ```
 
-Inside the CLI, you can then submit a real task prompt directly at the `>` prompt.
-
-If you want to force the real-provider path during a session, set:
-
-```powershell
-$env:CHEERS_PROVIDER_MODE='real'
-npm start
-```
-
-## Optional Rust execution path
-
-```bash
-DAEMON_ENABLED=1 npm start
-```
-
-On PowerShell:
-
-```powershell
-$env:DAEMON_ENABLED='1'
-npm start
-```
+The executable includes its runtime. Run the build on the platform that will use the executable.

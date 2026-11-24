@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { contract, readBundleMetadata, repository } from '../.normproof/adapter/artifact.mjs';
+import { brotliDecompressSync } from 'node:zlib';
+import { contract, digest, readBundleMetadata, repository } from '../.normproof/adapter/artifact.mjs';
 import { prepareRefresh } from '../.normproof/package.mjs';
 
 function fixture(t) {
@@ -37,11 +38,24 @@ function fixture(t) {
 test('the checked artifact packet reproduces the pinned files', t => {
   const { prepare, current } = fixture(t);
   const replacements = prepare();
-  assert.equal(replacements.size, 8);
+  assert.equal(replacements.size, 9);
   for (const [file, bytes] of replacements) {
     assert.deepEqual(bytes, fs.readFileSync(path.join(repository, file)), file);
   }
   assert.deepEqual(current.hooks, JSON.parse(replacements.get('.agents/hooks.json')));
+});
+
+test('the architecture initializer identifies the same source archive and decodes to its recorded bytes', () => {
+  const pin = readBundleMetadata();
+  const relative = 'packages/ts-shell/src/cli/runtime/architecture/asset.json';
+  const asset = JSON.parse(fs.readFileSync(path.join(repository, relative), 'utf8'));
+  assert.equal(asset.version, 1);
+  assert.equal(asset.sourceCommit, pin.baseCommit);
+  assert.equal(asset.archiveSha256, pin.archiveSha256);
+  const bytes = brotliDecompressSync(Buffer.from(asset.data, 'base64'), { maxOutputLength: 8 * 1024 * 1024 });
+  assert.equal(bytes.byteLength, asset.bytes);
+  assert.equal(digest(bytes), asset.sha256);
+  assert.match(bytes.toString('utf8'), /MIT License/);
 });
 
 test('pin preparation rejects a foreign revision, escaping input and altered CLI bytes', t => {

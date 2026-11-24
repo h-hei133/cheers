@@ -25,7 +25,7 @@ interface GitComposition {
   readonly getReadline: () => ReadlineInterface | null;
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly options: CliOptions;
-  readonly getPromptInteractiveApproval?: () => ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined;
+  readonly getPromptInteractiveApproval?: () => ((prompt: EscalationPrompt, signal?: AbortSignal) => Promise<InteractiveApprovalResult>) | undefined;
 }
 export function installGitCliRuntime(input: GitComposition, runtime: ShellSessionRuntime, isStdinTty: () => boolean): (tool?: string) => ToolGateOptions {
   const gate = (tool: string = 'bash') => gitGateFor(input.runtimeContext, input.sessionManager, runtime,
@@ -43,9 +43,13 @@ export function gitGateFor(context: ShellRuntimeContext, manager: SessionManager
   const operation = configurationOperation(context);
   const config = operation.config;
   const admission = () => operation.admission() ?? (!filterVisibleToolNames([tool], config).length ? 'The selected native capability is disabled.' : undefined);
-  const hooks = new HookDispatcher(); setupBuiltinVerificationHooks(hooks);
-  registerDeclaredHooks(hooks, context.cwd, { admission, bypassed: config.allowUntrustedHooks,
-    requestApproval: createHookApprovalRequest(approval) });
+  const hooks = new HookDispatcher();
+  // Direct source inspection consumes read policy only and never dispatches tool hooks.
+  if (tool !== 'read') {
+    setupBuiltinVerificationHooks(hooks);
+    registerDeclaredHooks(hooks, context.cwd, { admission, bypassed: config.allowUntrustedHooks,
+      requestApproval: createHookApprovalRequest(approval) });
+  }
   return { sessionId: context.session.id, workspaceRoot: context.cwd, workspaceRoots: context.session.workspaceRoots,
     agentMode: runtime.getAgentMode(), permissionScope: runtime.getPermissionScope(), denyRules: config.denyRules, configScope: toolScopeBinding(config),
     admission, hooks, escalationPromptHandler: approval,

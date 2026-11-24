@@ -40,6 +40,8 @@ export const REQUIRED_BUILD_LAUNCHER = "dist/cli.js";
 export const REQUIRED_PACKAGE_MAIN = "packages/ts-shell/dist/index.js";
 
 export const REQUIRED_BUILD_ASSETS = [
+  "cli/runtime/architecture/asset.json",
+  "core/hooks/assets.json",
   "presentation/themes/dark.json",
   "presentation/themes/dark-contrast.json",
   "presentation/themes/light.json",

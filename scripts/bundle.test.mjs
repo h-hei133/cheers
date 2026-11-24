@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import { bundleModules } from "./build/bundle.mjs";
 import { bindingName } from "./build/exports.mjs";
 import { bundleDomainTypes } from "./build/types.mjs";
+import { REQUIRED_BUILD_ASSETS } from "./build-identity.mjs";
 
 function write(file, contents) {
   mkdirSync(path.dirname(file), { recursive: true });
@@ -22,8 +23,8 @@ function fixture() {
   write(path.join(root, "package.json"), '{"type":"module"}\n');
   write(path.join(source, "index.ts"), 'export const value = 1;\n');
   write(path.join(source, "entrypoints/cli.tsx"), 'export {};\n');
-  for (const name of ["dark", "light", "dark-contrast", "light-contrast", "schema"]) {
-    write(path.join(source, `presentation/themes/${name}.json`), JSON.stringify({ name }));
+  for (const asset of REQUIRED_BUILD_ASSETS) {
+    write(path.join(source, asset), JSON.stringify({ name: path.basename(asset, ".json") }));
   }
   return { root, source, staging, entries: [{ specifier: ".", path: "index.js", types: "types/index.d.ts" }],
     version: "1.2.3", name: "@cheers/fixture" };
