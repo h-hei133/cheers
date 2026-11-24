@@ -1,23 +1,23 @@
 # 2026-11 路线图执行记录
 
-**状态**：执行中。Batch 0.5 已通过 Linux 本地验收。Batch 0 的真实模型路由验证仍部分未证实。
+**状态**：Batch 0–4 的可执行范围已通过 Linux 本地验收并本地提交。Batch 0 真实模型路由仍部分未证实；Batch 4 LICENSE 与公开 Release 按用户要求或发布边界暂缓。
 **任务范围**：核实并执行 `.wiki/wiki/references/codex-and-frontier-gap-audit-2026-11.md` 与 `.wiki/wiki/references/cheers-next-phase-roadmap-2026-11.md` 中的后续批次。
 **基线**：2026-11-23，源码提交 `f65ba979`。
 
 这份记录只跟踪上述两份研究材料带来的后续工作。它与 `.wiki/refactor/upgrade/tasks.md` 中已有的 62 项会话／运行时计划分开计数，不重置或改写那份清单。目标仓库及 Linux 是本次可写、验证范围；参考树只读；真实模型只通过现有 Cheers 运行路径调用。测试和报告不读取或输出凭据。新产品文件、标识符、界面文案不引入其他项目的名称或标签，也不复制参考仓库实现。
 
-基线工作区还包含已修改的 `.wiki/_index.md`、`.wiki/wiki/references/_index.md`，以及两份未提交的研究文档。它们属于已有工作，本次保留原样。后续每一批先按准确的验收范围验证，再单独本地提交。外部平台、Windows、实际计费和无法由 Linux 本机证明的结果单独标为未验证。
+每批按准确验收范围验证后分别本地提交。外部平台、Windows、实际计费和无法由 Linux 本机证明的结果单独标为未验证。本次不推送。
 
 ## 核实后需要执行的任务
 
 | 批次 | 状态 | 当前证据与边界 |
 | --- | --- | --- |
-| Batch 0 | 实现完成，B0.6 部分验证 | 已实现 Ready / Configured、显式 Registry、视图内搜索、命令和补全收窄、精确地址归属、唯一连接会话切换、effort auto 回退、启动模型锁释放、事务重命名及 RPC 忙时取消。`.tmp/` 只有空目录，无活动进程或可清理历史文件。420 项聚焦测试、静态门禁、源码构建和 Linux 二进制构建通过。三个真实 endpoint 请求成功。workbuddy 选择正确连接，但 `127.0.0.1:7863` 无监听进程，请求为 provider/network failure。 |
+| Batch 0 | 实现完成，B0.6 部分验证 | Ready / Configured、模型 Registry、会话连接切换和事务重命名已有实现。四连接实际探测中 BaiLu 请求成功；Casa/NOFX 认证失败，Workbuddy 目标 `127.0.0.1:7863` 无监听。不能把认证或服务状态记为路由验收成功。 |
 | Batch 0.5 | Linux 本地验收通过，已本地提交 | YAML/JSONC、用户配置解析、保注释局部写回、显式迁移和配置消费者通过 31 个聚焦套件 826/826，六个静态门、源码构建、单文件构建和隔离配置迁移入口通过。提交 `f7f9044c74e05eaa7d0d79dd5023a36fa475a294`，未推送。 |
-| Batch 1 | 实现中，尚未串行验收 | 增加首轮环境请求投影、局部工具发现跨轮保留、缓存成本/usage 观测、摘要请求前缀复用、Bedrock 缓存断点和账户路由状态捕获。收尾步省略工具仍是安全合同。所有切片待串行消费者和 capability 反转验证。 |
-| Batch 2 | 实现切片完成，待串行验收 | 嵌套调用 fail-closed、拒绝终止、逐调用审批、审批等待计时、脚本 receipt/diff、代码折叠与结果 hook 脱敏已有切片。字面 shell 模板复用原命令门。自动脚本后台化按进程句柄、CLI 清理和 turn-bound 权限事实暂缓，详见 `script-jobs.md`。 |
-| Batch 3 | 多切片实现中，待串行验收 | 命令面板、主题入口、diff 换行、输入快捷键、首次连接引导、受控 LSP 候选、非否决 repeat 提醒和流空闲看门狗已有切片。worker 作业等待/晋升与注意力容量核实显示现有生命周期不能支持五秒后台化；自动晋升暂缓。 |
-| Batch 4 | 实现中，外部集成仍未就绪 | README、INSTALL 与 Linux/macOS 发布工作流已起草。根项目 SPDX 与版权主体尚待持有人确认，未创建 LICENSE。固定归档基线实际落后五个提交，完整刷新仍需 pinned source checkout 与串行包构建。外部工作区资产必须经宿主审核发布路径及随构建携带的摘要验证，不得由上游命令直接改目标。 |
+| Batch 1 | Linux 本地验收通过，已提交 | 请求前缀、工具发现、缓存 usage/状态、Responses 摘要前缀复用、Bedrock cachePoint 和 capability 反转均通过定向测试。提交 `ab7312f3` 与接线补充 `976847c3`。真实 BaiLu cache-read 为 0、384、640 tokens，但无输入 token 分母，未报告命中率百分比。 |
+| Batch 2 | Linux 本地验收通过，已提交 | 嵌套调用 fail-closed、拒绝终止分类、逐调用审批、审批等待暂停、receipt/diff、代码折叠和 PostToolUse 脱敏通过定向测试。字面 shell 模板复用现有 gated bash。提交 `d006c981`。重复调用观察器与共享工具执行 owner 同批集成。长脚本后台晋升按现有生命周期反证暂缓，详见 `script-jobs.md`。 |
+| Batch 3 | 四模式 Linux CLI 验收通过，已提交 | 命令面板、主题预览入口、并排 diff 换行、Tab/Alt+Up、首次连接引导、受控 LSP 候选、重复调用提醒、job 观察及 stream idle watchdog 通过定向测试及四模式 smoke。提交 `b06ec6d0`。五秒后台晋升暂缓。 |
+| Batch 4 | 除 LICENSE 和公开 Release 外的本地范围验收通过，已提交 | README、INSTALL、发布 workflow 和审批式外部 workspace 架构初始化已实现。固定包为 `ea5054127f4679a8939a747c6495e0df8534b70e`，pinned judge `proven`。提交 `099b661`。用户暂缓根项目 SPDX 与版权主体，因此未创建 LICENSE；未创建 tag 或公开 Release。 |
 
 ## 批次 0 验收清单
 
@@ -58,32 +58,32 @@
 | B0.5.3 人类配置显式迁移 | 成立 | 已验收 | 独占备份/目标身份、权限、软链、并发冲突和失败保留测试通过；隔离 Linux CLI 五文件迁移通过。 |
 | B0.5.4 机器状态、沙箱与原子写 | 部分成立 | 已验收 | Hooks/主题保留 JSON 文件名并解析 JSONC；沙箱无效 YAML 显式拒绝；模型目录与 workflow 消费者采用所选格式。 |
 | B0.5.5 串行验收 | 成立 | 已验收 | 826/826 聚焦测试、六项静态门、源码构建、Linux 单文件构建及 migration CLI 入口通过。提交 `f7f9044c74e05eaa7d0d79dd5023a36fa475a294`。 |
-| B1.1 首轮环境前缀稳定 | 缺口成立，原持久历史描述错误 | 进行中 | 沿已准入 prompt 元数据投影相同环境字节，不重写原始用户消息。 |
-| B1.2 动态发现导致的 schema 波动 | 部分成立 | 待执行 | 保留每轮授权/注册表新鲜度；只稳定确认的核心工具和受支持 wire 能力。 |
+| B1.1 首轮环境前缀稳定 | 缺口成立，原持久历史描述错误 | 已验收 | 沿已准入 prompt 元数据投影相同环境字节，不重写原始用户消息；请求捕获测试覆盖跨轮、重开和环境变化。 |
+| B1.2 动态发现导致的 schema 波动 | 部分成立 | 已验收 | 跨轮复用已加载 schema，同时保留每轮授权、注册表和 endpoint 能力准入。 |
 | B1.3 收尾步保留工具 schema | 与安全合同冲突 | 不适用 | 已有 endpoint 测试明确省略 tools 和 tool_choice。 |
 | B1.4 Responses 缓存键缺失 | 结论过时 | 不适用 | 能力允许时已有键；私有路由头和服务增量链须按 endpoint 单独证明。 |
-| B1.5 费率/预热与状态栏命中率 | 状态栏缺口成立 | 待执行 | 不填造未公布价格，只呈现真实 provider usage；预热不可用原因可观测。 |
-| B1.6 microcompact 前移到存储层 | 请求投影变化成立，修复建议未证明 | 待裁定 | 不改变持久 transcript/工具结果保真合同。 |
-| B1.7 复用压缩请求前缀/远端 compact | 需要产品协议裁定 | 待核实 | 不默认把摘要 system/tools 或私有 compact 协议用于所有 endpoint。 |
-| B1.8 Bedrock cachePoint | 缺口成立 | 待执行 | 仅按模型能力插入，并验证每个断点和请求转换。 |
-| B1.9 system prompt 稳定 | 波动点成立 | 待执行 | 与动态工具名分离需覆盖权限、提示规则和真实请求投影。 |
-| B2.1 嵌套工具无宿主执行器 | 缺口成立 | 进行中 | 缺宿主 gate 时不产生任何工具副作用。 |
-| B2.2 无理由拒绝终止脚本 | 缺口成立 | 进行中 | 区分反馈拒绝和停止拒绝，保留既有调用回执与外层终态。 |
-| B2.3 codemode 常驻授权与 plan 策略 | 缺口成立 | 进行中 | 不持久授权脚本整体；只读 plan 仍逐调用鉴权。 |
-| B2.4 内部执行 TUI receipt/代码折叠 | 缺口成立 | 进行中 | 消费有父子身份的 receipt，不建立第二份调用状态。 |
-| B2.5 审批等待暂停脚本预算 | 缺口成立 | 进行中 | 只暂停真实用户交互等待，取消/并发等待可结算。 |
-| B2.6 PostToolUse 安全覆写 | 部分成立 | 待执行 | 可隐藏秘密但保留成功/失败、工具、已发生效果和审批证据。 |
+| B1.5 费率/预热与状态栏命中率 | 状态栏缺口成立 | 已验收 | 只累计 provider 明确报告的 cache usage；缺乏分母时不显示百分比。不可用价格继续保持未知。 |
+| B1.6 microcompact 前移到存储层 | 原修复建议未成立 | 不适用 | microcompact 属于发出的 provider 投影，持久 transcript 保持权威；反例测试覆盖测量锚点修正。 |
+| B1.7 复用压缩请求前缀/远端 compact | 本地前缀复用成立，通用远端协议未成立 | 已验收／有界 | 仅在声明的 OpenAI Responses 主会话摘要请求复用 system/tools；超预算回退到原摘要形状，拒绝模型返回的工具调用。其他 endpoint 和 branch summary 不获得未证明协议。 |
+| B1.8 Bedrock cachePoint | 缺口成立 | 已验收 | 只按模型能力添加，并验证 cachePoint 数量、顺序和 Converse 转换。 |
+| B1.9 system prompt 稳定 | 波动点成立 | 已验收 | 将动态工具名称从稳定 system prompt 投影中移除，工具可用性说明按实际工具上下文保留。 |
+| B2.1 嵌套工具无宿主执行器 | 缺口成立 | 已验收 | 缺宿主 gate 时 fail-closed，工具副作用计数为零。 |
+| B2.2 无理由拒绝终止脚本 | 缺口成立 | 已验收 | 反馈拒绝和停止拒绝有不同终态；已完成 receipt 保留并与外层状态关联。 |
+| B2.3 codemode 常驻授权与 plan 策略 | 缺口成立 | 已验收 | 不持久授权脚本整体；只读 plan 仍通过逐调用授权。 |
+| B2.4 内部执行 TUI receipt/代码折叠 | 缺口成立 | 已验收 | 从有父子身份的 receipt 投影内部差异和可折叠代码，没有创建第二套调用状态。 |
+| B2.5 审批等待暂停脚本预算 | 缺口成立 | 已验收 | 只扣除真实审批等待时间；取消和并发 settle 有回归覆盖。 |
+| B2.6 PostToolUse 安全覆写 | 部分成立 | 已验收 | hook 可脱敏输出，同时保留 success/failure、调用名、审批事实及已发生副作用。 |
 | B2.7 shell 模板与长脚本后台晋升 | shell 模板已实现；脚本转后台反证成立 | 脚本转后台暂缓 | shell tag 只走既有 gated bash；TaskRegistry 接管的是本地进程 handle，不能续行 worker；细节见 `script-jobs.md`。 |
-| B3.1 命令面板、主题入口、并排 diff | 缺口成立 | 待串行验证 | 复用能力过滤、主题预览 lease、差异选择与分页 owner。 |
-| B3.2 Alt+Up、首启引导、媒体连接池 | 缺口成立 | 待执行 | 保留排队/补全区分、现有连接身份与凭据 owner。 |
-| B3.3 受控 LSP 候选选择 | 自动启动与安全合同冲突 | 有界修订 | 仅显示候选，用户明确选择后才允许现有 server owner 启动。 |
-| B3.4 repeat-tool reminder 与 stream idle watchdog | 缺口成立 | 实现待验收 | 有界参数摘要、阈值 3/5/8 和已排序结果附着；不 veto、跳过调用不计数；stream watchdog 与 native deadline/取消分类分离。 |
-| B3.5 jobs/diff 汇总过滤与注意力并发 | 部分成立 | 实现待验收，自动晋升暂缓 | 精确 run settlement waiter、审批等待临时观察和 jobs 投影去重已实现。五秒晋升受 child registry 生命周期限制。人类输入不使用 worker journal 槽位，扩大容量不能形成优先槽。 |
-| B3.6 文件拆分/死代码清理 | 大模块存在，具体死代码未指定 | 待核实 | 先按职责列候选与反例，再做独立小批。 |
-| B4.1 README/安装/许可证/发布工作流 | 部分成立 | 进行中 | Linux/macOS 构建可复现；LICENSE 需持有人信息。 |
-| B4.2 固定门控包刷新 | 版本缺口成立，实际相差五提交 | 待执行 | pinned source 干净、提交全哈希匹配，刷新包/manifest 后串行验证。 |
-| B4.3 外部工作区门控资产携带 | 缺口成立 | 进行中 | 包内 digest、profile 隔离、沙箱可读和 Node/单文件消费者验证。 |
-| B4.4 外部工作区一键初始化 | 缺口成立，原建议绕过批准 writer | 待裁定 | 使用现有 `/init` 及普通 patch/审批/readback；无经验证 staged 生成器前不宣称完成。 |
+| B3.1 命令面板、主题入口、并排 diff | 缺口成立 | 已验收 | 复用 capability filter、theme preview lease、并排 diff 换行、源码复制和分页 owner。 |
+| B3.2 Alt+Up、首启引导、媒体连接池 | 缺口成立 | 已验收 | 排队与补全语义分开；Alt+Up 召回队尾；首启连接向导和媒体池复用既有 credential owner。 |
+| B3.3 受控 LSP 候选选择 | 自动启动与安全合同冲突 | 已验收／有界 | 仅显示候选，用户明确选择后才允许现有 server owner 启动。 |
+| B3.4 repeat-tool reminder 与 stream idle watchdog | 缺口成立 | 已验收 | 有界有序参数摘要、阈值 3/5/8；观察器不 veto 且跳过调用不计数。stream watchdog 与 native deadline/取消分类分离。 |
+| B3.5 jobs/diff 汇总过滤与注意力并发 | 部分成立 | 已验收／有界 | 精确 run settlement waiter、审批等待观察和 jobs 差值投影完成；五秒后台晋升和新优先槽维持暂缓。 |
+| B3.6 文件拆分/死代码清理 | 无职责候选支撑宽泛拆分 | 已核实 | 删除无生产引用的 `DoomLoopDetector` 与孤立测试；未进行没有具体 owner/反例依据的大模块改写。 |
+| B4.1 README/安装/许可证/发布工作流 | 文档和发布配置缺口成立 | 部分验收 | README、INSTALL 与 workflow 通过本地构建/静态脚本验证。用户暂缓 SPDX 与版权主体，因此 LICENSE 未创建；公开 Release 未执行。 |
+| B4.2 固定门控包刷新 | 版本缺口成立，实际相差五提交 | 已验收 | pinned archive、全部清单哈希与全哈希 commit `ea5054127f4679a8939a747c6495e0df8534b70e` 一致，脚本契约通过。 |
+| B4.3 外部工作区门控资产携带 | 缺口成立 | 已验收 | initializer 与 hook assets 带 digest、Node/runtime 限制和 profile 隔离；实际构建产物包含资源。 |
+| B4.4 外部工作区一键初始化 | 原建议绕过 writer 不成立 | 已验收／有界 | `/init architecture` 只生成隔离快照提案；`/init apply` 复用普通 patch 审批、完整分组校验和逐文件读回。 |
 
 ## 每批门禁与状态
 
@@ -92,6 +92,17 @@
 - Batch 2 需 worker 与真实 `runTurn` 的拒绝反例、hook/权限/回执消费者测试、审批 UI 停止路径、并行调用结算、静态门和源码构建。不得为验证拒绝而对用户工作区写文件。
 - Batch 3 每项按对应 TUI owner 用短 PTY/终端尺寸和键序列验证；只在 Linux 侧执行。无真实外部服务器或账号证据时按 `not_configured` 报告。
 - Batch 4 需 pinned 包哈希与外部隔离工作区回读、Linux 可执行文件标签/摘要/安装目录验收、发布 workflow 静态审计。没有许可证持有人选择时 LICENSE 与公开 Release 仍为阻断项。
+
+## Batch 1–4 执行证据（2026-11-24）
+
+- Linux 聚焦 Vitest 运行 61 个受影响及边界套件，2244/2244 通过。覆盖请求前缀与测量、缓存及摘要 endpoint、Bedrock、codemode worker 与拒绝路径、审批/receipt/hook 脱敏、任务 settle、交互快捷键/连接向导、外部架构初始化和 session rename。
+- `npm run test:scripts` 225/225 通过；本轮修正两个 clipboard PTY 辅助器断言，使测试按实际拖选源行的 SGR 坐标工作。regular、fullscreen、line、pipe 四种 Linux 单文件 CLI smoke 全部通过。
+- `verify:import-cycles`、`check:config-consumers`、`check:declarations`、`check:node-floor`、`check:lint`、`verify:docs-drift:strict` 全部通过。严格文档门报告 35 条既有 unprefixed source-path advisory，binding rules 无 dangling path。
+- 8 个领域 workspace 和 `packages/ts-shell` 逐个串行构建通过；Linux `npm run build:exe` 通过，产物为 107 MB。单文件 smoke 读取当前 build manifest 与 executable digest。
+- pinned archive 经包契约测试核对，commit 为 `ea5054127f4679a8939a747c6495e0df8534b70e`。用归档成员 `package/dist/adapters/cli/normproof.js` 在 Cheers source 上运行 judge，结果 `proven`、0 open obligations、0 failed obligations、0 proof gaps。
+- `/init architecture` 通过隔离外部 workspace snapshot 生成精确提案；`/init apply` 使用既有 patch approval，要求完整选择并逐文件读回。测试验证被拒、partial、stale、源修改和普通配置并发变更都不会提交未核实结果。runtime asset 和 hook bundle digest 经构建及资产测试校验。
+- Linux 真实模型探测三轮 BaiLu 返回 cache-read `0`、`384`、`640` tokens，cache-write 为 `0`。provider 未给出输入 token 分母，未推导命中率。Casa 与 NOFX 分别返回认证失败，Workbuddy 目标 `127.0.0.1:7863` 无监听。旧 Batch 0 记录中的“真实 endpoint 请求成功”修正为 BaiLu 成功，Casa/NOFX 为认证失败，均与产品路由测试分开记录。
+- Batch 1–4 无新增产品运行时依赖。提交 `ab7312f3`/`976847c3`、`d006c981`、`b06ec6d0`、`099b661`，均本地且未推送。实际工作量 L。B4.1 LICENSE 与公开 Release 保持未完成，因用户选择暂缓根项目许可证信息。
 
 ## Batch 3.5 设计边界
 
@@ -131,7 +142,7 @@
 
 - 实际投入 L；S.U.P.E.R 检查 10/10；无新增运行时依赖。新增未预见依赖 2 项，分别是私有模型来源标记跨配置快照复制，以及启动模型目标解析器传递到实际 provider bridge。
 - Linux 验证 420/420 定向 Vitest。`verify:import-cycles`、`check:config-consumers`、`check:declarations`、`check:node-floor`、`check:lint`、`verify:docs-drift:strict`、`npm run build` 和 `npm run build:exe` 全部通过。
-- 生产 `--list-models` 入口只展示配置的 9 个模型。nofx、apikey-casa 和 BaiLu 在隔离临时 workspace 发出请求并完成。workbuddy 连接选择正确，但 `127.0.0.1:7863` 没有监听服务，真实请求归类为 provider/network failure。
+- 生产 `--list-models` 入口只展示配置的 9 个模型。BaiLu 真实请求成功；NOFX 与 APIKey Casa 请求分别返回认证失败，不能计为成功。Workbuddy 选择了正确连接，但 `127.0.0.1:7863` 没有监听服务，真实请求归类为 provider/network failure。
 - 测试副作用：第一次真实请求启动时复用了已有 Cheers session，将其模型选择改为 `bailu-2.8`。原选择没有执行前快照，不能安全推定并回写。本机 session ID 是 `sess_ce712b9e215964b0_1795310273004`。
 - 外部临时 workspace 和其中创建的测试 session 已删除。本批本地提交 `8d310529435445028890a165d67c11fb81b1a2c0`，未推送。
 
