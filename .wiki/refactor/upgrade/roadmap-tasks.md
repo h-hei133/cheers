@@ -192,7 +192,7 @@
 - T3：失效的旧测试路径改成现有权限记忆 codec/continuity 投影生产消费者测试。隔离 Home Gate 和 Git hook 边界显式设置。`verify:release:core` 在 Node 20.3.0、隔离 HOME/TestRoot、中间构建和最终 v0.1.2 构建中完整通过，包含 session/query、CLI、MCP、result contract、workspace safety、evidence artifact、long-session durability 及 strict docs gate。发布 workflow 增加精确 SHA 的 main `Build & Test` 与 `Validate NormProof Architecture` 前置成功条件。
 - T4：外部记录已更新。三条 provider 路由证据通过；`127.0.0.1:7863` 无监听，WorkBuddy 保持开放。根包、shell 包及 lockfile 已升至 v0.1.2；Linux TypeScript build、单文件产物、`--version` 和 `--help` 检查通过。标签 `v0.1.2` 已推送至提交 `4c11147b`，该提交的 main CI `45432989402` 两个必需 job 均成功。Release workflow `45442889705` 完成三个平台资产及 sidecar 校验和发布。下载的 Linux 资产为 112,670,848 字节，SHA-256、`--version` 和 `--help` 独立复验通过。
 - T5：CI 和 release workflow 的 checkout/setup-node 升至 v7，upload-artifact 升至 v7，download-artifact 升至 v8。Linux release gate 与 Node 20.3 已验收；Windows 未测试，macOS 交互真机未做，npm `private` 保持现状。
-- 本地门禁：六项静态检查通过，`npm run test:scripts` 229/229 通过，固定 `.normproof/normproof-0.1.0.tgz` 的 prose check/judge 通过，报告 `proven`、0 open obligations、0 failed obligations、0 proof gaps。strict docs drift 的无前缀源码 advisory 已归档为历史状态，当前门禁结果为 0 dangling reference 和 0 source-dangling reference。
+- 本地门禁：六项静态检查通过，`npm run test:scripts` 229/229 通过，固定 `.normproof/normproof-0.1.0.tgz` 的 prose check/judge 通过，报告 `proven`、0 open obligations、0 failed obligations、0 proof gaps。strict docs drift 的两份 2026-09 探索记录已标为历史，advisory 从 35 降至 28；当前无前缀引用仍集中在 sprint 计划与采用记录，按其索引状态保留。
 - GitHub main CI `45432989402` 与发布 workflow `45442889705` 均成功。提交 `4c11147b` 和标签 `v0.1.2` 已推送，公开 Release 资产验收完成。
 
 ## 完成及提交规则
