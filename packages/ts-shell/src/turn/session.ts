@@ -1,7 +1,7 @@
 import type { ImageContent } from "../model-adapters/multimodal.js";
 import { messageToText } from '../model-adapters/multimodal.js';
 import { AgentCore } from "../core/agent/agent.js";
-import { turnInput, type InputDisposition, type InputFormat, type QueuedInputOptions } from './input.js';
+import { turnInput, type InputDisposition, type InputFormat, type QueuedInputOptions, type RecallInput } from './input.js';
 import type { AgentLifecycleEvent } from "../core/agent/events.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
@@ -17,7 +17,7 @@ import { turnCompaction, type CompactionSetup } from './compaction.js';
 export type { CompactionSetup } from './compaction.js';
 import { openingMessage } from './opening.js';
 import { buildCompactionLifecycle } from "../core/shell/compaction.js";
-import { concludeRun, TurnProjection } from "./projection.js";
+import { concludeRun, runStoppedByScript, TurnProjection } from "./projection.js";
 import { EventChannel } from "./stream.js";
 import { createTurnRequest, requestPurposeFor } from "./request.js";
 import { isOverflowFailure, type StepFunction } from "./step.js";
@@ -74,6 +74,8 @@ export interface TurnOptions {
   readonly prompt: string;
   /** Accepted prompt-barrier message before transient request framing. */
   readonly storedPrompt?: SessionMessage;
+  /** Exact environment captured at the prompt barrier, when the shell owns it. */
+  readonly requestEnvironment?: string;
   /** Historical context for this run; never persisted as a new user prompt. */
   readonly continuityContext?: string;
   /** Commit prepared prompt context after startup checks, immediately before kernel entry. */
@@ -175,6 +177,8 @@ export interface TurnInput {
   pending(): { readonly steering: readonly string[]; readonly followUps: readonly string[] };
   /** Take back everything not yet delivered. */
   clearQueue(format?: InputFormat): string[];
+  /** Take back the pending interactive follow-up at the tail of this run's queue. */
+  readonly recallFollowUp?: (format: RecallInput) => string | undefined;
 }
 
 export interface TurnRun extends TurnInput {
@@ -228,9 +232,8 @@ export function runTurn(options: TurnOptions): TurnRun {
     ? createSubagentRunner(options.subagentHost, options.tools, parentGate)
     : undefined;
   const gate: ToolGateOptions = { ...parentGate, ...(runSubagent ? { runSubagent } : {}) };
-  const opening = openingMessage(options);
-  // The opening prompt carries the environment prefix; the surface already drew
-  // the user's own text, so its delivery is not reported again.
+  const opening = openingMessage(options, options.convertToLlm ? undefined : options.storedPrompt, options.requestEnvironment);
+  // The surface already drew this submission, so its delivery is not reported again.
   const projection = new TurnProjection(opening);
   const toolPool = () => options.toolSnapshot?.() ?? options.tools;
   const hooks = createToolHooks(gate, toolPool);
@@ -348,13 +351,15 @@ export function runTurn(options: TurnOptions): TurnRun {
       await core.prompt(opening, { skipInitialPreparation: Boolean(compaction) });
       // Input that arrived as the run was ending is still owed a run: the
       // kernel restarts from its queues rather than leaving them behind.
-      while (!options.signal.aborted && !queuedInput.publicationFailed() && ((await recoverOverflow()) || core.hasQueuedMessages())) {
+      while (!options.signal.aborted && !runStoppedByScript(core.state.messages) && !queuedInput.publicationFailed()
+        && ((await recoverOverflow()) || core.hasQueuedMessages())) {
         await core.continue();
       }
       while (!options.signal.aborted && await conclude()) {
         if (options.signal.aborted) break;
         await core.continue();
-        while (!options.signal.aborted && !queuedInput.publicationFailed() && ((await recoverOverflow()) || core.hasQueuedMessages())) await core.continue();
+        while (!options.signal.aborted && !runStoppedByScript(core.state.messages) && !queuedInput.publicationFailed()
+          && ((await recoverOverflow()) || core.hasQueuedMessages())) await core.continue();
       }
       if (options.signal.aborted) stop.finish('stopped', 'cancelled', false);
     } finally {
@@ -490,6 +495,11 @@ export function runTurn(options: TurnOptions): TurnRun {
       finalOutput: outcome.finalOutput,
     }, { signal: options.signal, onResult: result => stop.checked(result) });
     if (options.signal.aborted) { stop.finish('stopped', 'cancelled', false); return false; }
+    if (runStoppedByScript(core.state.messages)) {
+      stop.finish('stopped', 'approval_denied', false);
+      channel.push(outcome.completed);
+      return false;
+    }
     const next = stop.decide(decision, projection.stepCount < options.maxSteps, outcome.completed.result.status === 'completed');
     if (next === 'terminal') return false;
     if (next === 'repair') {
@@ -572,6 +582,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     pending: () => ({ steering: queue.entries().filter(entry => entry.lane === 'steering').map(entry => entry.text),
       followUps: queue.entries().filter(entry => entry.lane === 'followUp').map(entry => entry.text) }),
     clearQueue: queue.clear,
+    recallFollowUp: queue.recallFollowUp,
   };
 }
 

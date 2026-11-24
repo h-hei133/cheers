@@ -1,5 +1,6 @@
 import type { ChatMessage } from "../../../turn/prompt.js";
 import { formatNonVisionFallback, messageToText, type ImageContent } from "../../../model-adapters/multimodal.js";
+import type { CachePoint } from './cache.js';
 
 /** A block in a user turn. */
 type UserBlock =
@@ -15,7 +16,7 @@ type AssistantBlock =
 
 export interface WireMessage {
   readonly role: "user" | "assistant";
-  readonly content: ReadonlyArray<UserBlock | AssistantBlock>;
+  readonly content: ReadonlyArray<UserBlock | AssistantBlock | CachePoint>;
 }
 
 /**

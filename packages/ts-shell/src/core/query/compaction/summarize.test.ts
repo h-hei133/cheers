@@ -68,6 +68,48 @@ it('binds a prepared summary to requested cache retention and session even when 
   expect(prepareCompactionRequest({ ...request, provider: { ...request.provider, sessionId: 'second-session' } }).identity).not.toBe(short.identity);
 });
 
+it('reuses the native turn prefix for compaction and refuses any returned tool call', async () => {
+  const usage = vi.fn();
+  const bodies: Record<string, unknown>[] = [];
+  const request: CompactionRequest = {
+    provider: { headers: {}, baseUrl: 'https://api.openai.com/v1', model: 'summary', endpoint: 'openai-responses' },
+    messages: [{ role: 'user', content: 'Work since the checkpoint' }],
+    previousSummary: 'Earlier work\n',
+    reusePrefix: { systemPrompt: 'Captured instructions', tools: [{ type: 'function', function: {
+      name: 'inspect', description: 'Read data', parameters: { type: 'object' },
+    } }] },
+    onUsage: usage,
+    fetchImpl: async (_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return Response.json({ status: 'completed', output: [
+        { type: 'message', id: 'message-fixture', role: 'assistant', content: [{ type: 'output_text', text: 'Summary' }] },
+        { type: 'function_call', id: 'tool-fixture', call_id: 'call-fixture', name: 'inspect', arguments: '{}' },
+      ], usage: { input_tokens: 12, output_tokens: 2 } });
+    },
+  };
+  expect(await requestCompactionSummary(request)).toBeUndefined();
+  expect(usage).toHaveBeenCalledWith(expect.objectContaining({ prompt_tokens: 12 }));
+  expect(bodies[0]).toMatchObject({
+    instructions: 'Captured instructions', tool_choice: 'none',
+    tools: [{ type: 'function', name: 'inspect', description: 'Read data', parameters: { type: 'object' }, strict: false }],
+    input: [
+      { role: 'user', content: [{ type: 'input_text', text: '[Context Checkpoint]\nEarlier work\n' }] },
+      { role: 'user', content: [{ type: 'input_text', text: 'Work since the checkpoint' }] },
+      { role: 'user', content: [{ type: 'input_text', text: expect.stringContaining('existing checkpoint') }] },
+    ],
+  });
+  await requestCompactionSummary({ ...request, provider: { ...request.provider, baseUrl: 'https://relay.invalid/v1' } });
+  expect(bodies[1]).not.toHaveProperty('tool_choice');
+  expect(bodies[1]).not.toHaveProperty('instructions');
+  await requestCompactionSummary({ ...request, purpose: 'branch-summary' });
+  expect(bodies[2]).not.toHaveProperty('tools');
+  const prior = { ...request, previousSummary: undefined, prompt: 'Summarize' };
+  const minimal = prepareCompactionMessages({ ...prior, reusePrefix: undefined });
+  const inputLimit = promptTokensFor({ messages: minimal.map(message => ({ ...message, content: message.content ?? '' })) }).tokens;
+  await requestCompactionSummary({ ...prior, provider: { ...request.provider, inputLimit } });
+  expect(bodies[3]).not.toHaveProperty('tools');
+});
+
 it.each(['mistral-chat-completions', 'openai-account-responses'])('sends endpoint-owned %s summary affinity headers and suppresses them when disabled', async endpoint => {
   const observed: Headers[] = [];
   const provider = { headers: {}, baseUrl: 'https://summary-affinity.invalid/v1', model: 'summary',

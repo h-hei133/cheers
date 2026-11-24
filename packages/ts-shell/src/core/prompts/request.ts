@@ -29,7 +29,7 @@ export async function preparePromptRequest(input: PromptRequestInput, override?:
   const allowed = input.allowedTools ? new Set(input.allowedTools) : undefined;
   const filter = (pool: ReadonlyMap<string, ToolDefinition>) => allowed ? new Map([...pool].filter(([name]) => allowed.has(name))) : pool;
   const promptContext = buildSystemPromptContext({ workspaceRoot: input.workspaceRoot, sessionId: input.sessionId,
-    runtimeConfig: input.runtimeConfig, skills, toolNames: [...filter(tools).keys()],
+    runtimeConfig: input.runtimeConfig, skills,
     ...(input.systemPrompt !== undefined ? { systemPrompt: input.systemPrompt } : {}),
     ...(input.appendSystemPrompt?.length ? { appendSystemPrompt: input.appendSystemPrompt } : {}),
     onSource: input.onSource });

@@ -98,6 +98,7 @@ export class TurnProjection {
         const isError = open?.isError ?? false;
         const output = messageToText(message.content);
         const images = imagesOf(message.content);
+        const nestedCalls = message.metadata?.nestedCalls as { calls?: unknown } | undefined;
         return [
           {
             type: "tool.result",
@@ -108,6 +109,8 @@ export class TurnProjection {
             // The whole output, bounded: a card the user can open is only worth
             // opening if what the tool actually printed is behind it.
             output: output.slice(0, CARD_OUTPUT_LIMIT),
+            ...(open?.name === 'codemode' && Array.isArray(nestedCalls?.calls)
+              ? { nestedCallCount: nestedCalls.calls.length } : {}),
             // A screenshot's words say it was captured; the picture is the result.
             ...(images.length > 0 ? { images } : {}),
           },
@@ -173,8 +176,9 @@ export function concludeRun(messages: readonly AgentMessage[], prompt: string, s
   // same way rather than reported as an empty answer.
   const lastText = messageToText(last?.content);
   const explained = lastText.trim() === "";
-  const finalOutput = explained ? explainSilence(messages, last?.errorMessage) : lastText;
-  const refused = refusedToolCall(messages);
+  const scriptStop = runStoppedByScript(messages);
+  const finalOutput = scriptStop ?? (explained ? explainSilence(messages, last?.errorMessage) : lastText);
+  const refused = scriptStop ?? refusedToolCall(messages);
   if (refused) {
     return {
       kind: "completed",
@@ -233,6 +237,17 @@ export function concludeRun(messages: readonly AgentMessage[], prompt: string, s
       },
     },
   };
+}
+
+export function runStoppedByScript(messages: readonly AgentMessage[]): string | undefined {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index];
+    if (message?.role === 'user') break;
+    if (message?.role === 'tool' && message.metadata?.toolStop === 'approval-denied') {
+      return 'The user denied a nested tool approval and stopped script execution.';
+    }
+  }
+  return undefined;
 }
 
 /**

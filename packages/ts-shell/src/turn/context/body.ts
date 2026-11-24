@@ -32,6 +32,7 @@ export function prepareTurnBody(context: TurnBodyContext) {
     } : {}),
     ...(shape.supportsMidConvoEffort ? { supportsMidConvoEffort: true } : {}),
     declarationTarget: { provider: activeProvider, model: activeModel, endpoint, replayBinding },
+    accountTurnState: request.accountTurnAffinity?.read({ endpoint, baseUrl: request.provider.baseUrl, replayBinding }),
   }) ?? {};
   payload = endpointTurnBody(endpoint, {
     model: activeModel,

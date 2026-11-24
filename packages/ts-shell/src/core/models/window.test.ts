@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { CatalogProvider } from './catalog.js'
+import { BUILTIN_PROVIDERS, type CatalogProvider } from './catalog.js'
 import {
   DEFAULT_CONTEXT_WINDOW,
   configuredContextWindow,
@@ -80,6 +80,22 @@ it('does not borrow another provider rate when an unpriced model shares its id',
   expect(resolveModelCost(models, 'compatible', 'shared')).toBeUndefined();
   expect(resolveModelCost(models, 'priced', 'shared')).toEqual(rate);
   expect(resolveModelCost(models.slice(1), 'compatible', 'shared')).toEqual(rate);
+});
+
+it('uses the published standard rates only for the native Responses endpoint with an explicit default tier', () => {
+  const address = 'https://api.openai.com/v1';
+  const request = { endpoint: 'openai-responses', serviceTier: 'default' };
+  const standard = resolveModelCost(BUILTIN_PROVIDERS, 'openai', 'o4-mini', address, request);
+  expect(standard).toEqual({ promptPerMTok: 1.10, cacheReadPerMTok: 0.275, completionPerMTok: 4.40 });
+  expect(resolveModelCost(BUILTIN_PROVIDERS, 'openai', 'o4-mini', 'https://relay.invalid/v1', request)).toBeUndefined();
+  expect(resolveModelCost(BUILTIN_PROVIDERS, 'openai', 'o4-mini', address, { ...request, endpoint: 'openai-compatible' })).toBeUndefined();
+  for (const serviceTier of [undefined, 'auto', 'flex', 'priority']) {
+    expect(resolveModelCost(BUILTIN_PROVIDERS, 'openai', 'o4-mini', address, { ...request, serviceTier })).toBeUndefined();
+  }
+  expect(resolveModelCost(BUILTIN_PROVIDERS, 'openai', 'o4-mini')).toBeUndefined();
+  const configuredRate = { promptPerMTok: 2 };
+  const configured = [{ id: 'openai', baseUrl: address, models: [{ id: 'o4-mini', cost: configuredRate }] }];
+  expect(resolveModelCost(configured, 'openai', 'o4-mini', address, request)).toEqual(configuredRate);
 });
 
 const catalog: readonly CatalogProvider[] = [

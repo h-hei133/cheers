@@ -4,6 +4,7 @@ import { createStepFunction } from '../../turn/step.js';
 import type { SentRequest } from '../request/sentRequest.js';
 import type { StepRequest } from '../../turn/context/contract.js';
 import { createTurnContextPreparer } from '../../turn/context/prepare.js';
+import { BUILTIN_PROVIDERS } from '../../core/models/catalog.js';
 
 describe('captured request cache window', () => {
   it('uses only the serialized tier and leaves missing and disabled windows unknown', () => {
@@ -43,6 +44,33 @@ describe('captured request cache window', () => {
       model: { id: 'm', promptCache: { short: 300, long: 3600 } },
       payload: { system: [{ cache_control: { type: 'ephemeral', ttl: '1h' } }] } }))
       .toEqual({ retention: 'long', ttlMs: 3_600_000 });
+  });
+
+  it('captures the shortest serialized Converse checkpoint duration', () => {
+    const model = { id: 'm', promptCache: { short: 600, long: 3600 } };
+    const system = [{ text: 'prefix' }, { cachePoint: { type: 'default', ttl: '1h' } }];
+    expect(requestCacheWindow({ endpoint: 'bedrock-converse-stream', retention: 'long', model,
+      payload: { system } })).toEqual({ retention: 'long', ttlMs: 3_600_000 });
+    expect(requestCacheWindow({ endpoint: 'bedrock-converse-stream', retention: 'long', model,
+      payload: { system, toolConfig: { tools: [{ cachePoint: { type: 'default' } }] } } }))
+      .toEqual({ retention: 'short', ttlMs: 300_000 });
+    expect(requestCacheWindow({ endpoint: 'bedrock-converse-stream', model,
+      payload: { system: [{ text: 'prefix' }] } })).toEqual({ retention: 'none' });
+  });
+
+  it.each([
+    { provider: 'openai', model: 'o4-mini', address: 'https://api.openai.com/v1', endpoint: 'openai-responses' },
+    { provider: 'bedrock', model: 'amazon.nova-pro-v1:0', address: 'https://bedrock-runtime.us-east-1.amazonaws.com',
+      endpoint: 'bedrock-converse-stream' },
+  ])('captures the supported built-in short window for $model', async ({ provider, model, address, endpoint }) => {
+    const prepare = createTurnContextPreparer({ provider: { headers: {}, baseUrl: address, provider, model, endpoint },
+      workspaceRoot: process.cwd(), sessionId: 'builtin-cache-window', systemPrompt: 'Stable', tools: [],
+      catalog: BUILTIN_PROVIDERS, cacheRetention: 'long' }, { allowTools: false }, {
+      replayBinding: 'a'.repeat(64), streamAttempts: () => 0, effortAccepted: () => false, explicitEffort: false,
+    });
+    const captured = await prepare([{ role: 'user', content: 'Stable' }]);
+    expect(captured.cache).toEqual({ retention: 'short', ttlMs: 300_000 });
+    expect(captured.payload).not.toHaveProperty('prompt_cache_retention');
   });
 
   it.each([NaN, Infinity, -1, 0, Number.MAX_SAFE_INTEGER])('rejects invalid declared window %s', long => {

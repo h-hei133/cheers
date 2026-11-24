@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import type { ToolDefinition } from '../../../tools/types.js';
-import { createToolDiscovery, DISCOVERY_LOAD_TOOL, DISCOVERY_SEARCH_TOOL, PINNED_TOOL_NAMES } from './state.js';
+import { createToolDiscovery, DISCOVERED_TOOL_LIMIT, DISCOVERY_LOAD_TOOL, DISCOVERY_SEARCH_TOOL, PINNED_TOOL_NAMES } from './state.js';
 import { discoveryTools } from './tools.js';
 import { createCoreToolRegistry } from '../registry.js';
 
@@ -24,9 +24,22 @@ it('starts from pinned tools plus the discovery entry points', () => {
   expect(value.snapshot().has('browser')).toBe(false);
 });
 
+it('keeps the common structured tools available in the initial run schema', () => {
+  const value = createToolDiscovery({ catalog: createCoreToolRegistry() });
+  const initial = value.snapshot();
+
+  expect(PINNED_TOOL_NAMES).toContain('apply_patch');
+  expect(PINNED_TOOL_NAMES).toContain('task');
+  expect(PINNED_TOOL_NAMES).toContain('ask');
+  expect(PINNED_TOOL_NAMES).toContain('todo');
+  expect(['apply_patch', 'task', 'ask', 'todo'].every(name => initial.has(name))).toBe(true);
+});
+
 it('loads background taskWait advertised by bash on demand while keeping initial pinned surface compact', async () => {
   const value = createToolDiscovery({ catalog: createCoreToolRegistry() });
-  expect(PINNED_TOOL_NAMES).toEqual(['read', 'glob', 'grep', 'bash', 'edit', 'write']);
+  expect(PINNED_TOOL_NAMES).toEqual([
+    'read', 'glob', 'grep', 'bash', 'edit', 'write', 'apply_patch', 'task', 'ask', 'todo',
+  ]);
   expect(value.snapshot().get('bash')!.description).toContain('taskWait');
   expect(value.load(['taskWait']).loaded).toEqual(['taskWait']);
   const tools = value.snapshot();
@@ -78,6 +91,17 @@ it('bounds the loaded set and keeps pinned tools out of the budget', () => {
   expect(value.load(Array.from({ length: 40 }, (_, index) => `extra_${index}`)).loaded).toHaveLength(32);
   expect(value.load(['extra_32']).rejected).toEqual(['extra_32']);
   expect(value.load(['read']).loaded).toEqual(['read']);
+});
+
+it('replaces carried tools before refusing load capacity in the new turn', () => {
+  const retained = Array.from({ length: DISCOVERED_TOOL_LIMIT }, (_, index) => `extra_${index}`);
+  const tools = new Map([...retained, 'feature', 'new_tool'].map(name => [name, tool(name)]));
+  const discovery = createToolDiscovery({ catalog: tools, initial: ['feature'], retained });
+  expect(discovery.snapshot().size).toBe(DISCOVERED_TOOL_LIMIT + 1);
+  expect(discovery.load(['new_tool'])).toEqual({ loaded: ['new_tool'], rejected: [] });
+  expect(discovery.snapshot().has(retained[0]!)).toBe(false);
+  expect(discovery.snapshot().has('feature')).toBe(true);
+  expect(discovery.loadedNames()).toHaveLength(DISCOVERED_TOOL_LIMIT);
 });
 
 it('uses a stable generation for the same visible catalogue and a different one for a changed schema', () => {

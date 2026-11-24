@@ -84,6 +84,7 @@ export interface CacheWarmingInput {
   readonly cost?: ModelCostSchedule;
   /** Tokens in the prefix that would be kept warm. */
   readonly promptTokens: number;
+  readonly refreshOutputTokens?: number;
   readonly phase: WarmingPhase;
 }
 
@@ -139,7 +140,7 @@ export function evaluateCacheWarming(input: CacheWarmingInput): CacheWarmingDeci
       : pricePerMillion(cost.promptPerMTok, tokens);
   const warmCost =
     pricePerMillion(cost.cacheReadPerMTok ?? cost.promptPerMTok, tokens) +
-    pricePerMillion(cost.completionPerMTok, 1);
+    pricePerMillion(cost.completionPerMTok, input.refreshOutputTokens ?? 1);
   const missCost = Math.max(0, cacheMissCost - cacheHitCost);
   const expectedSavings = continuationProbability * missCost - warmCost;
   // Both sides zero means the model is priced at nothing, which is not a

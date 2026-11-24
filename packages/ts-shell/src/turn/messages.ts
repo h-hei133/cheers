@@ -2,6 +2,7 @@ import { microcompactMessages } from '../core/query/microCompact.js';
 import type { AgentMessage } from '../core/agent/state.js';
 import { toChatMessages, type ChatMessage } from './prompt.js';
 import type { ProviderMessage } from '../model-adapters/message.js';
+import { replayEnvironment } from './opening.js';
 
 /** Every endpoint accepts system text through the request's system field. */
 export function providerSystemPrompt(base: string, messages: readonly ProviderMessage[]): string {
@@ -34,7 +35,8 @@ export function outgoingProjection(
     ? { pruneToolText: pruneOrOptions }
     : pruneOrOptions;
   const pruneToolText = opts.pruneToolText ?? false;
-  const converted = toChatMessages(messages);
+  const framed = replayEnvironment(messages);
+  const converted = toChatMessages(framed);
   const { messages: compacted, prunedCount, savedChars } = microcompactMessages(converted, {
     pruneToolText,
     ...(opts.keepRecentTurns !== undefined ? { keepRecentTurns: opts.keepRecentTurns } : {}),
@@ -61,8 +63,9 @@ export function outgoingProjection(
     indexAligned: !opts.transformMessages && converted.length === messages.length && result.length === compacted.length
       && converted.every((message, index) => message.role === messages[index]!.role
         && message.tool_call_id === messages[index]!.tool_call_id
-        && message.content === messages[index]!.content),
-    sourceAligned: !opts.transformMessages && converted.length === messages.length && prunedCount === 0 && result.length === compacted.length,
+        && message.content === framed[index]!.content),
+    sourceAligned: !opts.transformMessages && framed === messages && converted.length === messages.length
+      && prunedCount === 0 && result.length === compacted.length,
   };
 }
 

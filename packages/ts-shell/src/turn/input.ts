@@ -4,9 +4,11 @@ import { imagesOf, messageToText, type ImageContent } from '../model-adapters/mu
 
 export type InputDisposition = 'steer' | 'followUp';
 export type InputFormat = (text: string, images: readonly ImageContent[]) => string;
+export type RecallInput = (text: string, images: readonly ImageContent[]) => string | undefined;
 
 export interface QueuedInputOptions {
   readonly images?: readonly ImageContent[];
+  readonly source?: 'interactive' | 'rpc' | 'sdk';
   readonly prepare?: (text: string, images: readonly ImageContent[], signal: AbortSignal) => Promise<PreparedQueuedInput>;
 }
 
@@ -19,7 +21,7 @@ type Preparation = { readonly status: 'rejected' } | PreparedQueuedInput;
 /** The consumer holds the exact queue head until its callbacks and admission have settled. */
 export function turnInput(signal: AbortSignal, report: (status: 'handled' | 'rejected', lane: InputDisposition) => void,
   publish: (message: AgentMessage) => void) {
-  const preparation = new WeakMap<AgentMessage, NonNullable<QueuedInputOptions['prepare']>>();
+  const inputs = new WeakMap<AgentMessage, QueuedInputOptions>();
   const decisions = new WeakMap<AgentMessage, Preparation>();
   const published = new WeakSet<AgentMessage>();
   const reservations = new WeakMap<AgentMessage, { readonly queue: MessageQueue; readonly entry: PendingQueueEntry<AgentMessage>;
@@ -29,7 +31,7 @@ export function turnInput(signal: AbortSignal, report: (status: 'handled' | 'rej
 
   const message = (text: string, options?: QueuedInputOptions): AgentMessage => {
     const value: AgentMessage = { role: 'user', content: options?.images?.length ? [{ type: 'text', text }, ...options.images] : text };
-    if (options?.prepare) preparation.set(value, options.prepare);
+    if (options) inputs.set(value, options);
     return value;
   };
   const changed = () => {
@@ -42,13 +44,24 @@ export function turnInput(signal: AbortSignal, report: (status: 'handled' | 'rej
     ];
     const queue = inputQueueControl<AgentMessage>(owners.map(owner => ({ ...owner,
       text: value => messageToText(value.content),
-      replace: (value, text) => message(text, { images: imagesOf(value.content), prepare: preparation.get(value) }),
+      replace: (value, text) => message(text, { ...inputs.get(value), images: imagesOf(value.content) }),
     })));
     return {
       entries: queue.entries,
       edit: (id: string, text: string) => { const result = queue.edit(id, text); changed(); return result; },
       cancel: (id: string) => { const result = queue.cancel(id); changed(); return result; },
       move: (id: string, beforeId?: string) => { const result = queue.move(id, beforeId); changed(); return result; },
+      recallFollowUp: (format: RecallInput) => {
+        const entry = followUp.entries().at(-1);
+        // An input hook may already be handling this entry even while it is
+        // held at the queue head. Keep that lifecycle with its original run.
+        if (!entry || active?.entry.id === entry.id || decisions.has(entry.value)
+          || inputs.get(entry.value)?.source !== 'interactive') return;
+        const draft = format(messageToText(entry.value.content), imagesOf(entry.value.content));
+        if (draft === undefined || !followUp.contains(entry) || !followUp.cancel(entry.id)) return;
+        changed();
+        return draft;
+      },
       clear: (format: InputFormat = text => text) => {
         const pending = owners.flatMap(owner => owner.queue.entries());
         for (const owner of owners) owner.queue.clear();
@@ -95,7 +108,7 @@ export function turnInput(signal: AbortSignal, report: (status: 'handled' | 'rej
       let wait: Promise<void> | undefined;
       for (const entry of queue.entries()) {
         if (!initial.has(entry.id)) break;
-        const reduce = preparation.get(entry.value), result = decisions.get(entry.value);
+        const reduce = inputs.get(entry.value)?.prepare, result = decisions.get(entry.value);
         if (reduce && !result) { wait = prepare(queue, entry, reduce); break; }
         chosen.push(entry);
         if (queue.mode === 'one-at-a-time' && (!result || result.status === 'continue' && admitted(result.check))) break;

@@ -110,6 +110,10 @@ export interface StepTarget {
   readonly provider: ProviderTarget;
   readonly fetchImpl?: typeof fetch;
   readonly modelTransport?: ModelTransport;
+  /** Native transports already enforce their configured response-body deadline. */
+  readonly transportOwnsBodyDeadline?: true;
+  /** Captured response body idle limit for transports without a native watchdog. */
+  readonly bodyIdleTimeoutMs?: number;
   /** Explicit output control; absent uses the physical catalogue entry. */
   readonly maxOutputTokens?: number;
   /** Resolved window override; absent uses the physical catalogue entry. */
@@ -120,6 +124,7 @@ export interface StepTarget {
 }
 
 export interface StepRequest extends StepTarget {
+  readonly accountTurnAffinity?: import('../../provider/endpoints/responses/account.js').AccountTurnAffinity;
   readonly recordAuxiliaryUsage?: (usage: SessionUsageRecord) => void;
   readonly requestPolicy?: RequestPolicy;
   readonly thinkingEffort?: ThinkingPreference;

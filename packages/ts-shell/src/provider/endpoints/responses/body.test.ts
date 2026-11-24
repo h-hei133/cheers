@@ -35,7 +35,7 @@ describe('Responses requests', () => {
     expect(body).not.toHaveProperty('messages'); expect(body).not.toHaveProperty('temperature'); expect(body).not.toHaveProperty('max_completion_tokens');
     expect(body.tools).not.toEqual(turn.tools);
     expect(endpointTurnBody('openai-responses', { ...turn, allowTools: false })).not.toHaveProperty('tools');
-    expect(endpointShape('openai-responses').refreshBody!(body, {})).toEqual({ ...body, max_output_tokens: 1 });
+    expect(endpointShape('openai-responses').refreshBody!(body, {})).toEqual({ ...body, max_output_tokens: 16 });
   });
 
   it('pairs simple JSON requests and preserves multimodal tool result call identity', () => {

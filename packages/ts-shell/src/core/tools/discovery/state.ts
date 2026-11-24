@@ -10,10 +10,12 @@ import { rankToolsByBm25 } from './ranker.js';
  * mechanism: a loaded tool still goes through the same schema validation,
  * permission gate and sandbox as a pinned one.
  */
-export const PINNED_TOOL_NAMES = ['read', 'glob', 'grep', 'bash', 'edit', 'write'] as const;
+export const PINNED_TOOL_NAMES = [
+  'read', 'glob', 'grep', 'bash', 'edit', 'write', 'apply_patch', 'task', 'ask', 'todo',
+] as const;
 export const DISCOVERY_SEARCH_TOOL = 'tool_search';
 export const DISCOVERY_LOAD_TOOL = 'tool_load';
-const LOADED_LIMIT = 32;
+export const DISCOVERED_TOOL_LIMIT = 32;
 
 interface CatalogEntry { readonly name: string; readonly tool: ToolDefinition; readonly fingerprint: string }
 
@@ -28,6 +30,7 @@ export interface ToolDiscovery {
   readonly generation: string;
   readonly catalog: ReadonlyMap<string, ToolDefinition>;
   subscribe(listener: () => void): () => void;
+  loadedNames(): readonly string[];
   snapshot(includeDeferred?: boolean): ReadonlyMap<string, ToolDefinition>;
   search(query: string, limit?: number): readonly DiscoveryMatch[];
   load(names: readonly string[]): { readonly loaded: readonly string[]; readonly rejected: readonly string[] };
@@ -45,9 +48,13 @@ export function createToolDiscovery(input: {
   readonly catalog: ReadonlyMap<string, ToolDefinition>;
   readonly pinned?: readonly string[];
   readonly initial?: readonly string[];
+  readonly retained?: readonly string[];
 }): ToolDiscovery {
   const pinned = new Set(input.pinned ?? PINNED_TOOL_NAMES);
-  const loaded = new Set((input.initial ?? []).filter(name => input.catalog.has(name)));
+  const initial = new Set(input.initial?.filter(name => input.catalog.has(name)));
+  const loaded = new Set<string>();
+  const retained = new Set([...new Set(input.retained)].filter(name => input.catalog.has(name) && !pinned.has(name)
+    && !initial.has(name)).slice(0, DISCOVERED_TOOL_LIMIT));
   const listeners = new Set<() => void>();
   let meta: readonly ToolDefinition[] = [];
   const notify = (): void => {
@@ -106,7 +113,7 @@ export function createToolDiscovery(input: {
     generation();
     const selected = new Map<string, ToolDefinition>();
     for (const [name, tool] of input.catalog) {
-      if (includeDeferred || pinned.has(name) || loaded.has(name)) selected.set(name, guard(tool));
+      if (includeDeferred || pinned.has(name) || initial.has(name) || loaded.has(name) || retained.has(name)) selected.set(name, guard(tool));
     }
     for (const tool of meta) selected.set(tool.name, guard(tool, cachedEntries));
     return selected;
@@ -119,6 +126,7 @@ export function createToolDiscovery(input: {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+    loadedNames: () => [...loaded, ...retained].filter(name => !pinned.has(name) && input.catalog.has(name)),
     snapshot,
     search: (query, limit = 8) => {
       if (!query.trim()) return [];
@@ -128,20 +136,27 @@ export function createToolDiscovery(input: {
       return rankToolsByBm25(query, searchable, bounded).map(tool => ({
         name: tool.name,
         summary: tool.description.split('\n')[0]!.slice(0, 240),
-        loaded: loaded.has(tool.name),
+        loaded: initial.has(tool.name) || loaded.has(tool.name) || retained.has(tool.name),
         pinned: pinned.has(tool.name),
       }));
     },
     load: names => {
       const accepted: string[] = []; const rejected: string[] = [];
-      const before = [...loaded].sort().join("\0");
+      const before = [...loaded, ...retained].sort().join("\0");
       for (const raw of names) {
         const name = String(raw).trim();
         if (!name || name === DISCOVERY_SEARCH_TOOL || name === DISCOVERY_LOAD_TOOL || !input.catalog.has(name)) { rejected.push(name || '(empty)'); continue; }
-        if (!pinned.has(name) && !loaded.has(name) && loaded.size >= LOADED_LIMIT) { rejected.push(name); continue; }
-        loaded.add(name); accepted.push(name);
+        if (pinned.has(name) || initial.has(name)) { accepted.push(name); continue; }
+        if (!loaded.has(name) && loaded.size >= DISCOVERED_TOOL_LIMIT) { rejected.push(name); continue; }
+        loaded.add(name);
+        retained.delete(name);
+        if (loaded.size + retained.size > DISCOVERED_TOOL_LIMIT) {
+          const oldest = retained.values().next().value;
+          if (oldest !== undefined) retained.delete(oldest);
+        }
+        accepted.push(name);
       }
-      if ([...loaded].sort().join("\0") !== before) notify();
+      if ([...loaded, ...retained].sort().join("\0") !== before) notify();
       return { loaded: accepted, rejected };
     },
     attachMeta: tools => {

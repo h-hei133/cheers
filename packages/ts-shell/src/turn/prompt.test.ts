@@ -117,22 +117,20 @@ describe("buildSystemPrompt", () => {
 
   it("does not advertise tools when the model cannot call them", () => {
     const prompt = buildSystemPrompt('build', {
-      toolNames: ['read', 'write'],
       instructions: '<project_instructions>rule one</project_instructions>',
     }, false);
 
     expect(prompt).toContain('No tools are available');
     expect(prompt).toContain('rule one');
-    expect(prompt).not.toContain('equipped with real tools');
+    expect(prompt).not.toContain('Use the tools declared');
     expect(prompt).not.toContain('`read`');
     expect(prompt).not.toContain('`web_search`');
   });
-  it("filters tool usage rules to the active toolNames when supplied", () => {
-    const prompt = buildSystemPrompt('build', { toolNames: ['read', 'edit'] });
-    expect(prompt).toContain('`read`');
-    expect(prompt).toContain('`edit`');
-    expect(prompt).not.toContain('`web_search`');
-    expect(prompt).not.toContain('`bash`');
-    expect(prompt).not.toContain('`glob`');
+  it("takes its tool inventory from the current request declarations", () => {
+    const prompt = buildSystemPrompt('plan');
+    expect(prompt).toContain('Use the tools declared for the current request');
+    expect(prompt).toContain('Use read-only tools');
+    expect(prompt).toContain('immediately respect the decision');
+    expect(prompt).not.toMatch(/`(?:read|edit|web_search|bash|glob)`/);
   });
 });

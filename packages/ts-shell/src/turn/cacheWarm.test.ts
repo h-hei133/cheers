@@ -100,17 +100,34 @@ describe("the cache warming runner", () => {
   });
 
   it("sends nothing when the model publishes no prices", async () => {
-    // The saving cannot be computed, so the request is not made on a guess.
-    const refresh = vi.fn(async () => {});
-    const runner = createCacheWarmingRunner({
-      mode: "streaming",
-      refresh,
-    });
+    vi.useFakeTimers();
+    try {
+      const refresh = vi.fn(async () => {});
+      const onDecision = vi.fn();
+      const runner = createCacheWarmingRunner({ mode: "streaming", refresh, onDecision });
+      runner.noteRequest(200_000, sent);
+      await vi.advanceTimersByTimeAsync(270_000);
+      expect(refresh).not.toHaveBeenCalled();
+      expect(onDecision).toHaveBeenCalledWith(expect.objectContaining({ action: 'stop' }), expect.stringContaining('no prices'));
+      expect(runner.status().stopReason).toContain('no prices');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
-    runner.noteRequest(200_000, sent);
-
-    expect(refresh).not.toHaveBeenCalled();
-    runner.stop();
+  it('applies the Responses refresh output cap when deciding whether to send', async () => {
+    vi.useFakeTimers();
+    try {
+      const refresh = vi.fn(async () => {});
+      const runner = createCacheWarmingRunner({ mode: 'streaming', refresh,
+        cost: { promptPerMTok: 1, completionPerMTok: 50, cacheReadPerMTok: 0.2 } });
+      runner.noteRequest(84_000, { ...sent, endpoint: 'openai-responses' });
+      await vi.advanceTimersByTimeAsync(270_000);
+      expect(refresh).not.toHaveBeenCalled();
+      expect(runner.status().stopReason).toContain('below the threshold');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("schedules a refresh a little before the window lapses", async () => {

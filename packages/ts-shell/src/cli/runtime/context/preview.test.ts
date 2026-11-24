@@ -3,6 +3,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { previewContext } from './preview.js';
+import { discoveryLoadout } from '../discovery.js';
 import { contextEstimateFor } from './status.js';
 import { projectSessionFileLayout } from '../../../session/store/sessionFileLayout.js';
 import { writeSessionMetadataRecord } from '../../../session/store/sessionStore.js';
@@ -40,7 +41,7 @@ import { foregroundTools } from '../prompt.js';
 import { ShellSessionRuntime } from '../../../core/shell/sessionRuntime.js';
 import * as endpoints from '../../../provider/endpoints/index.js';
 import { toolSchemas } from '../../../turn/tools.js';
-import { openingMessage } from '../../../turn/opening.js';
+import { openingMessage, replayEnvironment, requestEnvironment } from '../../../turn/opening.js';
 import { readPromptPreview } from '../../../session/context/preview.js';
 import { transitionGoal } from '../../../planning/goal/state.js';
 import { estimateWirePrompt } from '../../../context/request/wire.js';
@@ -133,6 +134,28 @@ it('estimates an empty startup through the actual tool projection without provid
   expect(result.estimate.identity.endpointId).toMatch(/^[a-f0-9]{64}$/);
   expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
   expect(files.map(target => fs.readFileSync(target))).toEqual(before); expect(fs.existsSync(layout.stateLockPath)).toBe(false);
+});
+
+it('projects only retained local discovery for the current request scope', async () => {
+  const { load, context, gateway } = fixture();
+  const resolve = context.resolveConfigTarget;
+  const selected = resolve!(context.runtimeConfig, context.session.id)!;
+  const loadout = discoveryLoadout(context, selected, 'ask');
+  const wire = vi.spyOn(endpoints, 'endpointTurnBody');
+  const before = await load('Continue');
+  loadout.write(['web_search', 'mcp__fixture__read', 'codemode']);
+  expect(loadout.read()).toEqual(['web_search']);
+  expect(discoveryLoadout(context, { ...selected, model: 'different' }, 'ask').read()).toEqual([]);
+  expect(discoveryLoadout(context, selected, 'allow-all').read()).toEqual([]);
+  expect(() => before.verify()).toThrow();
+  const after = await load('Continue');
+  after.verify();
+  expect(wire.mock.calls.at(-1)![1].tools.map(tool => tool.function.name)).toContain('web_search');
+  expect(gateway.snapshot).not.toHaveBeenCalled();
+  context.workspaceRevision = 1;
+  expect(discoveryLoadout(context, selected, 'ask').read()).toEqual([]);
+  loadout.write(['browser']);
+  expect(discoveryLoadout(context, selected, 'ask').read()).toEqual([]);
 });
 
 it('projects only the captured active goal for the current session and workspace', async () => {
@@ -267,9 +290,10 @@ it('corrects a measured tool history anchor when the live wire projection microc
     recordSessionUsage(session.id, { promptTokens: 30_000, promptMessageCount: sent.length,
       promptIdentity: first.estimate.identity,
       attribution: captureUsageAttribution({ provider: target.provider, model: target.model, baseUrl: target.baseUrl }) });
-    const opening = sent.at(-1)!;
-    if (typeof opening.content !== 'string') throw new Error('Expected a text opening.');
-    append({ ...opening, content: opening.content });
+    const environment = requestEnvironment({ workspaceRoot: cwd, permissionScope: 'ask' });
+    append(openingMessage({ workspaceRoot: cwd, permissionScope: 'ask', prompt: 'question' }, {
+      role: 'user', content: 'question', metadata: { requestEnvironment: environment },
+    }));
     first.dispose?.();
     const next = await load('continue');
     expect(next.estimate.source).toBe('calibrated');
@@ -985,9 +1009,11 @@ it.each([
     skillOptions: context.skillOptions, agentMode: 'build', featureTools: foregroundTools(context, tools) });
   expect(preview.estimate.identity.schemaDigest).toBe(requestIdentity(actual.currentOverhead()).schemaDigest);
   expect(preview.estimate.identity.systemDigest).toBe(requestIdentity(actual.currentOverhead()).systemDigest);
-  const actualMessages = [openingMessage({ workspaceRoot: cwd, permissionScope: 'ask', prompt: expectedPrompt,
-    continuityContext: capturedSession.continuityContextFor(expectedPrompt) })];
-  const actualBody = endpoints.endpointTurnBody(endpoint, { ...wireInput, messages: actualMessages,
+  const actualEnvironment = { workspaceRoot: cwd, permissionScope: 'ask' as const };
+  const actualMessages = [openingMessage({ ...actualEnvironment, prompt: expectedPrompt,
+    continuityContext: capturedSession.continuityContextFor(expectedPrompt) },
+  { role: 'user', content: expectedPrompt, metadata: { requestEnvironment: requestEnvironment(actualEnvironment) } })];
+  const actualBody = endpoints.endpointTurnBody(endpoint, { ...wireInput, messages: replayEnvironment(actualMessages),
     systemPrompt: actual.currentOverhead().systemPrompt!, tools: toolSchemas(actual.currentTools()) });
   expect(preview.estimate.tokens).toBe(estimateWirePrompt(actualBody, endpoints.endpointShape(endpoint).contextFields));
   if (input.includes('/skill:')) expect(admitted.request.methods?.skills.map(skill => skill.name)).toEqual(['one', 'two']);
@@ -1309,7 +1335,7 @@ it('omits tool schemas for a model that cannot call tools', async () => {
   expect(body.tools).toBeUndefined();
   expect(body.tool_choice).toBeUndefined();
   const messages = body.messages as Array<{ readonly role: string; readonly content?: string }>;
-  expect(messages[0]?.content).not.toContain('equipped with real tools');
+    expect(messages[0]?.content).not.toContain('Use the tools declared');
   expect(messages[0]?.content).not.toContain('`read`');
   expect(JSON.stringify(messages)).not.toContain('You have reached the limit of steps');
   expect(result.estimate.identity.schemaDigest).toBe(requestIdentity({ tools: [] }).schemaDigest);
@@ -1504,13 +1530,14 @@ it('keeps preview and dispatch on the session-affine account-pool member', async
       ...captureThinkingPreference(cwd, resolution.thinkingEffort),
     }, prepared.currentTools(), prepared.promptContext);
     let acceptedPromptIdentity: unknown;
+    const openingEnvironment = { workspaceRoot: cwd, workspaceRoots: session.workspaceRoots, permissionScope: 'ask' as const };
+    const storedPrompt = { role: 'user' as const, content: 'question',
+      metadata: { requestEnvironment: requestEnvironment(openingEnvironment) } };
     const result = await step([openingMessage({
-      workspaceRoot: cwd,
-      workspaceRoots: session.workspaceRoots,
-      permissionScope: 'ask',
+      ...openingEnvironment,
       continuityContext: captured.continuityContextFor('question'),
       prompt: injected.prompt,
-    })], signal, {}, { allowTools: true, onRequestSent: sent => { acceptedPromptIdentity = sent.promptIdentity; } });
+    }, storedPrompt)], signal, {}, { allowTools: true, onRequestSent: sent => { acceptedPromptIdentity = sent.promptIdentity; } });
 
     expect(result.stopReason).toBe('stop');
     expect(requests).toEqual([previewBody]);
@@ -1621,7 +1648,9 @@ it.each([[], ['read'], ['web_fetch']].map(allowedTools => ({ allowedTools })))(
     tools: toolSchemas(prepared.currentTools()), catalog: context.configuration.current.catalog,
     temperature: config.temperature, topP: config.topP, maxOutputTokens: configuredOutputLimit(config, endpoints.DEFAULT_ENDPOINT_KIND), fetchImpl });
   try {
-    await step([openingMessage({ workspaceRoot: cwd, prompt, permissionScope: 'ask' })], new AbortController().signal, {},
+    const environment = { workspaceRoot: cwd, permissionScope: 'ask' as const };
+    await step([openingMessage({ ...environment, prompt }, { role: 'user', content: prompt,
+      metadata: { requestEnvironment: requestEnvironment(environment) } })], new AbortController().signal, {},
       { allowTools: true, onRequestSent: sent => { accepted = sent.context; } });
     expect(fetchImpl).toHaveBeenCalledOnce();
     expect(transmitted).toEqual(previewBody);
@@ -1679,8 +1708,8 @@ it.each(previewDispatchCases)(
     };
     const baseStep = createStepFunction({ provider: { ...target, headers: {} }, workspaceRoot: cwd, sessionId: session.id,
       systemPrompt: prepared.system.text, systemPromptSources: prepared.system.sources,
-      systemPromptFor: (requestAgentMode, toolNames, toolsAvailable = true) =>
-        buildSystemPrompt(requestAgentMode ?? agentMode, { ...prepared.promptContext, toolNames }, toolsAvailable),
+      systemPromptFor: (requestAgentMode, _toolNames, toolsAvailable = true) =>
+        buildSystemPrompt(requestAgentMode ?? agentMode, prepared.promptContext, toolsAvailable),
       tools: toolSchemas(prepared.tools), toolSnapshot: () => toolSchemas(prepared.currentTools()),
       catalog: context.configuration.current.catalog, temperature: config.temperature, topP: config.topP,
       maxOutputTokens: configuredOutputLimit(config, endpoints.DEFAULT_ENDPOINT_KIND), fetchImpl });
@@ -1694,7 +1723,10 @@ it.each(previewDispatchCases)(
       return result;
     };
     try {
+      const storedPrompt = { role: 'user' as const, content: prompt,
+        metadata: { requestEnvironment: requestEnvironment({ workspaceRoot: cwd, permissionScope: 'ask' }) } };
       const run = runTurn({ sessionId: session.id, workspaceRoot: cwd, history: [], prompt, agentMode, permissionScope: 'ask',
+        storedPrompt,
         continuityContext: captured.continuityContextFor(prompt),
         step, tools: new Map([['read', readTool]]), maxSteps: maxTurns, onMessage: vi.fn(), signal: new AbortController().signal,
         hooks: { dispatch: async () => ({ decision: 'allow' }) } as unknown as HookDispatcher });

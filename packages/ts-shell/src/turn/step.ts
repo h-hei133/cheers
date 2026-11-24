@@ -23,6 +23,8 @@ import { requestReplayBinding } from '../provider/request/replay.js';
 import { classifyProviderFailure, type ProviderFailureClass } from "../provider/registry/provider.js";
 import { IncompleteStreamError, ProviderResponseError } from '../provider/response/error.js';
 import { providerRequestError } from '../provider/request/error.js';
+import { resolveProviderTransportConfig } from '../provider/request/fetch.js';
+import { withBodyIdleTimeout } from '../provider/response/idle.js';
 import { PARSE_ERROR_KEY } from "./tools.js";
 import { requestContext } from '../context/request/projection.js';
 import { decodePromptMeasurement } from '../context/request/measurement.js';
@@ -315,6 +317,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
             },
           );
           if (attemptResponse.ok) {
+            request.accountTurnAffinity?.capture({ endpoint, baseUrl: target.provider.baseUrl,
+              replayBinding: prepared.replayBinding, headers: attemptResponse.headers });
             requestAcceptedAt = Date.now();
             acceptedResponse = true;
             traceLogger.info("provider request accepted", { requestId, endpoint, provider: activeProvider, model: activeModel, attempt });
@@ -438,7 +442,10 @@ export function createStepFunction(request: StepRequest): StepFunction {
       const preview = currentAllowTools && prepared.tools.length > 0 && listener.onToolPreview && isEventStream(response)
         ? toolPreview(prepared.tools, listener.onToolPreview, signal, target.isCurrent) : undefined;
       try {
-        const completion = await readCompletion(response, watched, endpoint, preview?.observe);
+        const completion = await readCompletion(response, watched, endpoint, preview?.observe,
+          target.transportOwnsBodyDeadline ? undefined : {
+            timeoutMs: target.bodyIdleTimeoutMs ?? resolveProviderTransportConfig(process.env).bodyTimeoutMs, signal,
+          });
         traceLogger.info("provider request completed", { requestId, endpoint, provider: activeProvider, model: activeModel, attempt: streamAttempts, usage: Boolean(completion.usage), durationMs: requestAcceptedAt === undefined ? undefined : Math.max(0, Date.now() - requestAcceptedAt) });
         const usage = completion.usage;
         const choice = completion.choices?.[0];
@@ -530,6 +537,7 @@ async function readCompletion(
   listener: StepListener,
   endpoint?: EndpointKind,
   observeToolArguments?: ObserveToolArguments,
+  idle?: { readonly timeoutMs: number; readonly signal?: AbortSignal },
 ): Promise<CompletionShape> {
   if (!isEventStream(response)) {
     if (endpointShape(endpoint).simpleResponse === 'stream') {
@@ -543,7 +551,8 @@ async function readCompletion(
     const read = endpointShape(endpoint).readBody(await response.json());
     return read as CompletionShape;
   }
-  const stream = endpointShape(endpoint).readStream(response.body!, observeToolArguments);
+  const body = response.body!;
+  const stream = endpointShape(endpoint).readStream(idle ? withBodyIdleTimeout(body, idle.timeoutMs, idle.signal) : body, observeToolArguments);
   let streamed = "";
   try {
   for (;;) {

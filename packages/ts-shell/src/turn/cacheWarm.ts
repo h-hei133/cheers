@@ -1,6 +1,7 @@
 import type { ProviderUsage } from "./completion.js";
 import {
   cacheWarmingDelayMs,
+  cacheWarmingStopReason,
   evaluateCacheWarming,
   resolveCacheWarmingMode,
   type CacheWarmingDecision,
@@ -8,6 +9,7 @@ import {
 } from "../core/models/cacheEconomics.js";
 import { captureCostSchedule, type ModelCostSchedule } from '../core/models/pricing.js';
 import type { SentRequest } from "../provider/request/sentRequest.js";
+import { endpointShape } from '../provider/endpoints/index.js';
 import { ModelAdmissionError } from '../core/agent/request/model.js';
 import { InputLimitError } from '../provider/request/input.js';
 import { freezeDeep } from '../core/values/freeze.js';
@@ -175,14 +177,17 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
     const decision = evaluateCacheWarming({
       ...(cost ? { cost } : {}),
       promptTokens: latestTokens,
+      refreshOutputTokens: endpointShape(lastSent?.endpoint).refreshOutputTokens,
       phase,
     });
-    options.onDecision?.(decision);
+    const reason = cacheWarmingStopReason(decision);
+    options.onDecision?.(decision, reason);
     if (!current(expectedGeneration)) return;
     if (now() > deadline || now() - started > ageLimit()) { clear(); return; }
     if (decision.action !== "warm") {
       // Declined on economics. Nothing else will change that for this prefix, so
       // there is no point staying armed.
+      stopReason = reason;
       clear();
       return;
     }
@@ -255,6 +260,7 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
       if (stopped || mode === "off") return;
       const expectedGeneration = clear();
       if (stopped || generation !== expectedGeneration) return;
+      stopReason = undefined;
       lastSent = undefined; refreshedAt = undefined;
       if (!Number.isFinite(promptTokens) || promptTokens <= 0) return;
       const captured = freezeDeep(structuredClone(sent));

@@ -66,6 +66,13 @@ export function pendingTurnInput(): PendingTurnInput {
       cancel: id => (live?.queue ?? buffered).cancel(id), move: (id, beforeId) => (live?.queue ?? buffered).move(id, beforeId) },
     pending: () =>
       live?.pending() ?? { steering: steering.entries().map(entry => entry.value.text), followUps: followUps.entries().map(entry => entry.value.text) },
+    recallFollowUp: format => {
+      if (live) return live.recallFollowUp?.(format);
+      const entry = followUps.entries().at(-1);
+      if (!entry || entry.value.options?.source !== 'interactive') return;
+      const draft = format(entry.value.text, entry.value.options.images ?? []);
+      return draft !== undefined && followUps.contains(entry) && followUps.cancel(entry.id) ? draft : undefined;
+    },
     clearQueue: (format) => {
       // Emptied as it is read: the interrupt path hands this text back to the
       // editor, and a second read must not hand it over twice.

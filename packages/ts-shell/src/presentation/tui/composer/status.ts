@@ -3,7 +3,7 @@ import { renderStatusItem, type StatusFacts, type StatusItemId } from "../chrome
 import { truncateToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 
-const RIGHT_ITEMS = new Set<StatusItemId>(["context", "session-tokens", "cost", "turns", "queued", "peers"]);
+const RIGHT_ITEMS = new Set<StatusItemId>(["context", "cache", "session-tokens", "cost", "turns", "queued", "peers"]);
 
 /** Keep the first configured facts as width pressure removes later segments. */
 function fit(parts: readonly string[], width: number): string {

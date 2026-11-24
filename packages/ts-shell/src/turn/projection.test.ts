@@ -47,6 +47,26 @@ it("does not report a completed turn after the newest tool failed", () => {
   });
 });
 
+it('preserves a bare nested approval denial as the terminal run outcome', () => {
+  expect(concludeRun([
+    { role: 'user', content: 'inspect safely' },
+    { role: 'assistant', content: '', tool_calls: [{ id: 'script', type: 'function', function: { name: 'codemode', arguments: '{}' } }] },
+    { role: 'tool', tool_call_id: 'script', content: 'Script failed', metadata: { toolStop: 'approval-denied' } },
+  ], 'inspect safely', 'sess_script_stop', 1)).toMatchObject({
+    kind: 'completed', completed: { result: {
+      status: 'stopped_error', terminalClassification: 'stopped',
+      stopReason: 'The user denied a nested tool approval and stopped script execution.',
+    } },
+  });
+  expect(concludeRun([
+    { role: 'user', content: 'continue after an explained denial' },
+    { role: 'tool', tool_call_id: 'script', content: 'denied', metadata: { nestedCalls: { complete: true } } },
+    { role: 'assistant', content: 'I will use the permitted alternative.' },
+  ], 'continue after an explained denial', 'sess_script_feedback', 1)).toMatchObject({
+    completed: { result: { status: 'completed' } },
+  });
+});
+
 it("does not let an older failure override a newer successful tool", () => {
   const outcome = concludeRun([
     { role: "user", content: "recover" },

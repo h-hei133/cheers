@@ -32,6 +32,7 @@ import { captureStepTarget, resolveStepTarget } from './target.js';
 import { prepareModelRoute, type PreparedRoute } from './route.js';
 import { requestReplayBinding } from '../../provider/request/replay.js';
 import { requestCacheWindow } from '../../provider/cache/window.js';
+import { resolveModelCost } from '../../core/models/window.js';
 import type { PreparedTurnContext, StepOptions, StepRequest, StepTarget } from './contract.js';
 
 const CAPTURE_LIMITS = { bytes: 64 * 1024 * 1024, nodes: 250_000, depth: 48 } as const;
@@ -173,7 +174,8 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
     const output = protocol.outputControl === 'provider' ? undefined : target.maxOutputTokens ?? shape.maxOutputCeiling;
     const modelEntry = catalogModel(request.catalog ?? [], activeProvider, activeModel, catalogAddress);
     const usageAttribution = captureUsageAttribution({ provider: activeProvider, model: activeModel,
-      baseUrl: target.provider.baseUrl, rates: modelEntry?.cost });
+      baseUrl: target.provider.baseUrl, rates: resolveModelCost(request.catalog ?? [], activeProvider, activeModel, catalogAddress,
+        { endpoint, serviceTier: target.provider.serviceTier }) });
     const usageInput = protocol.usageInput;
     const projectionOptions = {
       ...request.projection,

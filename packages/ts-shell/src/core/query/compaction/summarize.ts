@@ -23,6 +23,9 @@ import { readCompletion } from '../../../provider/response/read.js';
 import { createHash } from 'node:crypto';
 import { snapshotData } from '../../values/data.js';
 import { assertRequestInput, requestInputLimits } from '../../../provider/request/input.js';
+import { formatContextCheckpoint } from '../../../session/compaction/checkpoint.js';
+import { nativeCacheAddress } from '../../models/protocol.js';
+import type { ToolSchema } from '../../../turn/tools.js';
 
 /**
  * One summarization request.
@@ -152,10 +155,12 @@ export interface CompactionRequest {
    * prompt keeps the choice of prompt and the shape of the request together.
    */
   readonly previousSummary?: string;
+  /** The current physical turn's admitted instruction and schema prefix. */
+  readonly reusePrefix?: { readonly systemPrompt: string; readonly tools: readonly ToolSchema[] };
 }
 
 /** Pure preflight uses the same complete messages as the eventual summary send. */
-export function prepareCompactionMessages(request: Pick<CompactionRequest, 'messages' | 'previousSummary' | 'instructions' | 'prompt' | 'maxOutputTokens'> & {
+export function prepareCompactionMessages(request: Pick<CompactionRequest, 'messages' | 'previousSummary' | 'instructions' | 'prompt' | 'maxOutputTokens' | 'reusePrefix'> & {
   readonly provider: Pick<CompactionProvider, 'contextWindow' | 'inputLimit' | 'maxOutputTokens' | 'reserveTokens' | 'shape'>;
 }): readonly CompactionChatMessage[] {
   const previousSummary = request.previousSummary?.trim();
@@ -169,15 +174,26 @@ export function prepareCompactionMessages(request: Pick<CompactionRequest, 'mess
   const capturedHistory = summaryMessages(request.messages);
   const history = request.provider.shape?.toolCalling === false
     ? proseToolHistory(capturedHistory) : capturedHistory;
-  const messages = [
-    ...(previousSummary ? [{ role: 'user' as const, content: `<previous-summary>\n${previousSummary}\n</previous-summary>` }] : []),
-    ...history, { role: 'user' as const, content: prompt },
+  const system = history[0]?.role === 'system' ? history.slice(0, 1) : [];
+  const dialogue = system.length ? history.slice(1) : history;
+  const checkpoint = previousSummary ? {
+    role: 'user' as const,
+    content: request.reusePrefix && request.previousSummary !== undefined ? formatContextCheckpoint(request.previousSummary)
+      : `<previous-summary>\n${previousSummary}\n</previous-summary>`,
+  } : undefined;
+  const systemPrompt = request.reusePrefix ? request.reusePrefix.systemPrompt : system[0]?.content;
+  const messages: readonly CompactionChatMessage[] = [
+    ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
+    ...(checkpoint ? [checkpoint] : []), ...dialogue, { role: 'user', content: prompt },
   ];
   const maxOutputTokens = request.provider.maxOutputTokens ?? request.maxOutputTokens;
   if (request.provider.contextWindow !== undefined || request.provider.inputLimit !== undefined) {
     const budget = requestBudget({ window: request.provider.contextWindow, inputLimit: request.provider.inputLimit,
       outputTokens: maxOutputTokens,
-      reserveTokens: request.provider.reserveTokens, promptTokens: promptTokensFor({ messages: messages.map(message => ({ ...message, content: message.content ?? '' })) }).tokens, measured: false });
+      reserveTokens: request.provider.reserveTokens, promptTokens: promptTokensFor({
+        messages: messages.map(message => ({ ...message, content: message.content ?? '' })),
+        overhead: request.reusePrefix ? { tools: request.reusePrefix.tools } : undefined,
+      }).tokens, measured: false });
     if (budget.ok === false && budget.reason !== 'unknown') throw new SummaryAdmissionError(`Summary request refused: ${budget.detail}`);
   }
   return messages;
@@ -234,7 +250,8 @@ function proseToolHistory(messages: readonly CompactionChatMessage[]): Compactio
 /** Capture and admit one exact summary request before any durable claim or send. */
 export function prepareCompactionRequest(request: CompactionRequest): PreparedSummaryStep {
   request.signal?.throwIfAborted();
-  let data: { readonly provider: Omit<CompactionProvider, 'headers'>; readonly messages: readonly CompactionChatMessage[] };
+  let data: { readonly provider: Omit<CompactionProvider, 'headers'>; readonly messages: readonly CompactionChatMessage[];
+    readonly reusePrefix?: CompactionRequest['reusePrefix'] };
   try {
     const provider: Omit<CompactionProvider, 'headers'> = {
       baseUrl: request.provider.baseUrl, model: request.provider.model, providerId: request.provider.providerId,
@@ -249,41 +266,57 @@ export function prepareCompactionRequest(request: CompactionRequest): PreparedSu
       maxOutputTokens: request.provider.maxOutputTokens, reserveTokens: request.provider.reserveTokens,
       supportsTemperature: request.provider.supportsTemperature,
     };
-    data = snapshotData({ provider, messages: request.messages },
+    const prefix = (request.purpose ?? 'compaction') === 'compaction' && provider.endpoint === 'openai-responses'
+      && nativeCacheAddress(provider.baseUrl, 'openai') ? request.reusePrefix : undefined;
+    data = snapshotData({ provider, messages: request.messages, reusePrefix: prefix },
       { bytes: 64 * 1024 * 1024, nodes: 250_000, depth: 48 }) as unknown as typeof data;
   } catch { throw new SummaryAdmissionError('Summary request refused: messages and request shape must be bounded inert data.'); }
   const headers = new Headers(request.provider.headers);
   const captured = Object.freeze({ ...request,
-    provider: Object.freeze({ ...data.provider, headers: Object.freeze(Object.fromEntries(headers)) }), messages: data.messages });
-  const messages = prepareCompactionMessages(captured);
+    provider: Object.freeze({ ...data.provider, headers: Object.freeze(Object.fromEntries(headers)) }), messages: data.messages,
+    reusePrefix: data.reusePrefix });
   const history = captured.provider.shape?.toolCalling === false ? proseToolHistory(summaryMessages(captured.messages))
     : summaryMessages(captured.messages);
   const tokens = promptTokensFor({ messages: history.map(message => ({ ...message, content: message.content ?? '' })) }).tokens;
   const kind = endpointKind(captured.provider.endpoint) ?? 'openai-compatible';
   headers.set('accept', endpointShape(kind).simpleResponse === 'stream' ? 'text/event-stream' : 'application/json');
   const maxOutputTokens = captured.provider.maxOutputTokens ?? captured.maxOutputTokens;
-  const bodyInput: SimpleRequest = {
-    ...captured.provider.shape,
-    model: captured.provider.model,
-    baseUrl: captured.provider.baseUrl,
-    sessionId: captured.provider.sessionId,
-    cacheRetention: captured.provider.cacheRetention,
-    supportsPromptCacheKey: captured.provider.supportsPromptCacheKey,
-    supportsLongCacheRetention: captured.provider.supportsLongCacheRetention,
-    supportsExplicitPromptCacheMode: captured.provider.supportsExplicitPromptCacheMode,
-    provider: captured.provider.providerId,
-    replayBinding: captured.provider.replayBinding,
-    serviceTier: captured.provider.serviceTier,
-    ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
-    ...(captured.provider.supportsTemperature !== undefined ? { supportsTemperature: captured.provider.supportsTemperature } : {}),
-    ...(captured.temperature !== undefined ? { temperature: captured.temperature } : {}),
-    systemPrompt: messages.filter(message => message.role === 'system').map(message => message.content ?? '').join('\n\n'),
-    messages: messages.filter(message => message.role !== 'system'),
+  const bodyFor = (reusePrefix: CompactionRequest['reusePrefix'] = undefined): SimpleRequest => {
+    const messages = prepareCompactionMessages({ ...captured, reusePrefix });
+    return {
+      ...captured.provider.shape,
+      model: captured.provider.model,
+      baseUrl: captured.provider.baseUrl,
+      sessionId: captured.provider.sessionId,
+      cacheRetention: captured.provider.cacheRetention,
+      supportsPromptCacheKey: captured.provider.supportsPromptCacheKey,
+      supportsLongCacheRetention: captured.provider.supportsLongCacheRetention,
+      supportsExplicitPromptCacheMode: captured.provider.supportsExplicitPromptCacheMode,
+      provider: captured.provider.providerId,
+      replayBinding: captured.provider.replayBinding,
+      serviceTier: captured.provider.serviceTier,
+      ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+      ...(captured.provider.supportsTemperature !== undefined ? { supportsTemperature: captured.provider.supportsTemperature } : {}),
+      ...(captured.temperature !== undefined ? { temperature: captured.temperature } : {}),
+      systemPrompt: messages.filter(message => message.role === 'system').map(message => message.content ?? '').join('\n\n'),
+      messages: messages.filter(message => message.role !== 'system'),
+      ...(reusePrefix?.tools.length ? { summaryTools: reusePrefix.tools } : {}),
+    };
   };
+  const boundedBody = (bodyInput: SimpleRequest): string => {
+    const body = JSON.stringify(endpointBody(kind, bodyInput));
+    try { assertRequestInput(body, endpointShape(kind).contextFields, requestInputLimits(captured.provider.shape?.inputLimits)); }
+    catch { throw new SummaryAdmissionError('Summary request refused: the complete input exceeds the selected model limits.'); }
+    return body;
+  };
+  let body: string;
+  let bodyInput: SimpleRequest;
+  try { bodyInput = bodyFor(captured.reusePrefix); body = boundedBody(bodyInput); }
+  catch (error) {
+    if (!(error instanceof SummaryAdmissionError) || !captured.reusePrefix) throw error;
+    bodyInput = bodyFor(); body = boundedBody(bodyInput);
+  }
   for (const [name, value] of Object.entries(endpointShape(kind).requestHeaders?.(bodyInput) ?? {})) headers.set(name, value);
-  const body = JSON.stringify(endpointBody(kind, bodyInput));
-  try { assertRequestInput(body, endpointShape(kind).contextFields, requestInputLimits(captured.provider.shape?.inputLimits)); }
-  catch { throw new SummaryAdmissionError('Summary request refused: the complete input exceeds the selected model limits.'); }
   const url = endpointUrl(captured.provider.baseUrl, kind, captured.provider.model, false);
   const identity = createHash('sha256').update(JSON.stringify([
     'prepared-summary-v1', createHash('sha256').update(url).digest('hex'),
@@ -337,6 +370,7 @@ async function sendCompactionRequest(request: CompactionRequest,
   request.onUsage?.(completion.usage);
   attempt.settle(completion.usage);
   if (['error', 'length', 'refusal', 'content_filter'].includes(completion.choices?.[0]?.finish_reason ?? '')) return undefined;
+  if (completion.choices?.[0]?.message?.tool_calls?.length) return undefined;
   const summaryContent = completion.choices?.[0]?.message?.content;
   if (!summaryContent) return undefined;
   const { rawSummary } = parseCompactedSummary(summaryContent);

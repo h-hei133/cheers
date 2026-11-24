@@ -1,4 +1,5 @@
 import type { CatalogModel } from '../../core/models/catalog.js';
+import { isRecord } from '../../core/values/record.js';
 import type { CacheRetention, CacheWindow } from './model.js';
 
 /** Capture the tier the endpoint actually serialized; affinity alone promises no duration. */
@@ -12,21 +13,23 @@ export function requestCacheWindow(input: {
   if (input.retention === 'none') return Object.freeze({ retention: 'none' });
   let retention: CacheRetention = 'short';
   let protocolSeconds: number | undefined;
-  if (endpoint === 'anthropic-messages' || endpoint === 'copilot-messages') {
-    const groups = [payload.system, payload.tools, ...(Array.isArray(payload.messages)
+  const bedrock = endpoint === 'bedrock-converse-stream';
+  if (bedrock || endpoint === 'anthropic-messages' || endpoint === 'copilot-messages') {
+    const tools = bedrock && isRecord(payload.toolConfig) ? payload.toolConfig.tools : payload.tools;
+    const groups = [payload.system, tools, ...(Array.isArray(payload.messages)
       ? payload.messages.map(message => message && typeof message === 'object' ? message.content : undefined) : [])];
-    let marked = false;
     for (const group of groups) {
       if (!Array.isArray(group)) continue;
       for (const block of group) {
-        if (!block || typeof block !== 'object' || block.cache_control?.type !== 'ephemeral') continue;
-        marked = true;
-        const seconds = block.cache_control.ttl === '1h' ? 3600 : 300;
+        if (!isRecord(block)) continue;
+        const marker = bedrock ? block.cachePoint : block.cache_control;
+        if (!isRecord(marker) || marker.type !== (bedrock ? 'default' : 'ephemeral')) continue;
+        const seconds = marker.ttl === '1h' ? 3600 : 300;
         protocolSeconds = Math.min(protocolSeconds ?? seconds, seconds);
-        retention = protocolSeconds === 3600 ? 'long' : 'short';
       }
     }
-    if (!marked) return Object.freeze({ retention: 'none' });
+    if (protocolSeconds === undefined) return Object.freeze({ retention: 'none' });
+    retention = protocolSeconds === 3600 ? 'long' : 'short';
   } else if (endpoint !== 'openai-account-responses') {
     if (payload.prompt_cache_retention === '24h') { retention = 'long'; protocolSeconds = 86_400; }
     else if (payload.prompt_cache_options && typeof payload.prompt_cache_options === 'object'

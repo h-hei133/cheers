@@ -18,7 +18,6 @@ export interface SystemPromptContextInput {
   readonly sessionId?: string;
   readonly runtimeConfig?: RuntimeConfig;
   readonly skills: ReadonlyMap<string, Skill>;
-  readonly toolNames: readonly string[];
   readonly systemPrompt?: string;
   readonly appendSystemPrompt?: readonly string[];
   readonly onSource?: (target: string, content?: Buffer) => void;
@@ -63,6 +62,5 @@ export function buildSystemPromptContext(input: SystemPromptContextInput): Syste
     instructions: baseInstructions,
     appendedInstructions,
     skills: skillPrompt(input.skills, readSessionModel(input.sessionId)?.skillful),
-    toolNames: input.toolNames,
   };
 }

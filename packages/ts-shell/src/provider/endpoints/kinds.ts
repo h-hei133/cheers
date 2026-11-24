@@ -119,6 +119,8 @@ export interface EndpointShape {
   readonly turnBody: (input: TurnRequest) => Record<string, unknown>;
   /** Exact values emitted by this wire adapter; model support is checked separately. */
   readonly serviceTiers?: readonly string[];
+  /** Maximum generated tokens to price for a refresh; defaults to one. */
+  readonly refreshOutputTokens?: number;
   /** Lower only output controls for a captured prefix; absent means not replayable. */
   readonly refreshBody?: (body: Record<string, unknown>, model: {
     readonly reasoning?: boolean;
@@ -144,6 +146,8 @@ export interface SimpleRequest extends Partial<Pick<TurnRequest,
   readonly messages: readonly ChatMessage[];
   /** A system instruction, when the caller has one. */
   readonly systemPrompt?: string;
+  /** Native Responses compaction may reuse declarations with tool choice disabled. */
+  readonly summaryTools?: readonly ToolSchema[];
   readonly maxOutputTokens?: number;
   readonly temperature?: number;
   /**
@@ -175,6 +179,8 @@ export interface TurnRequest {
   readonly model: string;
   readonly provider?: string;
   readonly replayBinding?: string;
+  /** Opaque per-turn routing state, populated only by the native account endpoint owner. */
+  readonly accountTurnState?: string;
   readonly systemPrompt: string;
   readonly messages: readonly ChatMessage[];
   readonly tools: readonly ToolSchema[];

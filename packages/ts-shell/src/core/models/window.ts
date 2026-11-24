@@ -23,9 +23,10 @@
  * limit silently overruling them.
  */
 
-import { catalogBaseUrl, catalogModel, catalogProvider, type CatalogProvider, type ModelCostRates } from './catalog.js'
+import { catalogBaseUrl, catalogModel, catalogProvider, type CatalogProvider, type ModelCostSchedule } from './catalog.js'
 import type { ModelTokenBudget, RuntimeConfig } from '../../config/runtimeConfig.js'
 import { sessionPreferenceMatches, type ModelPreferenceTarget } from './preference.js'
+import { nativeCacheAddress } from './protocol.js'
 
 /** A matching session window overrides the ordinary budget only for its selected request. */
 export function configuredContextWindow(config: Partial<Pick<RuntimeConfig, 'contextWindow' | 'sessionContextWindow' | 'activeProviderConnectionId'>> | undefined,
@@ -115,6 +116,10 @@ function catalogWindow(
   return {}
 }
 
+const O4_MINI_STANDARD_RATES: ModelCostSchedule = Object.freeze({
+  promptPerMTok: 1.10, cacheReadPerMTok: 0.275, completionPerMTok: 4.40,
+});
+
 /**
  * What the catalog charges for one model, if it says.
  *
@@ -127,8 +132,14 @@ export function resolveModelCost(
   provider: string,
   model: string | undefined,
   baseUrl?: string,
-): ModelCostRates | undefined {
-  return catalogModel(catalog, provider, model, baseUrl)?.cost
+  request?: { readonly endpoint?: string; readonly serviceTier?: string },
+): ModelCostSchedule | undefined {
+  const modelEntry = catalogModel(catalog, provider, model, baseUrl);
+  if (modelEntry?.cost) return modelEntry.cost;
+  // Omitted and auto tiers can inherit a provider project setting.
+  if (modelEntry && provider === 'openai' && model === 'o4-mini' && request?.serviceTier === 'default'
+    && request.endpoint === 'openai-responses' && nativeCacheAddress(baseUrl, 'openai')) return O4_MINI_STANDARD_RATES;
+  return undefined;
 }
 
 /**

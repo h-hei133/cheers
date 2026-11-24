@@ -110,7 +110,7 @@ it.each(['bedrock', 'vertex'] as const)('uses credentialless %s session skill an
   const skills = new Map([['inspect', { name: 'inspect', description: 'inspect changes', body: 'inspect',
     filePath: '/synthetic/SKILL.md', source: 'user' as const, disableModelInvocation: false, unhonouredFields: [] }]]);
   const prompt = () => buildSystemPromptContext({ workspaceRoot: home, sessionId,
-    runtimeConfig: projectSessionModel(getRuntimeConfig(home), sessionId), skills, toolNames: [] });
+    runtimeConfig: projectSessionModel(getRuntimeConfig(home), sessionId), skills });
   for (const [action, enabled] of [['off', false], ['toggle', true], ['on', true]] as const) {
     expect((await runSkillfulCommand([action], fixture.command)).output).toContain(enabled ? 'enabled' : 'disabled');
     expect(readSessionModel(sessionId)?.skillful).toBe(enabled);

@@ -2,7 +2,9 @@ import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import type { ConfigPublication } from '../../config/state.js';
 import type { RequestPolicy } from '../../core/agent/request/model.js';
 import { credentialIdentityFor } from '../../core/auth/account/pool.js';
-import { catalogModel, type CatalogProvider } from '../../core/models/catalog.js';
+import type { CatalogProvider } from '../../core/models/catalog.js';
+import { resolveModelCost } from '../../core/models/window.js';
+import { configuredServiceTier } from '../../core/models/serviceTier.js';
 import { resolveCacheWarmingMode } from '../../core/models/cacheEconomics.js';
 import type { Admission } from '../../core/network/admission.js';
 import { allowsSelfInitiatedRequests } from '../../core/network/policy.js';
@@ -147,16 +149,17 @@ export function createProviderResources(input: {
         measurementScope = { publication, sessionId, projectRoot: input.runtimeContext.projectRoot, provider: activeProvider };
       }
       const warmingTarget = providers.target(resolved, catalog);
-      const warmingModel = warmingTarget
-        ? catalogModel(catalog, warmingTarget.provider, warmingTarget.model, warmingTarget.baseUrl)
+      const warmingRates = warmingTarget
+        ? resolveModelCost(catalog, warmingTarget.provider, warmingTarget.model, warmingTarget.baseUrl,
+            { endpoint: warmingTarget.endpoint, serviceTier: configuredServiceTier(config, resolved) })
         : undefined;
       const mayRefreshOnItsOwn = allowsSelfInitiatedRequests({ configuredOffline: config.offline === true });
       const cacheWarming = createCacheWarmingRunner({
         mode: mayRefreshOnItsOwn ? resolveCacheWarmingMode(config.cacheWarming) : 'off',
-        ...(warmingModel ? { cost: warmingModel.cost } : {}),
+        ...(warmingRates ? { cost: warmingRates } : {}),
         // Replay the captured request: rebuilding a prefix would buy a cache miss.
         ...cacheRefreshFor({ sessionId, runtimeConfig: config, admission, requestPolicy,
-          ...(warmingTarget ? { baseUrl: warmingTarget.baseUrl, rates: warmingModel?.cost } : {}),
+          ...(warmingTarget ? { baseUrl: warmingTarget.baseUrl, rates: warmingRates } : {}),
           ...(activeProvider ? { provider: activeProvider } : {}),
           ...(credentialIdentityFor(resolved.provider, resolved.credential) ? { credential: credentialIdentityFor(resolved.provider, resolved.credential)! } : {}),
           renewHeaders: async () => (await providers.renew(resolved, config, admission, catalog)).provider?.headers,

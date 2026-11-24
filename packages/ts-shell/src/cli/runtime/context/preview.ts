@@ -19,7 +19,7 @@ import { foregroundTools, promptWithContext } from '../prompt.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../../core/auth/account/target.js';
 import { DEFAULT_ENDPOINT_KIND, endpointShape, endpointTurnBody } from '../../../provider/endpoints/index.js';
 import { selectModelContext } from '../../../session/context/selection.js';
-import { openingMessage } from '../../../turn/opening.js';
+import { openingMessage, requestEnvironment } from '../../../turn/opening.js';
 import { getSessionUsage } from '../../../observability/usageTelemetry.js';
 import { estimatePrompt } from '../../../context/request/estimate.js';
 import { measuredProjectionPrefix } from '../../../turn/measurement.js';
@@ -60,6 +60,7 @@ import { clearResearchPreview, prepareResearchPreview } from './research.js';
 import { clearReviewPreview, clearStaleReviewPreview, prepareReviewPreview } from './review.js';
 import { systemPromptSnapshot } from '../../../turn/prompt.js';
 import { providerRequestTarget } from '../../provider/requestTarget.js';
+import { discoveryLoadout } from '../discovery.js';
 
 /** A local estimate never connects MCP, accepts an injection or starts a driver. */
 export async function previewContext(context: ShellRuntimeContext, manager: SessionManager, gateway: CliMcpGateway,
@@ -146,15 +147,17 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const ordinaryFeatures = foregroundTools(context);
   const features = research ? foregroundTools(context, researchPreviewTools(research.run)) : ordinaryFeatures;
   const featureIdentity = JSON.stringify(toolSchemas(new Map(ordinaryFeatures.map(tool => [tool.name, tool]))));
+  const resolution = context.resolveConfigTarget?.(config, expected.id)
+    ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: expected.id } });
+  if (!resolution?.model || resolution.blocked) throw new Error('Model request identity is unavailable.');
+  const loadout = forcedTool ? undefined : discoveryLoadout(context, resolution, permissionScope);
+  const retainedTools = loadout?.read();
   const prepared = await preparePromptRequest({ workspaceRoot: cwd, sessionId: expected.id, runtimeConfig: toolConfig, agentMode: review ? 'plan' : agentMode,
     catalogContent: { skills: skills.skills, tools: contributions.flatMap(entry => entry.tools), ...(snapshot ? { mcpTools: snapshot.tools } : {}) },
     ...(snapshot ? { mcpGateway: { snapshot: async () => snapshot } } : {}),
     builtinTools: browserTools(),
-    featureTools: features, admission, signal, onSource: sources.track,
+    featureTools: features, retainedTools, admission, signal, onSource: sources.track,
     ...(forcedTool ? { forcedTool, allowedTools: [forcedTool] } : {}) });
-  const resolution = context.resolveConfigTarget?.(config, expected.id)
-    ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: expected.id } });
-  if (!resolution?.model || resolution.blocked) throw new Error('Model request identity is unavailable.');
   const { catalog, admission: providerAdmission } = currentSessionProviderScope(cwd, expected.id, publication.catalog, resolution);
   const providerRefusal = providerAdmission?.();
   if (providerRefusal) throw new Error(providerRefusal);
@@ -162,9 +165,13 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   if (!base) throw new Error('Model request destination is unavailable.');
   const endpoint = providerCredentialEndpoint(catalog, resolution, base) ?? DEFAULT_ENDPOINT_KIND;
   const protocol = endpointShape(endpoint);
-  const messages = [...selectModelContext(session.session), ...(currentHistory ? [] : [openingMessage({ workspaceRoot: cwd,
-    workspaceRoots: expected.workspaceRoots, permissionScope, goalObjective, continuityContext: session.continuityContextFor(effectivePrompt),
-    prompt: promptWithContext(injected.prompt, entries), attachments })])];
+  const environment = { workspaceRoot: cwd, workspaceRoots: expected.workspaceRoots, permissionScope, goalObjective };
+  const historyMessages = selectModelContext(session.session);
+  const savedPrompt = currentHistory ? undefined : { role: 'user' as const, content: effectivePrompt,
+    metadata: { requestEnvironment: requestEnvironment(environment) } };
+  const messages = [...historyMessages, ...(currentHistory ? [] : [openingMessage({ ...environment,
+    continuityContext: session.continuityContextFor(effectivePrompt),
+    prompt: promptWithContext(injected.prompt, entries), attachments }, context.convertToLlm ? undefined : savedPrompt)])];
   // Ownership also binds public text; only opaque payloads prevent local measurement.
   if (messages.some(message => message.reasoning?.signature || message.reasoning?.redacted)) {
     throw new Error('Opaque replay has no complete local token estimate.');
@@ -249,7 +256,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
         throw new Error('Request tool schemas changed.');
       }
       if (admission() || selection?.admission() || providerAdmission?.() || context.configuration.current !== publication || context.session !== expected || context.cwd !== cwd
-        || !injected.isCurrent() || context.peekForcedTool?.() !== forcedTool
+        || !injected.isCurrent() || context.peekForcedTool?.() !== forcedTool || loadout?.read() !== retainedTools
         || JSON.stringify([context.contextAttachments, context.transientContextAttachments]) !== entryIdentity
         || catalogContributions(cwd, expected.id).some((entry, index) => entry !== contributions[index])
         || catalogContributions(cwd, expected.id).length !== contributions.length) throw new Error('Context preview is stale.');

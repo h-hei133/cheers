@@ -43,7 +43,7 @@ Rules:
  * pass would shed a little of what the last one preserved. Revising keeps the
  * established facts and folds in only what has happened since.
  */
-export const UPDATE_COMPACTION_PROMPT = `The messages above are NEW conversation messages to fold into the existing checkpoint provided in <previous-summary> tags. Rewrite that checkpoint so it accounts for the new messages.
+export const UPDATE_COMPACTION_PROMPT = `Fold the new conversation messages above into the existing checkpoint at the start of the conversation. Rewrite that checkpoint so it accounts for the new messages.
 
 Output EXACTLY the Markdown structure below: keep every section, in order. Use terse bullets, not verbose prose. Write "(none)" for an empty section.
 

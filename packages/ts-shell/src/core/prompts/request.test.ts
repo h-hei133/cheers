@@ -29,11 +29,11 @@ it('counts the first discovery subset and observes later schemas without rebuild
   expect(after.systemDigest).toBe(before.systemDigest);
 });
 
-it('uses allowed and forced selections before building prompt names and refuses a vanished force', async () => {
+it('uses allowed and forced selections for the wire schemas and refuses a vanished force', async () => {
   const input = { workspaceRoot: root, catalogContent, forcedTool: 'deferred', allowedTools: ['deferred'] };
   const prepared = await preparePromptRequest(input, () => new Map([['read', tool('read')], ['deferred', tool('deferred')]]));
   expect([...prepared.currentTools().keys()]).toEqual(['deferred']);
-  expect(prepared.promptContext.toolNames).toEqual(['deferred']);
+  expect(prepared.currentOverhead().tools).toMatchObject([{ function: { name: 'deferred' } }]);
   expect(prepared.discovery).toBeUndefined();
   await expect(preparePromptRequest(input, () => new Map())).rejects.toThrow('no longer available');
 });

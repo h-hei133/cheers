@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { endpointShape, endpointTurnBody, endpointUrl } from "./index.js";
+import { endpointBody, endpointShape, endpointTurnBody, endpointUrl } from "./index.js";
 import { crc32 } from "../aws/eventStream.js";
 import type { TurnRequest } from "./kinds.js";
 import type { ObserveToolArguments, WireToolArguments } from "../../turn/preview/model.js";
@@ -105,6 +105,78 @@ describe("the URL and headers", () => {
 });
 
 describe("the request body", () => {
+  const bedrock = 'https://bedrock-runtime.us-east-1.amazonaws.com';
+  const opus = 'anthropic.claude-opus-4-5-20251101-v1:0';
+  const tools = [{ type: 'function' as const, function: { name: 'read', parameters: { type: 'object' } } }];
+
+  it('adds the model-supported checkpoints to a native Converse turn', () => {
+    const cachePoint = { cachePoint: { type: 'default', ttl: '1h' } };
+    const body = endpointTurnBody('bedrock-converse-stream', {
+      ...BASE, baseUrl: bedrock, model: opus, tools, cacheRetention: 'long',
+    });
+
+    expect(body.system).toEqual([{ text: BASE.systemPrompt }, cachePoint]);
+    expect(body.messages).toEqual([{ role: 'user', content: [{ text: 'hello' }, cachePoint] }]);
+    expect(body.toolConfig).toEqual({
+      tools: [{ toolSpec: { name: 'read', inputSchema: { json: { type: 'object' } } } }, cachePoint],
+      toolChoice: { auto: {} },
+    });
+  });
+
+  it('limits Nova Pro to system and message checkpoints with the default retention', () => {
+    const body = endpointTurnBody('bedrock-converse-stream', {
+      ...BASE, baseUrl: bedrock, model: 'amazon.nova-pro-v1:0', tools, cacheRetention: 'long',
+    });
+
+    expect(body.system).toEqual([{ text: BASE.systemPrompt }, { cachePoint: { type: 'default' } }]);
+    expect(body.messages).toEqual([{ role: 'user', content: [{ text: 'hello' }, { cachePoint: { type: 'default' } }] }]);
+    expect(body.toolConfig).toEqual(endpointTurnBody('bedrock-converse-stream', { ...BASE, tools }).toolConfig);
+  });
+
+  it('places a Nova Pro checkpoint before a large conversation suffix without removing the suffix', () => {
+    const suffix = '界'.repeat(20_000);
+    const body = endpointTurnBody('bedrock-converse-stream', {
+      ...BASE, baseUrl: bedrock, model: 'amazon.nova-pro-v1:0',
+      messages: [...BASE.messages, { role: 'assistant', content: 'Describe the next part.' }, { role: 'user', content: suffix }],
+    });
+    expect(body.messages).toEqual([
+      { role: 'user', content: [{ text: 'hello' }, { cachePoint: { type: 'default' } }] },
+      { role: 'assistant', content: [{ text: 'Describe the next part.' }] },
+      { role: 'user', content: [{ text: suffix }] },
+    ]);
+    const largeSystem = endpointTurnBody('bedrock-converse-stream', {
+      ...BASE, baseUrl: bedrock, model: 'amazon.nova-pro-v1:0', systemPrompt: suffix,
+    });
+    expect(largeSystem.system).toEqual([{ text: suffix }]);
+    expect(JSON.stringify(largeSystem.messages)).not.toContain('cachePoint');
+  });
+
+  it.each([
+    { baseUrl: 'https://bedrock.fixture.invalid', model: opus },
+    { baseUrl: bedrock + '/gateway', model: opus },
+    { baseUrl: bedrock, model: 'anthropic.claude-opus-4-5-v1:0' },
+    { baseUrl: bedrock, model: opus, cacheRetention: 'none' as const },
+  ])('does not infer cache controls for $baseUrl / $model / $cacheRetention', request => {
+    expect(JSON.stringify(endpointTurnBody('bedrock-converse-stream', { ...BASE, tools, ...request })))
+      .not.toContain('cachePoint');
+  });
+
+  it('preserves a simple request retention opt-out and the closing tool placeholder', () => {
+    const simple = endpointBody('bedrock-converse-stream', {
+      model: opus, baseUrl: bedrock, messages: BASE.messages, cacheRetention: 'none',
+    });
+    expect(JSON.stringify(simple)).not.toContain('cachePoint');
+
+    const closing = endpointTurnBody('bedrock-converse-stream', { ...BASE, model: opus, baseUrl: bedrock,
+      allowTools: false, tools,
+      messages: [...BASE.messages, { role: 'assistant', content: '', tool_calls: [
+        { id: 'c1', type: 'function', function: { name: 'read', arguments: '{}' } },
+      ] }, { role: 'tool', content: 'result', tool_call_id: 'c1' }],
+    });
+    expect(closing.toolConfig).toMatchObject({ tools: [{ toolSpec: { name: '__no_tools__' } }] });
+    expect((closing.toolConfig as { tools: unknown[] }).tools).toHaveLength(1);
+  });
+
   it("carries the system instruction as blocks rather than a role", () => {
     const body = endpointTurnBody("bedrock-converse-stream", BASE);
 

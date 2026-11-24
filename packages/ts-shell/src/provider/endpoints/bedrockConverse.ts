@@ -21,6 +21,7 @@ import { resolveCredentials } from "../aws/credentials.js";
 import { signAwsRequest } from "../aws/signature.js";
 import type { RequestSigner } from "../request/fetch.js";
 import { convertMessages, type WireMessage } from "./bedrock/messages.js";
+import { appendMessageCachePoint, converseCache, type CachePoint } from './bedrock/cache.js';
 import type { CompletedBody, StreamFragment, StreamedCompletion } from "../../turn/completion.js";
 import type { ObserveToolArguments } from "../../turn/preview/model.js";
 
@@ -63,16 +64,17 @@ function toolConfigFor(input: {
   readonly tools: TurnRequest["tools"];
   readonly allowTools: boolean;
   readonly mentionsTools: boolean;
+  readonly cachePoint?: CachePoint;
 }): Record<string, unknown> | undefined {
   if (input.tools.length > 0 && input.allowTools) {
     return {
-      tools: input.tools.map((tool) => ({
+      tools: [...input.tools.map((tool) => ({
         toolSpec: {
           name: tool.function.name,
           ...(tool.function.description ? { description: tool.function.description } : {}),
           inputSchema: { json: tool.function.parameters },
         },
-      })),
+      })), ...(input.cachePoint ? [input.cachePoint] : [])],
       toolChoice: { auto: {} },
     };
   }
@@ -87,6 +89,7 @@ function toolConfigFor(input: {
  */
 function converseBody(input: TurnRequest): Record<string, unknown> {
   const messages = convertMessages(input.messages, input.vision);
+  const cache = converseCache(input);
   const maxTokens = input.maxOutputTokens ?? 4096;
   // Keep the requested output ceiling and reserve room for the answer. A budget
   // below 1024 is rejected by the model, so small ceilings get no thinking.
@@ -96,11 +99,16 @@ function converseBody(input: TurnRequest): Record<string, unknown> {
     tools: input.tools,
     allowTools: input.allowTools,
     mentionsTools: mentionsTools(messages),
+    ...(cache?.tools ? { cachePoint: cache.point } : {}),
   });
+  const cacheTextBudget = cache?.textPrefixLimit === undefined ? undefined : cache.textPrefixLimit
+    - Buffer.byteLength(input.systemPrompt) - (toolConfig ? Buffer.byteLength(JSON.stringify(toolConfig)) : 0);
+  if (cache) appendMessageCachePoint(messages, cache.point, cacheTextBudget);
+  const systemPoint = cacheTextBudget === undefined || cacheTextBudget >= 0 ? cache?.point : undefined;
 
   return {
     messages,
-    ...(input.systemPrompt.trim() !== "" ? { system: [{ text: input.systemPrompt }] } : {}),
+    ...(input.systemPrompt.trim() !== "" ? { system: [{ text: input.systemPrompt }, ...(systemPoint ? [systemPoint] : [])] } : {}),
     inferenceConfig: {
       maxTokens,
       // Only stated when the model takes one: a reasoning model rejects the field.
@@ -332,6 +340,8 @@ async function* readConverseStream(
 function simpleAsTurn(input: SimpleRequest): TurnRequest {
   return {
     model: input.model,
+    baseUrl: input.baseUrl,
+    cacheRetention: input.cacheRetention,
     systemPrompt: input.systemPrompt ?? "",
     messages: input.messages,
     tools: [],

@@ -4,7 +4,7 @@ import type { RequestPolicy } from '../../core/agent/request/model.js';
 import type { AgentMessage } from '../../core/agent/state.js';
 import { convertMessages, type MessageConverter } from '../../core/agent/messages.js';
 import { catalogModel, catalogProvider, type CatalogProvider } from '../../core/models/catalog.js';
-import { configuredContextWindow, resolveContextWindow, resolveTokenBudget } from '../../core/models/window.js';
+import { configuredContextWindow, resolveContextWindow, resolveModelCost, resolveTokenBudget } from '../../core/models/window.js';
 import type { ModelPreferenceTarget } from '../../core/models/preference.js';
 import { messageToText } from '../../model-adapters/multimodal.js';
 import { createComponentLogger } from '../../observability/structuredLogger.js';
@@ -153,6 +153,8 @@ function compactionWiring(input: CompactionInput, summaryRole: ReturnType<typeof
   const cacheRetention = prepared?.cacheRetention ?? provider.cacheRetention ?? runtimeConfig.cacheRetention ?? 'short';
   const serviceTier = summaryRole ? undefined : prepared ? provider.serviceTier : requestServiceTier(runtimeConfig,
     input.resolution ?? { provider: provider.providerId, model: provider.model }, input.catalog, provider.baseUrl, provider.endpoint);
+  const reusePrefix = !summaryRole && prepared
+    ? { systemPrompt: prepared.systemPrompt, tools: prepared.allowTools ? prepared.tools : [] } : undefined;
   const prepare = async (request: Omit<CompactionRequest, 'provider' | 'fetchImpl' | 'messages'> & { readonly messages: readonly AgentMessage[] }) => {
     const ownerSignal = currentProviderConnections()?.signal;
     request = { ...request, signal: ownerSignal && request.signal ? AbortSignal.any([request.signal, ownerSignal]) : request.signal ?? ownerSignal };
@@ -171,9 +173,10 @@ function compactionWiring(input: CompactionInput, summaryRole: ReturnType<typeof
       fetchImpl: providerFetchForEndpoint(runtimeConfig, summaryProvider.endpoint, endpointShape, input.admission),
       modelTransport: providerModelTransport(runtimeConfig, summaryProvider.endpoint, input.admission),
     }, input.admission);
-    const captured = prepareCompactionRequest({ ...request, messages, provider: summaryProvider,
+    const captured = prepareCompactionRequest({ ...request, messages, provider: summaryProvider, reusePrefix,
       onUsage: usageFor({ provider: summaryProvider.providerId ?? '', model: summaryProvider.model,
-        baseUrl: summaryProvider.baseUrl, rates: catalogModel(input.catalog, summaryProvider.providerId ?? '', summaryProvider.model, summaryProvider.baseUrl)?.cost,
+        baseUrl: summaryProvider.baseUrl, rates: resolveModelCost(input.catalog, summaryProvider.providerId ?? '',
+          summaryProvider.model, summaryProvider.baseUrl, summaryProvider),
         usageInput: endpointShape(summaryProvider.endpoint).usageInput }),
       ...transport });
     return Object.freeze({ ...captured, send: (dispatch?: CompactionDispatch) => {

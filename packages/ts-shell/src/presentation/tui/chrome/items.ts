@@ -19,6 +19,8 @@ export type StatusItemId =
   | "branch"
   | "directory"
   | "context"
+  | "cache"
+  | "architecture"
   | "session-tokens"
   | "cost"
   | "turns"
@@ -40,6 +42,9 @@ export interface StatusFacts {
   readonly contextWindow?: number;
   readonly contextWindowSource?: WindowSource;
   readonly contextWarning?: string;
+  /** Ratio of measured cache reads to input tokens over the retained, accounted requests. */
+  readonly cacheHitRate?: number;
+  readonly architecture?: 'proven' | 'partial';
   readonly sessionTokens?: number;
   /** Unreadable persisted usage makes retained counters a partial measurement. */
   readonly usageIncomplete?: boolean;
@@ -76,6 +81,8 @@ export const STATUS_ITEMS: readonly StatusItem[] = [
   { id: "branch", label: "branch", describe: "current git branch" },
   { id: "directory", label: "directory", describe: "project root, home-relative" },
   { id: "context", label: "context", describe: "last reported prompt and window; /context explains sources and warnings" },
+  { id: "cache", label: "cache", describe: "prompt cache hit rate across requests with provider-reported cache usage" },
+  { id: 'architecture', label: 'architecture', describe: 'latest architecture check for this workspace' },
   { id: "session-tokens", label: "tokens", describe: "recorded tokens this session" },
   { id: "cost", label: "cost", describe: "estimated spend from recorded usage; /cost explains rates" },
   { id: "turns", label: "turns", describe: "turns completed this session" },
@@ -93,6 +100,8 @@ export const DEFAULT_STATUS_ITEMS: readonly StatusItemId[] = [
   "permission-scope",
   "branch",
   "context",
+  "cache",
+  "architecture",
   "directory",
 ];
 
@@ -135,6 +144,10 @@ export function renderStatusItem(id: StatusItemId, facts: StatusFacts): string |
       return facts.directory ? defaultTheme.fg("statusLinePath", facts.directory) : undefined;
     case "context":
       return renderContext(facts);
+    case "cache":
+      return facts.cacheHitRate === undefined ? undefined : defaultTheme.dim(`cache ${facts.cacheHitRate.toFixed(1)}%`);
+    case 'architecture':
+      return facts.architecture && defaultTheme.fg(facts.architecture === 'proven' ? 'success' : 'warning', `architecture ${facts.architecture}`);
     case "session-tokens":
       return facts.sessionTokens ? defaultTheme.dim(`${formatTokens(facts.sessionTokens)} tok${facts.usageIncomplete ? ' partial' : ''}`)
         : facts.usageIncomplete ? defaultTheme.fg('warning', 'tokens unknown') : undefined;

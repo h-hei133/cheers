@@ -6,7 +6,8 @@ import type { StepRequest, StepTarget } from './contract.js';
 
 function targetData(target: StepTarget) {
   return snapshotData({ provider: target.provider, maxOutputTokens: target.maxOutputTokens,
-    contextWindow: target.contextWindow, reserveTokens: target.reserveTokens },
+    contextWindow: target.contextWindow, reserveTokens: target.reserveTokens,
+    transportOwnsBodyDeadline: target.transportOwnsBodyDeadline, bodyIdleTimeoutMs: target.bodyIdleTimeoutMs },
   { bytes: 256 * 1024, nodes: 4_096, depth: 8 }) as unknown as StepTarget;
 }
 

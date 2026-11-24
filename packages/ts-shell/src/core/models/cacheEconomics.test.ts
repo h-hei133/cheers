@@ -151,6 +151,15 @@ describe("the mode", () => {
       });
     }
   });
+
+  it('prices the endpoint refresh cap while keeping the input pricing tier', () => {
+    const input = { cost: { promptPerMTok: 1, completionPerMTok: 50, cacheReadPerMTok: 0.2 },
+      promptTokens: 84_000, phase: 'streaming' as const };
+    expect(evaluateCacheWarming(input).action).toBe('warm');
+    const decision = evaluateCacheWarming({ ...input, refreshOutputTokens: 16 });
+    expect(decision.action).toBe('stop');
+    expect(decision.warmCost).toBeCloseTo(0.0176, 10);
+  });
   it("accepts the three modes it defines", () => {
     for (const mode of CACHE_WARMING_MODES) {
       expect(resolveCacheWarmingMode(mode)).toBe(mode);

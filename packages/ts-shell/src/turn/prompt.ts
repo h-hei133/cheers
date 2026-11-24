@@ -38,15 +38,6 @@ export interface SystemPromptContext {
    * should also do. Kept as their own section so a reader can tell which is which.
    */
   readonly appendedInstructions?: string
-  /**
-   * The tools this run actually offers, in the order they should be named.
-   *
-   * Passed in rather than listed here because a hand-written list drifts: it
-   * named thirteen tools while the registry offered fourteen, so the model was
-   * told about a tool set it did not have. The registry is the only place that
-   * knows, and `restrictToolPool` may have narrowed it further for this run.
-   */
-  readonly toolNames?: readonly string[]
 }
 
 export function buildSystemPrompt(
@@ -64,15 +55,15 @@ export function systemPromptSnapshot(
   toolsAvailable = true,
 ): { readonly text: string; readonly sources: readonly PromptSource[] } {
   const sections = toolsAvailable ? [
-    `You are an expert autonomous coding agent equipped with real tools (${context?.toolNames?.join(", ") ?? "none available"}).`,
+    "You are an expert autonomous coding agent. Use the tools declared for the current request when they apply.",
     agentMode === "plan"
-      ? "PLAN MODE ACTIVE: You have full access to inspect files, search symbols via LSP, run safe read-only commands (like git status, git diff) via bash, and explore websites via browser and web tools, but cannot modify files. Produce a structured execution plan based on real file contents."
-      : "BUILD MODE ACTIVE: You have full access to inspect, search, execute, browse, and edit files to accomplish the user's task.",
+      ? "PLAN MODE ACTIVE: Use read-only tools to gather evidence. Do not modify files or other workspace state. Produce a structured execution plan based on your findings."
+      : "BUILD MODE ACTIVE: Use available tools within the current permissions to accomplish the user's task.",
     "CRITICAL EXECUTION & ANSWER RULES:",
     "For Cheers keyboard shortcut help, direct the user to /hotkey in their interactive session; it shows effective bindings, overrides, and terminal limitations.",
     "1. When you run tools and gather facts, you MUST provide a final, comprehensive, structured markdown answer to the user.",
     "2. NEVER stop after running tools without giving your findings, explanation, and answer in text.",
-    ...toolUsageRules(context?.toolNames),
+    "3. User Permission & Denial Feedback: When a tool execution is denied by the user, immediately respect the decision. If the user provided feedback or alternative instructions (e.g. changing filenames, using different arguments, or avoiding certain actions), you MUST strictly follow their feedback and not retry the rejected action.",
   ] : [
     "You are an expert autonomous coding agent. No tools are available for this turn.",
     agentMode === "plan"
@@ -95,30 +86,6 @@ export function systemPromptSnapshot(
   const sources: PromptSource[] = parts.map(part => Object.freeze({ kind: part.kind, ...textSize(part.text) }));
   sources.push(Object.freeze({ kind: 'separators', ...textSize('\n'.repeat(parts.length - 1)) }));
   return { text, sources: Object.freeze(sources) };
-}
-
-function toolUsageRules(toolNames?: readonly string[]): readonly string[] {
-  const available = toolNames ? new Set(toolNames) : undefined;
-  const has = (name: string) => available === undefined || available.has(name);
-  const rules: string[] = [];
-  if (has('web_search')) {
-    rules.push('3. For web searching: use `web_search` to retrieve online technical references.');
-  }
-  const workspaceTools = [
-    has('glob') ? '`glob` (to find paths)' : undefined,
-    has('grep') ? '`grep` (to search contents)' : undefined,
-    has('read') ? '`read` (to inspect files)' : undefined,
-    has('edit') || has('write')
-      ? `${[has('edit') ? '`edit`' : undefined, has('write') ? '`write`' : undefined].filter(Boolean).join('/')} (to update code)`
-      : undefined,
-    has('bash') ? '`bash` (to run commands/tests/git)' : undefined,
-  ].filter((entry): entry is string => entry !== undefined);
-  if (workspaceTools.length > 0) {
-    rules.push(`${rules.length > 0 ? '4' : '3'}. For workspace files: use ${workspaceTools.join(', ')}.`);
-  }
-  const nextNumber = rules.length + 3;
-  rules.push(`${nextNumber}. User Permission & Denial Feedback: When a tool execution is denied by the user, immediately respect the decision. If the user provided feedback or alternative instructions (e.g. changing filenames, using different arguments, or avoiding certain actions), you MUST strictly follow their feedback and not retry the rejected action.`);
-  return rules;
 }
 
 /**

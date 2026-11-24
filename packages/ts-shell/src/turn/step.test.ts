@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -114,8 +114,8 @@ describe("createStepFunction", () => {
       catalog: [{ id: "fixture", models: [{ id: "m", toolCalling: false }] }],
       tools: [{ type: "function", function: { name: "read", parameters: { type: "object" } } }],
       systemPromptSources: [{ kind: "base", bytes: 8, codeUnits: 8 }],
-      systemPromptFor: (agentMode, toolNames, toolsAvailable = true) =>
-        buildSystemPrompt(agentMode, { toolNames }, toolsAvailable),
+      systemPromptFor: (agentMode, _toolNames, toolsAvailable = true) =>
+        buildSystemPrompt(agentMode, undefined, toolsAvailable),
       fetchImpl: async (_url, init) => {
         bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
         return jsonResponse({ choices: [{ message: { content: "answer" }, finish_reason: "stop" }] });
@@ -130,7 +130,7 @@ describe("createStepFunction", () => {
     expect(bodies).toHaveLength(1);
     expect(bodies[0]).not.toHaveProperty("tools");
     expect(bodies[0]).not.toHaveProperty("tool_choice");
-    expect(bodies[0]?.messages).toEqual([{ role: "system", content: buildSystemPrompt(undefined, { toolNames: [] }, false) },
+    expect(bodies[0]?.messages).toEqual([{ role: "system", content: buildSystemPrompt(undefined, undefined, false) },
       { role: "user", content: "hello" }]);
     expect(JSON.stringify(bodies[0]?.messages)).not.toContain("You have reached the limit of steps");
     expect(sent?.promptIdentity?.schemaDigest).toBe(requestIdentity({ tools: [] }).schemaDigest);

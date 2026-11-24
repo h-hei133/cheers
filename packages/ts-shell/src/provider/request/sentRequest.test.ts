@@ -78,6 +78,19 @@ describe("sending a captured request again", () => {
     expect(resent.max_tokens).toBeUndefined();
   });
 
+  it('preserves the Responses prefix byte for byte when lowering its output ceiling', async () => {
+    const prefix = { model: 'm', instructions: 'keep defaults', input: [{ role: 'user', content: 'cached' }],
+      tools: [{ type: 'function', name: 'read' }], prompt_cache_key: 'session', stream: true };
+    const captured = { ...sent, endpoint: 'openai-responses', url: 'https://api.openai.com/v1/responses',
+      body: JSON.stringify({ ...prefix, max_output_tokens: 4096 }) };
+    const { calls, impl } = recorder();
+
+    await sendSentRequest(captured, undefined, impl);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.init.body).toBe(JSON.stringify({ ...prefix, max_output_tokens: 16 }));
+  });
+
   it("reports a refusal rather than raising it", async () => {
     // Nothing the user did caused it and nothing they could do would fix it.
     const { impl } = recorder(false);

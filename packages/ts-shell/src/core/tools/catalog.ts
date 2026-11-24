@@ -35,6 +35,7 @@ export interface ToolCatalogInput {
   /** Model runs start small; command inspection keeps the full pool. */
   readonly discover?: boolean;
   readonly initialTools?: readonly string[];
+  readonly retainedTools?: readonly string[];
   readonly forcedTool?: string;
   readonly mcpGateway?: ToolMcpGateway;
 }
@@ -101,7 +102,7 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
   // in the first request, so they join the initial set alongside pinned tools.
   const initial = [...(input.initialTools ?? []), ...(input.featureTools ?? []).map(tool => tool.name)];
   const nested = new Map(bindNestedCatalog(restricted, () => discovery.snapshot(true)));
-  const discovery: ToolDiscovery = createToolDiscovery({ catalog: nested, ...(initial.length ? { initial } : {}) });
+  const discovery: ToolDiscovery = createToolDiscovery({ catalog: nested, initial, retained: input.retainedTools });
   discovery.attachMeta(discoveryTools(discovery, deferred ? deferredMcpTools(input, nested) : undefined));
   return { skills, tools: discovery.snapshot(), discovery };
 }

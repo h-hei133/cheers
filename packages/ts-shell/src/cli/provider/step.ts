@@ -32,6 +32,8 @@ import type { VirtualModelRegistry } from '../../core/models/virtualModels.js';
 import { providerRouteResolver } from './route.js';
 import type { SessionVirtualModelSelection } from '../../session/model/contract.js';
 import { captureRoutingState } from '../../session/model/routing.js';
+import { createAccountTurnAffinity } from '../../provider/endpoints/responses/account.js';
+import { providerTimeoutsFrom, resolveProviderTransportConfig } from '../../provider/request/fetch.js';
 
 export interface ProviderStepHost {
   readonly providerMode: 'synthetic' | 'real';
@@ -70,7 +72,8 @@ export function createProviderStep(
   promptContext: SystemPromptContext,
   discovery?: ToolDiscovery,
 ): StepFunction {
-  return createStepFunction(providerStepRequest(request, tools, promptContext, discovery));
+  return createStepFunction({ ...providerStepRequest(request, tools, promptContext, discovery),
+    accountTurnAffinity: createAccountTurnAffinity() });
 }
 
 /** Shared request assembly for foreground dispatch and pure context preparation. */
@@ -105,8 +108,10 @@ export function providerStepRequest(
   });
   return {
     recordAuxiliaryUsage: sessionUsageSink(request.sessionId),
+    bodyIdleTimeoutMs: resolveProviderTransportConfig(process.env, providerTimeoutsFrom(request.runtimeConfig)).bodyTimeoutMs,
     requestPolicy: request.requestPolicy,
     modelTransport: logical ? undefined : providerModelTransport(request.runtimeConfig, endpoint, request.admission),
+    ...(logical ? {} : { transportOwnsBodyDeadline: true as const }),
     provider: {
       // Built from the whole credential, not from its key alone. An account login
       // yields a token instead of a key, and formatting the header here from a
@@ -141,8 +146,8 @@ export function providerStepRequest(
     sessionId: request.sessionId,
     systemPrompt: system.text,
     systemPromptSources: system.sources,
-    systemPromptFor: (agentMode, toolNames, toolsAvailable = true) =>
-      buildSystemPrompt(agentMode ?? request.agentMode, { ...promptContext, toolNames }, toolsAvailable),
+    systemPromptFor: (agentMode, _toolNames, toolsAvailable = true) =>
+      buildSystemPrompt(agentMode ?? request.agentMode, promptContext, toolsAvailable),
     thinkingEffort: logical ? logical.thinkingEffort : request.thinkingEffort,
     thinkingEffortExplicit: logical ? logical.thinkingEffort !== undefined : request.thinkingEffortExplicit,
     tools: toolSchemas(tools),

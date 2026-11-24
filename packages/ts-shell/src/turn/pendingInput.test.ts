@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { pendingTurnInput } from "./pendingInput.js";
 import type { TurnInput } from "./session.js";
 import { inputQueueControl, PendingQueue } from '../core/agent/queue.js';
+import { turnInput } from './input.js';
+import type { AgentMessage } from '../core/agent/state.js';
 
 /** A run's own handle, recording what reaches it. */
 function recordingRun(): {
@@ -33,6 +35,56 @@ function recordingRun(): {
 }
 
 describe("input held before a run exists", () => {
+  it('recalls the exact interactive follow-up in the readiness buffer and after run adoption', () => {
+    const pending = pendingTurnInput();
+    const image = { type: 'image' as const, data: 'AA==', mimeType: 'image/png' };
+    const format = vi.fn((text: string) => text);
+    pending.input.steer('steer', 'steer', { source: 'interactive' });
+    pending.input.followUp('background', 'background');
+    pending.input.followUp('buffered', 'buffered', { source: 'interactive', images: [image] });
+    expect(pending.input.recallFollowUp?.(format)).toBe('buffered');
+    expect(format).toHaveBeenLastCalledWith('buffered', [image]);
+    expect(pending.input.recallFollowUp?.(format)).toBeUndefined();
+    pending.input.followUp('live', 'live', { source: 'interactive', images: [image] });
+
+    const active = turnInput(new AbortController().signal, vi.fn(), vi.fn());
+    const steering = new PendingQueue<AgentMessage>(), followUps = new PendingQueue<AgentMessage>();
+    const control = active.control(steering, followUps);
+    pending.adopt({ input: {
+      ...recordingRun().input,
+      steer: (text, id, options) => { steering.enqueue(active.message(text, options), id); },
+      followUp: (text, id, options) => { followUps.enqueue(active.message(text, options), id); },
+      queue: control,
+      recallFollowUp: control.recallFollowUp,
+    } });
+    expect(pending.input.queue?.edit('live', 'edited')).toBe(true);
+    expect(pending.input.recallFollowUp?.(format)).toBe('edited');
+    expect(format).toHaveBeenLastCalledWith('edited', [image]);
+    expect(pending.input.recallFollowUp?.(format)).toBeUndefined();
+    expect(control.entries().map(entry => entry.id)).toEqual(['steer', 'background']);
+  });
+
+  it('leaves an already acquired follow-up under its running input hook', async () => {
+    const publish = vi.fn();
+    const input = turnInput(new AbortController().signal, vi.fn(), publish);
+    const steering = new PendingQueue<AgentMessage>(), followUps = new PendingQueue<AgentMessage>();
+    const control = input.control(steering, followUps);
+    let finish!: () => void;
+    const wait = new Promise<void>(resolve => { finish = resolve; });
+    followUps.enqueue(input.message('acquired', { source: 'interactive', prepare: async () => {
+      await wait;
+      return { status: 'continue', prompt: 'prepared', check: () => {} };
+    } }));
+    const delivery = input.drain(followUps, 'followUp');
+    expect(control.recallFollowUp(text => text)).toBeUndefined();
+    finish();
+    const ready = await delivery;
+    expect(control.recallFollowUp(text => text)).toBeUndefined();
+    expect(input.commit(ready).messages.map(message => message.content)).toEqual(['prepared']);
+    expect(publish).toHaveBeenCalledOnce();
+    expect(control.recallFollowUp(text => text)).toBeUndefined();
+  });
+
   it('reads only the adopted run compaction activity without retaining a previous run phase', () => {
     const pending = pendingTurnInput(), first = recordingRun(), second = recordingRun();
     const input = pending.input;

@@ -3,6 +3,8 @@ import { responseBody } from './body.js';
 import { readResponse } from './output.js';
 import { readResponseStream } from './stream.js';
 
+const MIN_OUTPUT_TOKENS = 16;
+
 declareEndpoint('openai-responses', {
   usageInput: 'inclusive',
   opaqueReplay: true,
@@ -13,7 +15,8 @@ declareEndpoint('openai-responses', {
   headers: key => ({ 'content-type': 'application/json', ...(key ? { Authorization: `Bearer ${key}` } : {}) }),
   body: input => responseBody(input, false),
   turnBody: input => responseBody(input, true),
-  refreshBody: body => ({ ...body, max_output_tokens: 1 }),
+  refreshOutputTokens: MIN_OUTPUT_TOKENS,
+  refreshBody: body => ({ ...body, max_output_tokens: MIN_OUTPUT_TOKENS }),
   readBody: readResponse,
   readStream: (body, observe) => readResponseStream(body, false, observe),
 });

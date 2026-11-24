@@ -6,7 +6,7 @@ import { sessionToolConfig } from './extensions/host.js';
 import { createProviderResources } from '../provider/resources.js';
 import { assertAdmission, type Admission } from '../../core/network/admission.js';
 import { providerFetchForEndpoint } from '../../provider/request/fetch.js';
-import { catalogModel } from '../../core/models/catalog.js';
+import { resolveModelCost } from '../../core/models/window.js';
 import { endpointShape } from '../../provider/endpoints/index.js';
 import { buildCompactionWiring, routedCompactionWiring, nativeCompactionAuthority, toCompactionMessages } from './compaction.js';
 import { profileScope } from '../../core/paths/profile/scope.js';
@@ -88,6 +88,8 @@ import { directCompactionTarget } from './compaction/direct.js';
 import { summaryTransport } from './compaction/target.js';
 import type { StepTarget } from '../../turn/context/contract.js';
 import { captureThinkingPreference } from '../../core/models/preference.js';
+import { requestEnvironment } from '../../turn/opening.js';
+import { discoveryLoadout } from './discovery.js';
 
 export function createCliSessionRuntime(input: {
   readonly sessionManager: SessionManager;
@@ -107,7 +109,7 @@ export function createCliSessionRuntime(input: {
    * freeze at undefined and the approval overlay would never appear.
    */
   readonly getPromptInteractiveApproval?: () => (
-    | ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>)
+    | ((prompt: EscalationPrompt, signal?: AbortSignal) => Promise<InteractiveApprovalResult>)
     | undefined
   );
 }): ShellSessionRuntime {
@@ -132,6 +134,13 @@ export function createCliSessionRuntime(input: {
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
     inputSource: input.options.rpcMode ? 'rpc' : isStdinTty() ? 'interactive' : 'cli',
     prepareInput: request => prepareExtensionInput(input.runtimeContext, request, inputHooks),
+    requestEnvironment: sessionId => sessionId === input.runtimeContext.session.id && !convertToLlm
+      ? requestEnvironment({
+          workspaceRoot: input.runtimeContext.cwd,
+          workspaceRoots: input.runtimeContext.session.workspaceRoots,
+          permissionScope: sessionRuntime.getPermissionScope(),
+          goalObjective: goalObjectiveFor(input.runtimeContext, input.sessionManager),
+        }) : undefined,
     captureQueuedInput: binding => captureQueuedExtensionInput(input.runtimeContext, binding, inputHooks),
     admitPrompt: admitCollaborationPrompt.bind(undefined, input.runtimeContext),
     promptSettled: handoffSettlement(input.runtimeContext, settleCollaborationPrompt.bind(undefined, input.runtimeContext)),
@@ -259,7 +268,7 @@ export function createCliSessionRuntime(input: {
           signal,
           requestPolicy, purpose: 'branch-summary', maxOutputTokens: virtualModel ? provider.maxOutputTokens : configuredOutputLimit(config, provider.endpoint),
           onUsage: usageFor({ provider: provider.providerId ?? '', model: provider.model, baseUrl: provider.baseUrl,
-            rates: catalogModel(catalog, provider.providerId ?? '', provider.model, provider.baseUrl)?.cost,
+            rates: resolveModelCost(catalog, provider.providerId ?? '', provider.model, provider.baseUrl, provider),
             usageInput: endpointShape(provider.endpoint).usageInput }),
           provider,
           // The third of the three summarisers, and the one that was missed: it kept
@@ -275,7 +284,7 @@ export function createCliSessionRuntime(input: {
         });
       });
     }),
-    runPrompt: (prompt, signal, _runtimeSeed, _continuityState, attachments, continuityContext, onPromptAccepted, inputAdmission, effectiveInput): PromptRun => providerResources.withConnections(() => {
+    runPrompt: (prompt, signal, _runtimeSeed, _continuityState, attachments, continuityContext, onPromptAccepted, inputAdmission, effectiveInput, requestEnvironmentSnapshot): PromptRun => providerResources.withConnections(() => {
       const operation = configurationOperation(input.runtimeContext);
       const publication = operation.publication;
       const config = operation.config;
@@ -341,10 +350,14 @@ export function createCliSessionRuntime(input: {
       const attachmentRefusal = attachmentAdmission();
       if (attachmentRefusal) throw new Error(attachmentRefusal);
       const forcedTool = takeForcedTool(input.runtimeContext);
+      const permissionScope = sessionRuntime.getPermissionScope();
+      const loadout = !forcedTool && !director && !handoff && !virtualModel && !resolvedCredential.blocked
+        ? discoveryLoadout(input.runtimeContext, resolvedCredential, permissionScope) : undefined;
       const promptWithAttachments = promptWithContext(prompt, attachedContext);
       const run = streamCliRuntimePrompt({
         inputAdmission,
         effectiveInput,
+        requestEnvironment: requestEnvironmentSnapshot,
         virtualModel,
         ...(virtualModel ? { virtualModels: sessionVirtualRegistry(input.runtimeContext.cwd, sessionId) } : {}),
         stepControl: handoff?.control,
@@ -356,13 +369,17 @@ export function createCliSessionRuntime(input: {
         checkpointError: input.renderer.renderLine.bind(input.renderer),
         ...(promptEntryId ? { correlationId: promptEntryId, commandProof: acceptanceCapture(input.sessionManager,
           input.runtimeContext.session, promptEntryId, currentGoal?.id) } : {}),
-        goalObjective: goalObjectiveFor(input.runtimeContext, input.sessionManager),
+        ...(requestEnvironmentSnapshot === undefined
+          ? { goalObjective: goalObjectiveFor(input.runtimeContext, input.sessionManager) } : {}),
         requestPolicy,
         mcpGateway: input.mcpGateway,
         // Carried so the tool pool honours disabledTools / hiddenToolPrefixes.
         runtimeConfig: director?.config(config) ?? config,
         providerCatalog: catalog,
         prompt: promptWithAttachments,
+        ...(loadout ? { retainedTools: loadout.read(), onDiscoveryLoad: (names: readonly string[]) => {
+          if (!signal.aborted && !admission() && sessionRuntime.getPermissionScope() === permissionScope) loadout.write(names);
+        } } : {}),
         onPromptIdentity: identity => {
           if (input.runtimeContext.session.id === sessionId) input.runtimeContext.promptIdentity = identity;
         },
@@ -382,7 +399,7 @@ export function createCliSessionRuntime(input: {
         signal,
         maxTurns: config.maxTurns,
         escalationPromptHandler,
-        permissionScope: sessionRuntime.getPermissionScope(),
+        permissionScope,
         interactiveAsk: (questions, askSignal) =>
           promptInteractiveQuestions(input.getReadline(), questions, askSignal),
         historyMessages,

@@ -1,9 +1,11 @@
-import { afterEach, expect, it } from 'vitest';
+import fs from 'node:fs';
+import { afterEach, expect, it, vi } from 'vitest';
 import type { SessionMessage } from '../session/schema/sessionMessage.js';
 import type { HookDispatcher } from '../core/hooks/hookDispatcher.js';
 import { createStepFunction } from './step.js';
 import { runTurn } from './session.js';
-import { openingMessage } from './opening.js';
+import { openingMessage, requestEnvironment } from './opening.js';
+import { SessionManager } from '../session/SessionManager.js';
 import { outgoingProjection } from './messages.js';
 import { measuredProjectionPrefix, storedPromptProjection } from './measurement.js';
 import { historyDigest, requestIdentity } from '../context/request/identity.js';
@@ -17,6 +19,60 @@ const provider = { provider: 'fixture', model: 'model', baseUrl: 'https://fixtur
 const overhead = { systemPrompt: 'Answer briefly.', tools: [] };
 const hooks = { dispatch: async () => ({ decision: 'allow', stopChecks: [] }) } as unknown as HookDispatcher;
 afterEach(() => resetSessionUsage(id));
+
+it('keeps the wire prefix through prompt transactions, reopening and an environment change', async () => {
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  const root = fs.mkdtempSync('/tmp/cheers-test/cache-prefix-');
+  const home = `${root}/home`;
+  const workspaceRoot = `${root}/workspace`;
+  fs.mkdirSync(home);
+  fs.mkdirSync(workspaceRoot);
+  vi.stubEnv('CHEERS_TEST_ROOT', home);
+  vi.stubEnv('USERPROFILE', home);
+  vi.stubEnv('HOME', home);
+  let sessionId: string | undefined;
+  try {
+    const manager = new SessionManager();
+    const session = manager.createNew(workspaceRoot);
+    sessionId = session.id;
+    const sent: string[] = [];
+    const step = createStepFunction({ provider, sessionId: session.id, workspaceRoot, ...overhead,
+      fetchImpl: async (_url, init) => {
+        sent.push(String(init?.body));
+        return new Response(JSON.stringify({ choices: [{ message: { content: 'answer' }, finish_reason: 'stop' }] }),
+          { headers: { 'content-type': 'application/json' } });
+      } });
+    const submit = async (owner: SessionManager, prompt: string, permissionScope: 'ask' | 'accept-edits') => {
+      const environment = { workspaceRoot, permissionScope };
+      owner.persistUserPromptBarrier(session.id, prompt, { requestEnvironment: requestEnvironment(environment) });
+      const turns = owner.getSession(session.id)!.turns;
+      expect(turns.at(-1)?.content).toBe(prompt);
+      const run = runTurn({ ...environment, prompt, sessionId: session.id, history: turns.slice(0, -1),
+        storedPrompt: turns.at(-1), onMessage: message => owner.addTurn(session.id, message),
+        step, tools: new Map(), hooks, maxSteps: 3, signal: new AbortController().signal });
+      for await (const event of run.events) expect(event.type).not.toBe('query.failed');
+      owner.saveCompleted(session.id);
+    };
+
+    await submit(manager, 'first', 'ask');
+    const reopened = new SessionManager();
+    await submit(reopened, 'second', 'ask');
+    await submit(reopened, 'third', 'accept-edits');
+    const bodies = sent.map(body => JSON.parse(body).messages as SessionMessage[]);
+    expect(bodies).toHaveLength(3);
+    expect(bodies[0]![1]?.content).toContain('permission_scope=ask');
+    expect(bodies[1]!.at(-1)?.content).toBe('second');
+    expect(bodies[2]!.at(-1)?.content).toContain('permission_scope=accept-edits');
+    expect(JSON.stringify(bodies[1]!.slice(0, bodies[0]!.length))).toBe(JSON.stringify(bodies[0]));
+    expect(JSON.stringify(bodies[2]!.slice(0, bodies[1]!.length))).toBe(JSON.stringify(bodies[1]));
+    expect(reopened.getSession(session.id)!.turns.filter(message => message.role === 'user')
+      .map(message => message.content)).toEqual(['first', 'second', 'third']);
+  } finally {
+    if (sessionId) resetSessionUsage(sessionId);
+    vi.unstubAllEnvs();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
 
 it('keeps the selected text projection when removing only a transient opening', () => {
   const opening = openingMessage({ workspaceRoot: '/fixture', prompt: 'inspect' });

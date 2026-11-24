@@ -290,7 +290,7 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     models: [
       { id: "anthropic.claude-sonnet-4-5-v1:0", contextWindow: 200_000, vision: true },
       { id: "anthropic.claude-opus-4-5-v1:0", contextWindow: 200_000, vision: true },
-      { id: "amazon.nova-pro-v1:0", contextWindow: 300_000, vision: true },
+      { id: "amazon.nova-pro-v1:0", contextWindow: 300_000, promptCache: { short: 300 }, vision: true },
     ],
   },
   {
@@ -343,8 +343,9 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
         promptCache: { short: 600, long: 86_400 }, vision: true },
       { id: "gpt-5.1-mini", tokenizer: 'o200k_base', contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
       { id: "o4-mini", tokenizer: 'o200k_base', contextWindow: 200_000, reasoning: true,
-        compat: { ...REASONING_REQUEST_SHAPE, endpoint: 'openai-responses', reasoningSummary: true },
-        vision: true, serviceTiers: ['default', 'priority', 'fast', 'flex'] },
+        compat: { ...REASONING_REQUEST_SHAPE, endpoint: 'openai-responses', reasoningSummary: true,
+          supportsLongCacheRetention: false },
+        promptCache: { short: 300 }, vision: true, serviceTiers: ['default', 'priority', 'fast', 'flex'] },
     ],
   },
   {

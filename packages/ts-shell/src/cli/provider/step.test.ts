@@ -108,6 +108,36 @@ it('captures configured cache retention before foreground dispatch and preserves
   expect(server.received[2]).not.toHaveProperty('prompt_cache_retention');
 });
 
+it('keeps system text independent of the tool inventory and sends schema objects in a stable order', async () => {
+  const setup = createAdvisorHarness(false, false);
+  const server = await wire(setup);
+  const tool = (name: string, argsSchema: Record<string, unknown>): ToolDefinition => ({
+    name, description: 'Schema fixture', argsSchema,
+    execute: async () => ({ success: true, output: '' }),
+  });
+  const first = tool('inspect_fixture', { type: 'object', required: ['z', 'a'],
+    properties: { z: { type: 'integer' }, a: { enum: ['second', 'first'], type: 'string' } } });
+  const reordered = tool('inspect_fixture', { properties: {
+    a: { type: 'string', enum: ['second', 'first'] }, z: { type: 'integer' } },
+  required: ['z', 'a'], type: 'object' });
+  const extra = tool('extra_fixture', { type: 'object' });
+  for (const definitions of [[first], [reordered], [reordered, extra]]) {
+    const step = createProviderStep(server.request, new Map(definitions.map(definition => [definition.name, definition])), {});
+    const answer = await step([{ role: 'user', content: 'inspect the fixture' }], setup.signal, {}, {
+      allowTools: true, agentMode: 'plan',
+    });
+    expect(answer.stopReason).toBe('stop');
+  }
+  const [before, same, expanded] = server.received;
+  expect(JSON.stringify(before?.tools)).toBe(JSON.stringify(same?.tools));
+  expect(before?.tools).toMatchObject([{ function: { parameters: { required: ['z', 'a'],
+    properties: { a: { enum: ['second', 'first'] } } } } }]);
+  expect(expanded?.tools).toHaveLength(2);
+  expect(before?.messages).toEqual(expanded?.messages);
+  expect(JSON.stringify(before?.messages)).toContain('PLAN MODE ACTIVE');
+  expect(JSON.stringify(before?.messages)).not.toContain(first.name);
+});
+
 it('forwards configured tool-text retention through the provider host to the outgoing request', async () => {
   const setup = createAdvisorHarness(false, false);
   const server = await wire(setup);
@@ -245,7 +275,7 @@ it('uses the host plan mode for a foreground model that cannot call tools', asyn
   const messages = server.received[0]?.messages as Array<{ readonly role: string; readonly content?: string }>;
   expect(messages[0]?.content).toContain('PLAN MODE ACTIVE: Answer from the conversation');
   expect(messages[0]?.content).not.toContain('BUILD MODE ACTIVE');
-  expect(messages[0]?.content).not.toContain('equipped with real tools');
+  expect(messages[0]?.content).not.toContain('Use the tools declared');
   expect(prepared.currentTools().has('task')).toBe(true);
   expect(prepared.currentOverhead()).toEqual({ systemPrompt: messages[0]?.content, tools: [] });
 });
