@@ -1,6 +1,6 @@
 # 2026-11 路线图执行记录
 
-**状态**：Batch 0–4 的可发布范围已通过定向验收并分批提交，v0.1.0 已发布；包含五秒 job 晋升的 v0.1.1 正在做标签发布验收。B0.6 中三个 provider 外部连接结果未通过或无法连接；完整 JS worker 脱离父 tool 与额外 agent slot 经核实不适用。
+**状态**：Batch 0–4 的可发布范围已通过定向验收并分批提交，v0.1.0 与包含五秒 job 晋升的 v0.1.1 均已发布。B0.6 中三个 provider 外部连接结果未通过或无法连接；完整 JS worker 脱离父 tool 与额外 agent slot 经核实不适用。
 **任务范围**：核实并执行 `.wiki/wiki/references/codex-and-frontier-gap-audit-2026-11.md` 与 `.wiki/wiki/references/cheers-next-phase-roadmap-2026-11.md` 中的后续批次。
 **基线**：2026-11-23，源码提交 `f65ba979`。
 
@@ -17,7 +17,7 @@
 | Batch 1 | Linux 本地验收通过，已提交 | 请求前缀、工具发现、缓存 usage/状态、Responses 摘要前缀复用、Bedrock cachePoint 和 capability 反转均通过定向测试。提交 `ab7312f3` 与接线补充 `976847c3`。真实 BaiLu cache-read 为 0、384、640 tokens，但无输入 token 分母，未报告命中率百分比。 |
 | Batch 2 | Linux 本地验收通过，shell 长命令晋升补充已提交 | 嵌套调用 fail-closed、拒绝终止分类、逐调用审批、审批等待暂停、receipt/diff、代码折叠和 PostToolUse 脱敏通过定向测试。Code Mode shell tag 的长 bash 命令现复用同一 PID 的 session job 晋升。完整 JS worker 仍由父 tool 持有，不转入新生命周期。 |
 | Batch 3 | 五秒同进程晋升已实现并通过定向验收 | 命令面板、主题预览入口、并排 diff 换行、Tab/Alt+Up、首次连接引导、受控 LSP 候选、重复调用提醒、job 观察及 stream idle watchdog 原实现已验收。当前晋升改动通过 33 项聚焦测试与 Linux 编译/单文件 build；新 agent 并发槽由现有输入/任务 owner 反证为不适用。 |
-| Batch 4 | v0.1.0 已发布；v0.1.1 纳入 job 晋升收尾 | README、INSTALL、发布 workflow、审批式外部 workspace 架构初始化及 MIT LICENSE 已实现。根与 shell 包 SPDX 为 MIT，版权信息为 `Copyright (c) 2026 h-hei133`。固定包为 `ea5054127f4679a8939a747c6495e0df8534b70e`，pinned judge `proven`。原 Batch 4 实现提交 `099b661`；复现性修复 `fb567fb7`；许可证收尾 `e1719fdb`；首个标签 `v0.1.0`。 |
+| Batch 4 | v0.1.0 与 v0.1.1 均已发布 | README、INSTALL、发布 workflow、审批式外部 workspace 架构初始化及 MIT LICENSE 已实现。根与 shell 包 SPDX 为 MIT，版权信息为 `Copyright (c) 2026 h-hei133`。固定包为 `ea5054127f4679a8939a747c6495e0df8534b70e`，pinned judge `proven`。原 Batch 4 实现提交 `099b661`；复现性修复 `fb567fb7`；许可证收尾 `e1719fdb`；版本标签 `v0.1.0` 和 `v0.1.1` 均完成发布验收。 |
 
 ## 批次 0 验收清单
 
@@ -80,7 +80,7 @@
 | B3.4 repeat-tool reminder 与 stream idle watchdog | 缺口成立 | 已验收 | 有界有序参数摘要、阈值 3/5/8；观察器不 veto 且跳过调用不计数。stream watchdog 与 native deadline/取消分类分离。 |
 | B3.5 jobs/diff 汇总过滤与注意力并发 | 部分成立；五秒晋升成立，“+1 槽”不成立 | 已验收／不适用项已纠正 | run settlement waiter、审批等待观察、jobs 差值投影和无显式 timeout 的五秒原进程晋升通过测试。`AgentService` 的两个 slot 独立于主会话输入/turn 队列，增加它们不会为人类保留并发槽；不新增调度器或第三个 agent slot。 |
 | B3.6 文件拆分/死代码清理 | 无职责候选支撑宽泛拆分 | 已核实 | 删除无生产引用的 `DoomLoopDetector` 与孤立测试；未进行没有具体 owner/反例依据的大模块改写。 |
-| B4.1 README/安装/许可证/发布工作流 | 文档和发布配置缺口成立 | 已验收并发布 | README、INSTALL、MIT LICENSE、根/shell 包元数据；GitHub Actions `45310333037` 对 Linux x64 与 macOS arm64/x64 执行构建、版本/help 检查及 SHA-256 校验，全部成功；GitHub Release `v0.1.0` 已公开。Linux release asset 已下载并通过 sidecar、`--version` 与 `--help` 验收。 |
+| B4.1 README/安装/许可证/发布工作流 | 文档和发布配置缺口成立 | 已验收并发布 | README、INSTALL、MIT LICENSE、根/shell 包元数据；GitHub Actions `45310333037` 与 `45324521050` 对 Linux x64 与 macOS arm64/x64 执行构建、版本/help 检查及 SHA-256 校验，均成功；GitHub Release `v0.1.0` 与 `v0.1.1` 已公开。两个 Linux release asset 均通过 sidecar、`--version` 与 `--help` 验收。 |
 | B4.2 固定门控包刷新 | 版本缺口成立，实际相差五提交 | 已验收 | pinned archive、全部清单哈希与全哈希 commit `ea5054127f4679a8939a747c6495e0df8534b70e` 一致，脚本契约通过。 |
 | B4.3 外部工作区门控资产携带 | 缺口成立 | 已验收 | initializer 与 hook assets 带 digest、Node/runtime 限制和 profile 隔离；实际构建产物包含资源。 |
 | B4.4 外部工作区一键初始化 | 原建议绕过 writer 不成立 | 已验收／有界 | `/init architecture` 只生成隔离快照提案；`/init apply` 复用普通 patch 审批、完整分组校验和逐文件读回。 |
@@ -177,6 +177,13 @@
 - Linux 定向 Vitest 为 3 suites / 33 tests 通过；Biome lint、运行时依赖图、配置消费者、声明、Node floor 门禁通过。TypeScript build 和 Linux 单文件 build 通过，`--version`/`--help` 正常，构建 manifest 为 `fresh`。显式 timeout 反例确认命令仍留在前台；完整 CLI 四模式 PTY smoke 未在这次 5 秒阈值修改后重跑。
 - 用户优先的第三 agent 并发槽经源码反证不适用。完整 JavaScript worker 生命周期脱离父 tool 仍不支持，因为 job journal 没有 worker checkpoint/重连，父 tool 负责 nested approval、RPC drain 与 branch-store commit；不把 shell process 晋升报告成 worker detachment。
 - 五秒晋升改动晚于 `v0.1.0` 标签。依据 patch version 语义，后续将发行 `v0.1.1` 以纳入该功能；已同步根包、shell 包及 lockfile 版本。该版本 Linux build、`--version`、`--help` 通过，等待标签 workflow 验收。
+
+## v0.1.1 发布验收（2026-11-24）
+
+- GitHub Actions run `45324521050` 完成成功。Linux x64、macOS x64、macOS arm64 构建及发布 job 均通过，公开 Release `v0.1.1` 包含三个二进制和对应的 `.sha256` 文件。
+- 从公开 Release 下载的 Linux x64 资产通过 sidecar 校验，`--version` 返回 `0.1.1`，`--help` 正常退出。下载器没有保留可执行权限，本地临时副本加执行位后完成入口验收。
+- Linux 资产 SHA-256 为 `656f67e69f339a7e57c4292149cbee7626ddad72cb9283e32ec6079a1c4f53fc`。下载副本已从 `.tmp/` 清理。
+- 版本提交 `4c755946` 和 `v0.1.1` 标签已推送；该轮发布与 Linux 资产验收完成。
 
 ## 完成及提交规则
 
