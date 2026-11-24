@@ -37,6 +37,16 @@ job owner 还需要持久或可重连的 worker controller，带确认状态的 
 
 这些要求增加了新的持久工作种类、恢复状态与 UI 交互。当前 `LocalJob` schema 只有 native 命令字段，`AgentJob` schema 则定义为一个新的模型回合，现有本地 runner 没有可移交的 worker-owner 通道。因此这不是为 Batch 2 安全补丁增加一个 `TaskRegistry` adapter 就能满足的范围。
 
-## 实现边界
+## 初始实现边界
 
-在生命周期合同确定前，不自动晋升运行中的脚本，也不在关闭时留下脱离 owner 的 worker。可以继续使用脚本内 `$` shell tag 调用普通 gated `bash`，使每条命令保持当前回合的权限、超时和取消路径。长任务必须通过已存在且明确支持 native shell command 的本地 job 入口显式启动。
+此节记录初始核验结论，后续实现见下一节。在生命周期合同确定前，不自动晋升运行中的脚本，也不在关闭时留下脱离 owner 的 worker。可以继续使用脚本内 `$` shell tag 调用普通 gated `bash`，使每条命令保持当前回合的权限、超时和取消路径。长任务必须通过已存在且明确支持 native shell command 的本地 job 入口显式启动。
+
+## 后续实现结论（2026-11-24）
+
+B2.7 的范围重新拆成 shell tag 中的长原生命令与 JavaScript worker 本身。前者能够在不改变执行 owner 的情况下复用原生 job 晋升，后者仍受以上父 tool、store commit 和 nested RPC 结算合同约束。
+
+- `NestedToolCallRunner.shell()` 不再显式传默认 `timeout`，因此普通 Bash owner 可把同一 foreground PID 先交给 `TaskRegistry.adopt()`，等待 5 秒后沿原 `LocalJournal.promote()` 晋升。不调用第二次 spawn，不扩展持久 job 类型或新增 scheduler。
+- 晋升的 nested result 保留 `backgroundJobId`，并标记 shell 输出不完整。脚本仍能看到明确的后台 job 提示，`.json()` 拒绝解析尚未产生的命令输出；用户可通过同 session jobs 工具读取或停止该命令。
+- 不将 JS worker 从父 tool/turn 解绑。无论参考方案如何组织自己的 job owner，worker 程序计数器、局部变量、后续 nested approval 与父 tool receipt 都没有当前 Cheers job journal 可重连的持久合同。worker 退出后禁止从代码起点重跑。
+- B3.5 使用同一个 Bash 晋升 owner，前台等待时间独立为 5 秒；60 秒无显式 timeout 的执行上限与晋升后 300 秒 lease 不变。主会话输入事件仍立即促使现有 `promoteForeground()`，无需增加另一并发槽。
+- Linux 聚焦回归及编译产物 build 证据记在 [`roadmap-tasks.md`](roadmap-tasks.md#shell-job-晋升收尾2026-11-24)。

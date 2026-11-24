@@ -1,6 +1,6 @@
 import { createCommandOutputCapture } from '../../../runtime/execution/output/capture.js';
 import type { CommandExecutionResult, CommandExecutionRequest, ExecutionService } from '../../../runtime/execution/types.js';
-import { resolveCommandTimeout, DEFAULT_COMMAND_TIMEOUT_MS } from '../../../runtime/execution/commandTimeout.js';
+import { resolveCommandTimeout, DEFAULT_COMMAND_TIMEOUT_MS, FOREGROUND_PROMOTION_DELAY_MS } from '../../../runtime/execution/commandTimeout.js';
 import { startCommandProof } from '../../../runtime/execution/proof.js';
 import { networkNotice, readSandboxRules } from '../../../sandbox/osSandbox.js';
 import type { ToolExecutionContext } from '../../../tools/types.js';
@@ -55,7 +55,7 @@ export async function runCommandTool(executionService: ExecutionService, command
       }
       let timer: ReturnType<typeof setTimeout> | undefined;
       const deadline = new Promise<{ kind: 'timeout' }>(resolve => {
-        timer = setTimeout(() => resolve({ kind: 'timeout' }), DEFAULT_COMMAND_TIMEOUT_MS);
+        timer = setTimeout(() => resolve({ kind: 'timeout' }), FOREGROUND_PROMOTION_DELAY_MS);
         timer.unref?.();
       });
       try {
@@ -69,7 +69,9 @@ export async function runCommandTool(executionService: ExecutionService, command
             started.handle.detach();
             foreground = false;
             transferred = true;
-            return approvedResult(`Moved to the background as ${task.id}${raced.kind === 'timeout' ? ` after ${DEFAULT_COMMAND_TIMEOUT_MS / 1000} seconds` : ''}. It keeps the same process; read it with taskOutput and stop it with taskStop.`);
+            return approvedResult(`Moved to the background as ${task.id}${raced.kind === 'timeout' ? ` after ${FOREGROUND_PROMOTION_DELAY_MS / 1000} seconds` : ''}. It keeps the same process; read it with taskOutput and stop it with taskStop.`, {
+              backgroundJobId: task.id,
+            });
           }
           if (outcome === 'refused') {
             foreground = false;

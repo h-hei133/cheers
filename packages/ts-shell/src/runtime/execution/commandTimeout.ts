@@ -17,6 +17,9 @@
 /** The bound applied when a caller names no timeout. */
 export const DEFAULT_COMMAND_TIMEOUT_MS = 60_000;
 
+/** How long an unbounded foreground command waits before becoming a session job. */
+export const FOREGROUND_PROMOTION_DELAY_MS = 5_000;
+
 /** The largest delay `setTimeout` accepts without overflowing. */
 export const MAX_COMMAND_TIMEOUT_MS = 2_147_483_647;
 

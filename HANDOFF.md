@@ -56,6 +56,11 @@ Long wrapped Unicode lines can spend over 30 seconds in terminal layout on Node 
 - **Root Cause**: Linux retains an exited zombie PID until reaped, and PIDs can be reused.
 - **Rule**: Capture the target's start identity while live, then observe absence, identity change, or zombie state within a bounded deadline after wrapper close.
 
+### Default Timeout Arguments Disable Foreground Job Promotion
+- **Symptom**: A long nested shell call reaches its timeout instead of moving into the session job list.
+- **Root Cause**: The foreground executor can adopt and promote the same live process only when no timeout was explicitly requested. Passing the resolved default is indistinguishable from a user-specified limit.
+- **Rule**: Preserve an omitted timeout through the normal shell owner. Mark a promoted result incomplete and retain its job identity so callers cannot treat its notice as final command output.
+
 ### Sandboxed Hooks Must Expose Non-System `process.execPath`
 - **Symptom**: `PreToolUse` / `Stop` hooks fail under `bwrap` when Cheers runs via `nvm` Node or a compiled single-file executable outside `/usr`/`/bin`/`/opt`.
 - **Root Cause**: `bwrap` only read-only mounts `sandboxSystemReadRoots` and the workspace; executables under `$HOME` are invisible inside the namespace.

@@ -1,6 +1,6 @@
 # 2026-11 路线图执行记录
 
-**状态**：Batch 0–4 的本地实现已通过定向验收并分批提交，v0.1.0 公开 Release 已发布。Batch 0 真实模型路由仍部分未证实；B2.7 长脚本后台化与 B3.5 自动晋升/前台优先槽按已核实的生命周期边界继续暂缓。
+**状态**：Batch 0–4 的本地实现已通过定向验收并分批提交，v0.1.0 公开 Release 已发布。B0.6 中三个 provider 外部连接结果未通过或无法连接；B2.7 完整 JS worker 脱离父 tool 不符合当前持久/审批合同，B3.5 的五秒同进程晋升已实现，“+1 人类槽”建议不适用。
 **任务范围**：核实并执行 `.wiki/wiki/references/codex-and-frontier-gap-audit-2026-11.md` 与 `.wiki/wiki/references/cheers-next-phase-roadmap-2026-11.md` 中的后续批次。
 **基线**：2026-11-23，源码提交 `f65ba979`。
 
@@ -15,8 +15,8 @@
 | Batch 0 | 实现完成，B0.6 部分验证 | Ready / Configured、模型 Registry、会话连接切换和事务重命名已有实现。四连接实际探测中 BaiLu 请求成功；Casa/NOFX 认证失败，Workbuddy 目标 `127.0.0.1:7863` 无监听。不能把认证或服务状态记为路由验收成功。 |
 | Batch 0.5 | Linux 本地验收通过，已本地提交 | YAML/JSONC、用户配置解析、保注释局部写回、显式迁移和配置消费者通过 31 个聚焦套件 826/826，六个静态门、源码构建、单文件构建和隔离配置迁移入口通过。提交 `f7f9044c74e05eaa7d0d79dd5023a36fa475a294`，未推送。 |
 | Batch 1 | Linux 本地验收通过，已提交 | 请求前缀、工具发现、缓存 usage/状态、Responses 摘要前缀复用、Bedrock cachePoint 和 capability 反转均通过定向测试。提交 `ab7312f3` 与接线补充 `976847c3`。真实 BaiLu cache-read 为 0、384、640 tokens，但无输入 token 分母，未报告命中率百分比。 |
-| Batch 2 | Linux 本地验收通过，已提交 | 嵌套调用 fail-closed、拒绝终止分类、逐调用审批、审批等待暂停、receipt/diff、代码折叠和 PostToolUse 脱敏通过定向测试。字面 shell 模板复用现有 gated bash。提交 `d006c981`。重复调用观察器与共享工具执行 owner 同批集成。长脚本后台晋升按现有生命周期反证暂缓，详见 `script-jobs.md`。 |
-| Batch 3 | 四模式 Linux CLI 验收通过，已提交 | 命令面板、主题预览入口、并排 diff 换行、Tab/Alt+Up、首次连接引导、受控 LSP 候选、重复调用提醒、job 观察及 stream idle watchdog 通过定向测试及四模式 smoke。提交 `b06ec6d0`。五秒后台晋升暂缓。 |
+| Batch 2 | Linux 本地验收通过，shell 长命令晋升补充已提交 | 嵌套调用 fail-closed、拒绝终止分类、逐调用审批、审批等待暂停、receipt/diff、代码折叠和 PostToolUse 脱敏通过定向测试。Code Mode shell tag 的长 bash 命令现复用同一 PID 的 session job 晋升。完整 JS worker 仍由父 tool 持有，不转入新生命周期。 |
+| Batch 3 | 五秒同进程晋升已实现并通过定向验收 | 命令面板、主题预览入口、并排 diff 换行、Tab/Alt+Up、首次连接引导、受控 LSP 候选、重复调用提醒、job 观察及 stream idle watchdog 原实现已验收。当前晋升改动通过 33 项聚焦测试与 Linux 编译/单文件 build；新 agent 并发槽由现有输入/任务 owner 反证为不适用。 |
 | Batch 4 | v0.1.0 公开 Release 已发布 | README、INSTALL、发布 workflow、审批式外部 workspace 架构初始化及 MIT LICENSE 已实现。根与 shell 包 SPDX 为 MIT，版权信息为 `Copyright (c) 2026 h-hei133`。固定包为 `ea5054127f4679a8939a747c6495e0df8534b70e`，pinned judge `proven`。原 Batch 4 实现提交 `099b661`；复现性修复 `fb567fb7`；许可证和发布收尾 `e1719fdb`；标签 `v0.1.0`。 |
 
 ## 批次 0 验收清单
@@ -73,12 +73,12 @@
 | B2.4 内部执行 TUI receipt/代码折叠 | 缺口成立 | 已验收 | 从有父子身份的 receipt 投影内部差异和可折叠代码，没有创建第二套调用状态。 |
 | B2.5 审批等待暂停脚本预算 | 缺口成立 | 已验收 | 只扣除真实审批等待时间；取消和并发 settle 有回归覆盖。 |
 | B2.6 PostToolUse 安全覆写 | 部分成立 | 已验收 | hook 可脱敏输出，同时保留 success/failure、调用名、审批事实及已发生副作用。 |
-| B2.7 shell 模板与长脚本后台晋升 | shell 模板已实现；脚本转后台反证成立 | 脚本转后台暂缓 | shell tag 只走既有 gated bash；TaskRegistry 接管的是本地进程 handle，不能续行 worker；细节见 `script-jobs.md`。 |
+| B2.7 shell 模板与长脚本后台晋升 | shell 模板成立；原晋升接线缺口成立 | shell 命令晋升已验收，worker 转移不适用 | `$` template 省略显式默认 timeout，长 bash 调用通过现有 gated bash，在等待阈值后把同一 PID 交给 session job；后台 job ID 保留在 receipt/metadata，shell 输出标记不完整使 `.json()` 拒绝。JS worker 仍在父 tool 完成时收尾，不声称可恢复任意 PC/局部变量；详见 `script-jobs.md`。 |
 | B3.1 命令面板、主题入口、并排 diff | 缺口成立 | 已验收 | 复用 capability filter、theme preview lease、并排 diff 换行、源码复制和分页 owner。 |
 | B3.2 Alt+Up、首启引导、媒体连接池 | 缺口成立 | 已验收 | 排队与补全语义分开；Alt+Up 召回队尾；首启连接向导和媒体池复用既有 credential owner。 |
 | B3.3 受控 LSP 候选选择 | 自动启动与安全合同冲突 | 已验收／有界 | 仅显示候选，用户明确选择后才允许现有 server owner 启动。 |
 | B3.4 repeat-tool reminder 与 stream idle watchdog | 缺口成立 | 已验收 | 有界有序参数摘要、阈值 3/5/8；观察器不 veto 且跳过调用不计数。stream watchdog 与 native deadline/取消分类分离。 |
-| B3.5 jobs/diff 汇总过滤与注意力并发 | 部分成立 | 已验收／有界 | 精确 run settlement waiter、审批等待观察和 jobs 差值投影完成；五秒后台晋升和新优先槽维持暂缓。 |
+| B3.5 jobs/diff 汇总过滤与注意力并发 | 部分成立；五秒晋升成立，“+1 槽”不成立 | 已验收／不适用项已纠正 | run settlement waiter、审批等待观察、jobs 差值投影和无显式 timeout 的五秒原进程晋升通过测试。`AgentService` 的两个 slot 独立于主会话输入/turn 队列，增加它们不会为人类保留并发槽；不新增调度器或第三个 agent slot。 |
 | B3.6 文件拆分/死代码清理 | 无职责候选支撑宽泛拆分 | 已核实 | 删除无生产引用的 `DoomLoopDetector` 与孤立测试；未进行没有具体 owner/反例依据的大模块改写。 |
 | B4.1 README/安装/许可证/发布工作流 | 文档和发布配置缺口成立 | 已验收并发布 | README、INSTALL、MIT LICENSE、根/shell 包元数据；GitHub Actions `45310333037` 对 Linux x64 与 macOS arm64/x64 执行构建、版本/help 检查及 SHA-256 校验，全部成功；GitHub Release `v0.1.0` 已公开。Linux release asset 已下载并通过 sidecar、`--version` 与 `--help` 验收。 |
 | B4.2 固定门控包刷新 | 版本缺口成立，实际相差五提交 | 已验收 | pinned archive、全部清单哈希与全哈希 commit `ea5054127f4679a8939a747c6495e0df8534b70e` 一致，脚本契约通过。 |
@@ -104,13 +104,14 @@
 - Linux 真实模型探测三轮 BaiLu 返回 cache-read `0`、`384`、`640` tokens，cache-write 为 `0`。provider 未给出输入 token 分母，未推导命中率。Casa 与 NOFX 分别返回认证失败，Workbuddy 目标 `127.0.0.1:7863` 无监听。旧 Batch 0 记录中的“真实 endpoint 请求成功”修正为 BaiLu 成功，Casa/NOFX 为认证失败，均与产品路由测试分开记录。
 - Batch 1–4 无新增产品运行时依赖。提交 `ab7312f3`/`976847c3`、`d006c981`、`b06ec6d0`、`099b661`，均本地且未推送。实际工作量 L。B4.1 LICENSE 与公开 Release 保持未完成，因用户选择暂缓根项目许可证信息。
 
-## Batch 3.5 设计边界
+## Batch 3.5 设计与修正
 
 - `/director wait` 监听当前 run 的 settlement promise，精确保留 run identity；调用方等待超时和取消只结束观察，不取消 worker。状态输出按安全行与详情做差值发布。
 - 审批等待提示来自未结算的审批 prompt，限于内存中的 operation，不持久化确认、密钥或输入内容；run 结束后消失。
-- 五秒自动晋升不能复用子会话的原生任务登记器。`AgentService` run 结束时关闭子会话 `TaskRegistry`，会杀掉它接管的进程；父会话的 `/jobs` 使用另一份 `JobStore`，缺少进程、artifact、停止权限和精确作用域的转移合同。未把 worker 命令发布到父会话。
-- 已比较持久任务登记、原生命令存活期和短等待 UI 的参考决策。它们采用既有 job 身份持续读取或有期限的前台等待，没有找到“启动五秒后即可脱离 child turn”的共同契约。目标深度审计所引的执行文档未在配置的参考树中找到，因此不将该具体时间规则当作产品事实。
-- 当前两槽 agent journal 不承载前台输入；增加 agent 槽位无法创建 human-priority slot。没有共同调度器、准入与结算 owner 时不增加槽位。
+- 此前把 shell foreground promotion 与子会话 AgentService job 生命周期混为一项。当前 Bash owner 已先采用 provisional `LocalExecutionHandle`，在同一父 session 的 `TaskRegistry` 中原 PID 晋升；人类输入路径本来就会立即触发 `promoteForeground()`。因此仅将默认前台晋升等待从 60 秒调到 5 秒，仍保留默认命令执行上限 60 秒、晋升后 job lease 300 秒、用户显式 timeout 及 journal/capacity failure 语义。
+- 本地测试覆盖 4,999ms 尚未晋升、5,000ms 晋升、完成竞赛、用户输入提前晋升和容量拒绝。Promoted command 保留原 PID，不重新 spawn。
+- 同 session agent journal 的两个 slot 仅约束 side-agent runs。主会话输入与 turn queue 有独立 owner，因此把 agent 上限改为三个不能新增前台人类槽，也没有统一 request semaphore 可调。已有 `waitsForPerson` 行高亮继续复用，不新增槽位或调度器。
+- 对照时采用的有效决策是同一 job ID/进程继续读取、完成与中止竞速先于晋升、输入可提前晋升。更贴近的异步任务方案使用 60 秒默认阈值；Cheers 依据本路线图保留同一执行 owner，仅设置 5 秒等待。各参考仓库的 worker abort/close 与父工具结算没有给当前 JS worker 提供可直接移交的可恢复 checkpoint。
 
 ## Batch 0.5 格式与迁移合同
 
@@ -167,6 +168,14 @@
 - Release 共六个资产：`cheers-linux-x64`（112,670,848 字节）、`cheers-darwin-arm64`（81,658,850 字节）、`cheers-darwin-x64`（87,244,880 字节）及各自 `.sha256` 文件。Linux 资产下载后在 Linux 主机按 sidecar 校验通过，`--version` 为 `0.1.0`，`--help` 正常退出。
 - GitHub Actions 注明 `checkout@v4`、`setup-node@v4`、`upload-artifact@v4` 和 `download-artifact@v4` 当前使用的 Node 20 action runtime 将被 runner 强制切至 Node 24；本次 job 成功，该提示作为后续 action 版本维护信息保留。
 - 仓库本地 `npm run verify:release:core` 仍未通过：release 核心权限/记忆脚本引用不存在的 `src/orchestration/runMvpIntegratedFlow.test.ts`，且其隔离 CLI 路径被 Stop hook 默认拒绝。该门禁不在 `.github/workflows/release.yml` 执行链内，不能记作通过，也不影响本次 workflow 已报告成功的发布证据。
+
+## shell job 晋升收尾（2026-11-24）
+
+- Code Mode `$` shell tag 删除了人为固定的 60 秒 timeout 参数，因而复用普通 bash 的 session job 晋升。结果 metadata 保留 `backgroundJobId`，shell 投影将该结果标记为 incomplete，`.json()` 不会把启动通知解析成命令输出。
+- 默认 session-owned foreground promotion 延迟为 5,000ms，独立于默认 60,000ms command timeout 与晋升后 300,000ms job timeout。4,999ms 前保持前台；5,000ms 后同一进程晋升；较早完成、用户输入提前晋升和容量拒绝保持原结算行为。
+- 复用 `ExecutionService.startCommand`、`TaskRegistry.adopt/promote`、`LocalJournal` 和现有 permission/sandbox/hook path。未新增领域包、执行器或依赖；S.U.P.E.R 10/10，未计划依赖 0，实际工作量 M。
+- Linux 定向 Vitest 为 3 suites / 33 tests 通过；Biome lint、运行时依赖图、配置消费者、声明、Node floor 门禁通过。TypeScript build 和 Linux 单文件 build 通过，`--version`/`--help` 正常，构建 manifest 为 `fresh`。显式 timeout 反例确认命令仍留在前台；完整 CLI 四模式 PTY smoke 未在这次 5 秒阈值修改后重跑。
+- 用户优先的第三 agent 并发槽经源码反证不适用。完整 JavaScript worker 生命周期脱离父 tool 仍不支持，因为 job journal 没有 worker checkpoint/重连，父 tool 负责 nested approval、RPC drain 与 branch-store commit；不把 shell process 晋升报告成 worker detachment。
 
 ## 完成及提交规则
 

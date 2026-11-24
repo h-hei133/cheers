@@ -4,7 +4,6 @@ import { boundToolMedia, createToolMediaBudget } from '../../agent/media.js'
 import { snapshotData } from '../../values/data.js'
 import { redactExportText } from '../../security/redaction.js'
 import { redactSecretsFromObject } from '../../../observability/structuredLogger.js'
-import { DEFAULT_COMMAND_TIMEOUT_MS } from '../../../runtime/execution/commandTimeout.js'
 
 export const NESTED_CALL_LIMITS = {
   maxCalls: 256,
@@ -141,9 +140,9 @@ export class NestedToolCallRunner {
     return nestedValue(result)
   }
 
-  /** The shell tag can observe a settled process exit through the ordinary bash call. */
+  /** The shell tag uses ordinary bash job promotion for commands that outlive the foreground wait. */
   async shell(command: string, beginApprovalWait?: () => () => void) {
-    const result = await this.execute('bash', { command, timeout: DEFAULT_COMMAND_TIMEOUT_MS / 1000 }, beginApprovalWait)
+    const result = await this.execute('bash', { command }, beginApprovalWait)
     const metadata = result.metadata
     const exited = !result.denial && !result.stop && !result.terminate && metadata?.status === 'failed'
       && metadata.failureKind === 'execution_failure' && typeof metadata.executionPath === 'string'
@@ -153,9 +152,10 @@ export class NestedToolCallRunner {
     const output = result.output ?? result.error ?? ''
     // The bash output owner appends an independently captured display notice.
     const tail = typeof metadata?.outputNotice === 'string' ? '\n\n' + metadata.outputNotice : undefined
-    const complete = metadata?.truncated !== true && metadata?.outputComplete !== false
+    const backgroundJobId = typeof metadata?.backgroundJobId === 'string' ? metadata.backgroundJobId : undefined
+    const complete = !backgroundJobId && metadata?.truncated !== true && metadata?.outputComplete !== false
     const text = complete && tail && output.endsWith(tail) ? output.slice(0, -tail.length) : output
-    return { text, complete, ...(exited === undefined ? {} : { exitCode: exited }) }
+    return { text, complete, ...(backgroundJobId ? { backgroundJobId } : {}), ...(exited === undefined ? {} : { exitCode: exited }) }
   }
 
   private async execute(name: string, rawArgs: unknown, beginApprovalWait?: () => () => void): Promise<ToolExecutionResult> {

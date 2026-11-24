@@ -2,11 +2,12 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { createCoreToolRegistry } from '../registry.js';
 import type { ExecutionService } from '../../../runtime/execution/types.js';
 import type { BackgroundRunner } from '../../../runtime/execution/background/model.js';
+import { FOREGROUND_PROMOTION_DELAY_MS } from '../../../runtime/execution/commandTimeout.js';
 import type { ToolExecutionContext } from '../../../tools/types.js';
 
 afterEach(() => vi.useRealTimers());
 
-it('promotes a default-timeout foreground command without spawning again', async () => {
+it('keeps a default foreground command in front for five seconds before promotion', async () => {
   vi.useFakeTimers();
   const detach = vi.fn();
   const kill = vi.fn(async () => {});
@@ -22,7 +23,10 @@ it('promotes a default-timeout foreground command without spawning again', async
   const context = { workspaceRoot: '/tmp', cwd: '/tmp', sessionId: 's', background, onOutput: () => {} } as unknown as ToolExecutionContext;
   const pending = bash.execute({ command: 'echo hi' }, context);
   await Promise.resolve();
-  await vi.advanceTimersByTimeAsync(60_000);
+  await vi.advanceTimersByTimeAsync(FOREGROUND_PROMOTION_DELAY_MS - 1);
+  expect(promote).not.toHaveBeenCalled();
+  expect(detach).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1);
   const result = await pending;
   expect(startCommand).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 300_000 }));
   expect(adopt).toHaveBeenCalledWith(expect.objectContaining({ pid: 4321 }), expect.objectContaining({ command: 'echo hi' }),
@@ -31,6 +35,7 @@ it('promotes a default-timeout foreground command without spawning again', async
   expect(promote).toHaveBeenCalledWith('task-1');
   expect(kill).not.toHaveBeenCalled();
   expect(result.success).toBe(true);
+  expect(result.output).toContain('after 5 seconds');
   expect(result.output).toContain('task-1');
 });
 
@@ -39,7 +44,8 @@ it('reports the result when the command settles before promotion', async () => {
   const detach = vi.fn();
   const promote = vi.fn(() => 'settled' as const);
   const adopt = vi.fn(() => ({ id: 'task-3', command: 'echo hi', cwd: '/tmp', pid: 4323, startedAt: 0, state: 'running', output: '' }));
-  const settled = new Promise(resolve => setTimeout(() => resolve({ status: 'completed', exitCode: 0, stdout: 'late', stderr: '' }), 60_050));
+  const settled = new Promise(resolve => setTimeout(() => resolve({ status: 'completed', exitCode: 0, stdout: 'late', stderr: '' }),
+    FOREGROUND_PROMOTION_DELAY_MS - 1));
   const service = { startCommand: () => ({ handle: { pid: 4323, onOutput: () => () => {}, detach, kill: async () => {}, result: settled },
     result: settled }), runCommand: vi.fn() } as unknown as ExecutionService;
   const background = { adopt, promote, start: vi.fn(), list: () => [], get: () => undefined, stop: async () => false, onEnded: () => () => {} } as unknown as BackgroundRunner;
@@ -47,11 +53,35 @@ it('reports the result when the command settles before promotion', async () => {
   const context = { workspaceRoot: '/tmp', cwd: '/tmp', sessionId: 's', background, onOutput: () => {} } as unknown as ToolExecutionContext;
   const pending = bash.execute({ command: 'echo hi' }, context);
   await Promise.resolve();
-  await vi.advanceTimersByTimeAsync(60_050);
+  await vi.advanceTimersByTimeAsync(FOREGROUND_PROMOTION_DELAY_MS - 1);
+  expect(promote).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1);
   const result = await pending;
-  expect(promote).toHaveBeenCalledWith('task-3');
+  expect(promote).not.toHaveBeenCalled();
   expect(result.success).toBe(true);
   expect(result.output).toContain('late');
+});
+
+it('keeps an explicitly timed command in the foreground', async () => {
+  const runCommand = vi.fn(async () => ({ status: 'completed' as const, exitCode: 0,
+    stdout: 'settled', stderr: '' }));
+  const startCommand = vi.fn();
+  const adopt = vi.fn();
+  const promote = vi.fn();
+  const service = { runCommand, startCommand } as unknown as ExecutionService;
+  const background = { adopt, promote, start: vi.fn(), list: () => [], get: () => undefined, stop: async () => false,
+    onEnded: () => () => {} } as unknown as BackgroundRunner;
+  const bash = createCoreToolRegistry({ executionService: service }).get('bash')!;
+  const context = { workspaceRoot: '/tmp', cwd: '/tmp', sessionId: 's', background, onOutput: () => {} } as unknown as ToolExecutionContext;
+
+  const result = await bash.execute({ command: 'echo hi', timeout: 12 }, context);
+
+  expect(runCommand).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 12_000 }));
+  expect(startCommand).not.toHaveBeenCalled();
+  expect(adopt).not.toHaveBeenCalled();
+  expect(promote).not.toHaveBeenCalled();
+  expect(result.success).toBe(true);
+  expect(result.output).toContain('settled');
 });
 
 it('returns as soon as a new message promotes the command', async () => {
@@ -83,7 +113,7 @@ it('stops the child when promotion is refused at capacity', async () => {
   const context = { workspaceRoot: '/tmp', cwd: '/tmp', sessionId: 's', background, onOutput: () => {} } as unknown as ToolExecutionContext;
   const pending = bash.execute({ command: 'echo hi' }, context);
   await Promise.resolve();
-  await vi.advanceTimersByTimeAsync(60_000);
+  await vi.advanceTimersByTimeAsync(FOREGROUND_PROMOTION_DELAY_MS);
   const result = await pending;
   expect(kill).toHaveBeenCalled();
   expect(result.success).toBe(false);

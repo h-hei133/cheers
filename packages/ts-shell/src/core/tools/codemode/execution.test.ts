@@ -95,7 +95,28 @@ describe('actual worker bridge admission', () => {
     expect(result.success, output(result)).toBe(true);
     expect(JSON.parse(output(result).replace(/^Script completed\s*/, ''))).toEqual(['{"value":7}', '{"value":7}', { value: 7 }, '{"value":7}', 'TypeError']);
     expect(executeNestedTool).toHaveBeenCalledOnce();
-    expect(executeNestedTool).toHaveBeenCalledWith('bash', { command: 'fixture a\\ b', timeout: 60 }, 'script-owner/1',
+    expect(executeNestedTool).toHaveBeenCalledWith('bash', { command: 'fixture a\\ b' }, 'script-owner/1',
+      expect.any(AbortSignal), expect.any(Function));
+  });
+
+  it('marks promoted shell output incomplete and preserves the session job identity', async () => {
+    const executeNestedTool = vi.fn(async (): Promise<ToolExecutionResult> => ({ success: true,
+      output: 'Moved to the background as bg_1 after 5 seconds.', metadata: { backgroundJobId: 'bg_1' } }));
+    const tool = scriptTool(new Map([['bash', { name: 'bash', description: 'Inert shell fixture', argsSchema: {},
+      execute: async () => { throw new Error('Host gate bypass'); } }]]));
+    const result = await tool.execute({ code: `
+      const command = $\`fixture\`;
+      let jsonRejected = false;
+      try { await command.json(); } catch (error) { jsonRejected = error.message.includes('incomplete shell output'); }
+      return { text: await command.text(), jsonRejected };
+    ` }, { ...context(), executeNestedTool });
+    expect(result.success, output(result)).toBe(true);
+    expect(JSON.parse(output(result).replace(/^Script completed\s*/, ''))).toEqual({
+      text: 'Moved to the background as bg_1 after 5 seconds.',
+      jsonRejected: true,
+    });
+    expect(executeNestedTool).toHaveBeenCalledOnce();
+    expect(executeNestedTool).toHaveBeenCalledWith('bash', { command: 'fixture' }, 'script-owner/1',
       expect.any(AbortSignal), expect.any(Function));
   });
 

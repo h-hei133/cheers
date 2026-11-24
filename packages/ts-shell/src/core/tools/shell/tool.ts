@@ -15,7 +15,7 @@ export function createShellToolDefinition(executionService: ExecutionService,
       properties: {
         command: { type: 'string', description: 'The shell command line to execute.' },
         timeout: { type: 'number',
-          description: `Optional timeout in seconds. Foreground defaults to ${DEFAULT_COMMAND_TIMEOUT_MS / 1000} seconds; the maximum is ${MAX_COMMAND_TIMEOUT_MS / 1000}. Session-owned background jobs default to 300 seconds and accept 1–300 seconds; unbound legacy background callers refuse an explicit timeout.`,
+          description: `Optional timeout in seconds. Without an explicit timeout, a session-owned foreground command moves to a background job after 5 seconds; callers without job ownership use the ${DEFAULT_COMMAND_TIMEOUT_MS / 1000}-second foreground limit. The maximum is ${MAX_COMMAND_TIMEOUT_MS / 1000} seconds. Session-owned background jobs default to 300 seconds and accept 1–300 seconds; unbound legacy background callers refuse an explicit timeout.`,
         },
         runInBackground: { type: 'boolean',
           description: 'Start the command and return immediately instead of waiting for it. Use it for something that takes longer than this turn should be held open, then read it with taskOutput. The command keeps running if the turn ends.',
