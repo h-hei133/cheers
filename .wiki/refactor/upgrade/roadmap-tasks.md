@@ -1,6 +1,6 @@
 # 2026-11 路线图执行记录
 
-**状态**：Batch 0–4 的本地实现已通过定向验收并分批提交，v0.1.0 公开 Release 已发布。B0.6 中三个 provider 外部连接结果未通过或无法连接；B2.7 完整 JS worker 脱离父 tool 不符合当前持久/审批合同，B3.5 的五秒同进程晋升已实现，“+1 人类槽”建议不适用。
+**状态**：Batch 0–4 的可发布范围已通过定向验收并分批提交，v0.1.0 已发布；包含五秒 job 晋升的 v0.1.1 正在做标签发布验收。B0.6 中三个 provider 外部连接结果未通过或无法连接；完整 JS worker 脱离父 tool 与额外 agent slot 经核实不适用。
 **任务范围**：核实并执行 `.wiki/wiki/references/codex-and-frontier-gap-audit-2026-11.md` 与 `.wiki/wiki/references/cheers-next-phase-roadmap-2026-11.md` 中的后续批次。
 **基线**：2026-11-23，源码提交 `f65ba979`。
 
@@ -17,7 +17,7 @@
 | Batch 1 | Linux 本地验收通过，已提交 | 请求前缀、工具发现、缓存 usage/状态、Responses 摘要前缀复用、Bedrock cachePoint 和 capability 反转均通过定向测试。提交 `ab7312f3` 与接线补充 `976847c3`。真实 BaiLu cache-read 为 0、384、640 tokens，但无输入 token 分母，未报告命中率百分比。 |
 | Batch 2 | Linux 本地验收通过，shell 长命令晋升补充已提交 | 嵌套调用 fail-closed、拒绝终止分类、逐调用审批、审批等待暂停、receipt/diff、代码折叠和 PostToolUse 脱敏通过定向测试。Code Mode shell tag 的长 bash 命令现复用同一 PID 的 session job 晋升。完整 JS worker 仍由父 tool 持有，不转入新生命周期。 |
 | Batch 3 | 五秒同进程晋升已实现并通过定向验收 | 命令面板、主题预览入口、并排 diff 换行、Tab/Alt+Up、首次连接引导、受控 LSP 候选、重复调用提醒、job 观察及 stream idle watchdog 原实现已验收。当前晋升改动通过 33 项聚焦测试与 Linux 编译/单文件 build；新 agent 并发槽由现有输入/任务 owner 反证为不适用。 |
-| Batch 4 | v0.1.0 公开 Release 已发布 | README、INSTALL、发布 workflow、审批式外部 workspace 架构初始化及 MIT LICENSE 已实现。根与 shell 包 SPDX 为 MIT，版权信息为 `Copyright (c) 2026 h-hei133`。固定包为 `ea5054127f4679a8939a747c6495e0df8534b70e`，pinned judge `proven`。原 Batch 4 实现提交 `099b661`；复现性修复 `fb567fb7`；许可证和发布收尾 `e1719fdb`；标签 `v0.1.0`。 |
+| Batch 4 | v0.1.0 已发布；v0.1.1 纳入 job 晋升收尾 | README、INSTALL、发布 workflow、审批式外部 workspace 架构初始化及 MIT LICENSE 已实现。根与 shell 包 SPDX 为 MIT，版权信息为 `Copyright (c) 2026 h-hei133`。固定包为 `ea5054127f4679a8939a747c6495e0df8534b70e`，pinned judge `proven`。原 Batch 4 实现提交 `099b661`；复现性修复 `fb567fb7`；许可证收尾 `e1719fdb`；首个标签 `v0.1.0`。 |
 
 ## 批次 0 验收清单
 
@@ -176,6 +176,7 @@
 - 复用 `ExecutionService.startCommand`、`TaskRegistry.adopt/promote`、`LocalJournal` 和现有 permission/sandbox/hook path。未新增领域包、执行器或依赖；S.U.P.E.R 10/10，未计划依赖 0，实际工作量 M。
 - Linux 定向 Vitest 为 3 suites / 33 tests 通过；Biome lint、运行时依赖图、配置消费者、声明、Node floor 门禁通过。TypeScript build 和 Linux 单文件 build 通过，`--version`/`--help` 正常，构建 manifest 为 `fresh`。显式 timeout 反例确认命令仍留在前台；完整 CLI 四模式 PTY smoke 未在这次 5 秒阈值修改后重跑。
 - 用户优先的第三 agent 并发槽经源码反证不适用。完整 JavaScript worker 生命周期脱离父 tool 仍不支持，因为 job journal 没有 worker checkpoint/重连，父 tool 负责 nested approval、RPC drain 与 branch-store commit；不把 shell process 晋升报告成 worker detachment。
+- 五秒晋升改动晚于 `v0.1.0` 标签。依据 patch version 语义，后续将发行 `v0.1.1` 以纳入该功能；已同步根包、shell 包及 lockfile 版本。该版本 Linux build、`--version`、`--help` 通过，等待标签 workflow 验收。
 
 ## 完成及提交规则
 
