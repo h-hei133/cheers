@@ -1,6 +1,6 @@
 {
   "name": "@cheers/ts-shell",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "description": "TypeScript CLI shell and orchestration layer",
   "type": "module",
