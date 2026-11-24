@@ -11,7 +11,8 @@ import { configuredOutputLimit } from '../../provider/request/output.js';
 import { requestSimpleCompletion } from "../../provider/request/completion.js";
 import { loadCatalog } from "../models/catalogStore.js";
 import { resolveRequestShape } from "../models/requestShape.js";
-import { catalogModel, catalogProvider } from "../models/catalog.js";
+import { catalogProvider } from "../models/catalog.js";
+import { resolveModelCost } from '../models/window.js';
 import { providerFetchForEndpoint } from "../../provider/request/fetch.js";
 import { endpointShape } from "../../provider/endpoints/index.js";
 import { classifyProviderFailure, type ProviderFailureClass } from "../../provider/registry/provider.js";
@@ -86,7 +87,7 @@ export async function runBtwCommand(
     const model = resolution.model ?? credential?.model ?? "";
     const shape = resolveRequestShape(catalog, resolution.provider, model, undefined, baseUrl, endpoint);
     const attribution = captureUsageAttribution({ provider: resolution.provider, model, baseUrl: baseUrl ?? '',
-      rates: catalogModel(catalog, resolution.provider, model, baseUrl)?.cost });
+      rates: resolveModelCost(catalog, resolution.provider, model, baseUrl, { endpoint, serviceTier }) });
     const usageInput = endpointShape(endpoint).usageInput;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), SIDE_QUESTION_TIMEOUT_MS);

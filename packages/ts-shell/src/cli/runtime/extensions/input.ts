@@ -45,14 +45,15 @@ export async function prepareExtensionInput(context: ShellRuntimeContext, reques
     const {text, images, handled, hooks} = await reduceInput(request, cwd, runners, check, () => prepareHooks(request, operation, audit));
     if (handled) return Object.freeze({status:'handled', check});
     let published = false;
-    const publication = () => {
+    const publication = (requestEnvironment?: string) => {
       if (published) throw new InputPreparationError();
       checkSource();
       const current = store.load(id), turns = current.turns, last = turns.at(-1);
       const content = images?.length ? [{type:'text', text}, ...images] : text;
+      const metadata = requestEnvironment === undefined ? request.metadata : { ...request.metadata, requestEnvironment };
       if (current.createdAt !== createdAt || current.projectRoot !== sessionRoot || current.pendingPrompt !== text
         || turns.length !== storedSession.turns.length + 1 || !sameValue(turns.slice(0, -1), storedSession.turns)
-        || last?.role !== 'user' || !sameValue(last.content, content) || !sameValue(last.metadata, request.metadata)) throw new InputPreparationError();
+        || last?.role !== 'user' || !sameValue(last.content, content) || !sameValue(last.metadata, metadata)) throw new InputPreparationError();
       saved = captureSessionTransition(layout)(current);
       published = true; check();
     };
